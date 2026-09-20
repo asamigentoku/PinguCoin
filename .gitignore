@@ -1,0 +1,71 @@
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# === Environment / secrets ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!infrastructure/**/*.example.key
+
+# === Node.js (apps/*, potential JS/TS services) ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+.turbo/
+.cache/
+coverage/
+
+# === Java / Kotlin (server/*) ===
+target/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+.gradle/
+gradle-app.setting
+!gradlew
+!gradlew.bat
+
+# === Python (worker) ===
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# === Terraform ===
+infrastructure/terraform/**/.terraform/
+infrastructure/terraform/**/*.tfstate
+infrastructure/terraform/**/*.tfstate.*
+infrastructure/terraform/**/*.tfvars
+!infrastructure/terraform/**/*.tfvars.example
+infrastructure/terraform/**/.terraform.lock.hcl
+infrastructure/terraform/**/crash.log
+
+# === Docker ===
+infrastructure/docker/**/*.env
+
+# === Kubernetes (avoid committing generated/secret manifests) ===
+infrastructure/kubernetes/**/secrets.yaml
+infrastructure/kubernetes/**/*.secret.yaml
+
+# === Logs ===
+*.log
+logs/
