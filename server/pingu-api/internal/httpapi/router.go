@@ -21,14 +21,18 @@ import (
 	"github.com/asamigentoku/PinguCoin/server/pingu-api/internal/repository"
 )
 
+// APIVersionPrefix は公開APIエンドポイントに共通で付与するバージョンプレフィックス。
+// GraphQL Playground(開発用UI)のみ、API自体ではないためプレフィックス外の "/" に置く。
+const APIVersionPrefix = "/api/v1"
+
 // NewRouter は以下のエンドポイントを1つのhttp.Handlerにまとめる。
 // ログイン/ログアウトはClerk(フロントエンド)側で完結するため、pingu-apiにRESTのauthエンドポイントは無い。
 // 各リクエストはAuthorizationヘッダのClerkセッショントークンをWithOptionalAuthが検証する。
-//   - GET  /            : GraphQL Playground(開発用)
-//   - POST /graphql      : GraphQL(商品・ユーザーのCRUD)
-//   - POST /orders       : 商品購入(注文API)
-//   - GET  /orders       : 自分の注文一覧
-//   - GET  /orders/{id}  : 注文詳細
+//   - GET  /                    : GraphQL Playground(開発用)
+//   - POST /api/v1/graphql      : GraphQL(商品・ユーザーのCRUD)
+//   - POST /api/v1/orders       : 商品購入(注文API)
+//   - GET  /api/v1/orders       : 自分の注文一覧
+//   - GET  /api/v1/orders/{id}  : 注文詳細
 func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository) http.Handler {
 	//muxはapp_router
 	mux := http.NewServeMux()
@@ -42,13 +46,13 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	graphqlServer.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
 	graphqlServer.SetErrorPresenter(newErrorPresenter(logger))
 
-	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", "/graphql"))
-	mux.Handle("/graphql", graphqlServer)
+	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", APIVersionPrefix+"/graphql"))
+	mux.Handle(APIVersionPrefix+"/graphql", graphqlServer)
 
 	orderHandler := NewOrderHandler(orcan, payment, orderRepo)
-	mux.HandleFunc("POST /orders", orderHandler.CreateOrder)
-	mux.HandleFunc("GET /orders", orderHandler.ListOrders)
-	mux.HandleFunc("GET /orders/{id}", orderHandler.GetOrder)
+	mux.HandleFunc("POST "+APIVersionPrefix+"/orders", orderHandler.CreateOrder)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/orders", orderHandler.ListOrders)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", orderHandler.GetOrder)
 
 	return WithLogging(logger)(WithOptionalAuth(orcan)(mux))
 }

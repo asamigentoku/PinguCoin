@@ -61,7 +61,7 @@ func toOrderResponse(order *model.Order) orderResponse {
 	}
 }
 
-// CreateOrder は POST /orders。ログイン中ユーザーが買い手(user_id)となる。
+// CreateOrder は POST /api/v1/orders。ログイン中ユーザーが買い手(user_id)となる。
 // 1) orcan-apiで商品を確認 → 2) payment-apiで決済 → 3) 注文としてDBに記録、の順で処理する。
 func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
@@ -125,7 +125,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusCreated, toOrderResponse(order))
 }
 
-// ListOrders は GET /orders。ログイン中ユーザー自身の注文一覧を返す。
+// ListOrders は GET /api/v1/orders。ログイン中ユーザー自身の注文一覧を返す。
 func (handler *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
@@ -146,7 +146,7 @@ func (handler *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, response)
 }
 
-// GetOrder は GET /orders/{id}。他ユーザーの注文は(存在を推測されないよう)404として扱う。
+// GetOrder は GET /api/v1/orders/{id}。他ユーザーの注文は(存在を推測されないよう)404として扱う。
 func (handler *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
