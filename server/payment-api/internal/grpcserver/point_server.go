@@ -28,14 +28,14 @@ func NewPointServer(points *repository.PointRepository) *PointServer {
 
 // GetPointAccount は残高を取得する。一度も取引がないユーザーはレコードが存在しないため、
 // その場合はエラーにせず残高0の口座として返す。
-func (s *PointServer) GetPointAccount(ctx context.Context, req *pb.GetPointAccountRequest) (*pb.GetPointAccountResponse, error) {
-	if req.GetUserId() == 0 {
+func (server *PointServer) GetPointAccount(ctx context.Context, request *pb.GetPointAccountRequest) (*pb.GetPointAccountResponse, error) {
+	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
 
-	account, err := s.points.GetAccount(uint(req.GetUserId()))
+	account, err := server.points.GetAccount(uint(request.GetUserId()))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		account = &model.PointAccount{UserID: uint(req.GetUserId()), Balance: 0}
+		account = &model.PointAccount{UserID: uint(request.GetUserId()), Balance: 0}
 	} else if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -43,60 +43,60 @@ func (s *PointServer) GetPointAccount(ctx context.Context, req *pb.GetPointAccou
 }
 
 // ListPointTransactions はポイント増減履歴を返す。user_id を指定するとそのユーザーに絞り込む。
-func (s *PointServer) ListPointTransactions(ctx context.Context, req *pb.ListPointTransactionsRequest) (*pb.ListPointTransactionsResponse, error) {
+func (server *PointServer) ListPointTransactions(ctx context.Context, request *pb.ListPointTransactionsRequest) (*pb.ListPointTransactionsResponse, error) {
 	var userID uint
-	if req.UserId != nil {
-		userID = uint(req.GetUserId())
+	if request.UserId != nil {
+		userID = uint(request.GetUserId())
 	}
 
-	transactions, err := s.points.ListTransactions(userID)
+	transactions, err := server.points.ListTransactions(userID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListPointTransactionsResponse{}
+	response := &pb.ListPointTransactionsResponse{}
 	for i := range transactions {
-		resp.Transactions = append(resp.Transactions, toProtoPointTransaction(&transactions[i]))
+		response.Transactions = append(response.Transactions, toProtoPointTransaction(&transactions[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
 // CreditPoints は決済連携以外の手動付与(例: キャンペーン)。
-func (s *PointServer) CreditPoints(ctx context.Context, req *pb.CreditPointsRequest) (*pb.CreditPointsResponse, error) {
-	if req.GetUserId() == 0 {
+func (server *PointServer) CreditPoints(ctx context.Context, request *pb.CreditPointsRequest) (*pb.CreditPointsResponse, error) {
+	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
-	if req.GetAmount() <= 0 {
+	if request.GetAmount() <= 0 {
 		return nil, apperr.InvalidArgument("amount must be greater than zero")
 	}
-	if strings.TrimSpace(req.GetReason()) == "" {
+	if strings.TrimSpace(request.GetReason()) == "" {
 		return nil, apperr.InvalidArgument("reason is required")
 	}
 
-	transaction, err := s.points.AdjustAtomic(uint(req.GetUserId()), req.GetAmount(), model.PointTransactionTypeCredit, req.GetReason(), nil)
+	transaction, err := server.points.AdjustAtomic(uint(request.GetUserId()), request.GetAmount(), model.PointTransactionTypeCredit, request.GetReason(), nil)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
 	return &pb.CreditPointsResponse{
 		Transaction: toProtoPointTransaction(transaction),
-		Account:     &pb.PointAccount{UserId: req.GetUserId(), Balance: transaction.BalanceAfter},
+		Account:     &pb.PointAccount{UserId: request.GetUserId(), Balance: transaction.BalanceAfter},
 	}, nil
 }
 
 // DebitPoints は決済連携以外の手動消費(例: 運用による調整)。
-func (s *PointServer) DebitPoints(ctx context.Context, req *pb.DebitPointsRequest) (*pb.DebitPointsResponse, error) {
-	if req.GetUserId() == 0 {
+func (server *PointServer) DebitPoints(ctx context.Context, request *pb.DebitPointsRequest) (*pb.DebitPointsResponse, error) {
+	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
-	if req.GetAmount() <= 0 {
+	if request.GetAmount() <= 0 {
 		return nil, apperr.InvalidArgument("amount must be greater than zero")
 	}
-	if strings.TrimSpace(req.GetReason()) == "" {
+	if strings.TrimSpace(request.GetReason()) == "" {
 		return nil, apperr.InvalidArgument("reason is required")
 	}
 
-	transaction, err := s.points.AdjustAtomic(uint(req.GetUserId()), -req.GetAmount(), model.PointTransactionTypeDebit, req.GetReason(), nil)
+	transaction, err := server.points.AdjustAtomic(uint(request.GetUserId()), -request.GetAmount(), model.PointTransactionTypeDebit, request.GetReason(), nil)
 	if err != nil {
 		if errors.Is(err, repository.ErrInsufficientPoints) {
 			return nil, apperr.FailedPrecondition("insufficient points")
@@ -106,34 +106,34 @@ func (s *PointServer) DebitPoints(ctx context.Context, req *pb.DebitPointsReques
 
 	return &pb.DebitPointsResponse{
 		Transaction: toProtoPointTransaction(transaction),
-		Account:     &pb.PointAccount{UserId: req.GetUserId(), Balance: transaction.BalanceAfter},
+		Account:     &pb.PointAccount{UserId: request.GetUserId(), Balance: transaction.BalanceAfter},
 	}, nil
 }
 
-func toProtoPointAccount(a *model.PointAccount) *pb.PointAccount {
-	p := &pb.PointAccount{
-		UserId:  uint32(a.UserID),
-		Balance: a.Balance,
+func toProtoPointAccount(account *model.PointAccount) *pb.PointAccount {
+	protoAccount := &pb.PointAccount{
+		UserId:  uint32(account.UserID),
+		Balance: account.Balance,
 	}
-	if !a.UpdatedAt.IsZero() {
-		p.UpdatedAt = timestamppb.New(a.UpdatedAt)
+	if !account.UpdatedAt.IsZero() {
+		protoAccount.UpdatedAt = timestamppb.New(account.UpdatedAt)
 	}
-	return p
+	return protoAccount
 }
 
-func toProtoPointTransaction(t *model.PointTransaction) *pb.PointTransaction {
-	p := &pb.PointTransaction{
-		Id:           uint32(t.ID),
-		UserId:       uint32(t.UserID),
-		Amount:       t.Amount,
-		Type:         t.Type,
-		Reason:       t.Reason,
-		BalanceAfter: t.BalanceAfter,
-		CreatedAt:    timestamppb.New(t.CreatedAt),
+func toProtoPointTransaction(transaction *model.PointTransaction) *pb.PointTransaction {
+	protoTransaction := &pb.PointTransaction{
+		Id:           uint32(transaction.ID),
+		UserId:       uint32(transaction.UserID),
+		Amount:       transaction.Amount,
+		Type:         transaction.Type,
+		Reason:       transaction.Reason,
+		BalanceAfter: transaction.BalanceAfter,
+		CreatedAt:    timestamppb.New(transaction.CreatedAt),
 	}
-	if t.PaymentID != nil {
-		v := uint32(*t.PaymentID)
-		p.PaymentId = &v
+	if transaction.PaymentID != nil {
+		paymentID := uint32(*transaction.PaymentID)
+		protoTransaction.PaymentId = &paymentID
 	}
-	return p
+	return protoTransaction
 }

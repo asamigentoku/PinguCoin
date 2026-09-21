@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	lis, err := net.Listen("tcp", ":"+cfg.Port)
+	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
 		logger.Error("failed to listen", slog.Any("error", err))
 		os.Exit(1)
@@ -56,7 +56,7 @@ func main() {
 	reflection.Register(server)
 
 	logger.Info("payment-api (gRPC) listening", slog.String("port", cfg.Port))
-	if err := server.Serve(lis); err != nil {
+	if err := server.Serve(listener); err != nil {
 		logger.Error("failed to serve", slog.Any("error", err))
 		os.Exit(1)
 	}

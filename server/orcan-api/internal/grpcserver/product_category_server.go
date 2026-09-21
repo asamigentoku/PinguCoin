@@ -34,22 +34,22 @@ func NewProductCategoryServer(repo *repository.ProductCategoryRepository) *Produ
 // 生のDBエラーをクライアントに漏らさない(ログには internal/interceptor.Logging が出す)。
 
 // ListProductCategories はカテゴリ一覧を返す(protoの ListProductCategories RPC の実装)。
-func (s *ProductCategoryServer) ListProductCategories(ctx context.Context, req *pb.ListProductCategoriesRequest) (*pb.ListProductCategoriesResponse, error) {
-	categories, err := s.repo.FindAll()
+func (server *ProductCategoryServer) ListProductCategories(ctx context.Context, request *pb.ListProductCategoriesRequest) (*pb.ListProductCategoriesResponse, error) {
+	categories, err := server.repo.FindAll()
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListProductCategoriesResponse{}
+	response := &pb.ListProductCategoriesResponse{}
 	for i := range categories {
-		resp.Categories = append(resp.Categories, toProtoCategory(&categories[i]))
+		response.Categories = append(response.Categories, toProtoCategory(&categories[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
 // GetProductCategory はIDを1件指定してカテゴリを取得する。
-func (s *ProductCategoryServer) GetProductCategory(ctx context.Context, req *pb.GetProductCategoryRequest) (*pb.GetProductCategoryResponse, error) {
-	category, err := s.repo.FindByID(uint(req.GetId()))
+func (server *ProductCategoryServer) GetProductCategory(ctx context.Context, request *pb.GetProductCategoryRequest) (*pb.GetProductCategoryResponse, error) {
+	category, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product category", err)
 	}
@@ -57,8 +57,8 @@ func (s *ProductCategoryServer) GetProductCategory(ctx context.Context, req *pb.
 }
 
 // CreateProductCategory は新規カテゴリを1件作成する。
-func (s *ProductCategoryServer) CreateProductCategory(ctx context.Context, req *pb.CreateProductCategoryRequest) (*pb.CreateProductCategoryResponse, error) {
-	name := strings.TrimSpace(req.GetName())
+func (server *ProductCategoryServer) CreateProductCategory(ctx context.Context, request *pb.CreateProductCategoryRequest) (*pb.CreateProductCategoryResponse, error) {
+	name := strings.TrimSpace(request.GetName())
 	if name == "" {
 		return nil, apperr.InvalidArgument("name is required")
 	}
@@ -68,48 +68,48 @@ func (s *ProductCategoryServer) CreateProductCategory(ctx context.Context, req *
 	}
 	// parent_id は proto側で `optional` にしているため、
 	// 「0」と「未指定」を区別できるようポインタ(*uint32)で来る。
-	// req.ParentId != nil で「クライアントが値を送ってきたかどうか」を判定する。
-	if req.ParentId != nil {
-		v := uint(req.GetParentId())
-		category.ParentID = &v
+	// request.ParentId != nil で「クライアントが値を送ってきたかどうか」を判定する。
+	if request.ParentId != nil {
+		parentID := uint(request.GetParentId())
+		category.ParentID = &parentID
 	}
 
-	if err := s.repo.Create(category); err != nil {
+	if err := server.repo.Create(category); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreateProductCategoryResponse{Category: toProtoCategory(category)}, nil
 }
 
 // UpdateProductCategory は既存カテゴリを更新する(いわゆるPUT相当、全項目上書き)。
-func (s *ProductCategoryServer) UpdateProductCategory(ctx context.Context, req *pb.UpdateProductCategoryRequest) (*pb.UpdateProductCategoryResponse, error) {
-	name := strings.TrimSpace(req.GetName())
+func (server *ProductCategoryServer) UpdateProductCategory(ctx context.Context, request *pb.UpdateProductCategoryRequest) (*pb.UpdateProductCategoryResponse, error) {
+	name := strings.TrimSpace(request.GetName())
 	if name == "" {
 		return nil, apperr.InvalidArgument("name is required")
 	}
 
-	category, err := s.repo.FindByID(uint(req.GetId()))
+	category, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product category", err)
 	}
 
 	category.Name = name
-	if req.ParentId != nil {
-		v := uint(req.GetParentId())
-		category.ParentID = &v
+	if request.ParentId != nil {
+		parentID := uint(request.GetParentId())
+		category.ParentID = &parentID
 	} else {
 		// 明示的にnilを送られた場合は「親カテゴリなし(ルート)」に更新する。
 		category.ParentID = nil
 	}
 
-	if err := s.repo.Update(category); err != nil {
+	if err := server.repo.Update(category); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.UpdateProductCategoryResponse{Category: toProtoCategory(category)}, nil
 }
 
 // DeleteProductCategory はIDを指定してカテゴリを削除する。
-func (s *ProductCategoryServer) DeleteProductCategory(ctx context.Context, req *pb.DeleteProductCategoryRequest) (*pb.DeleteProductCategoryResponse, error) {
-	if err := s.repo.Delete(uint(req.GetId())); err != nil {
+func (server *ProductCategoryServer) DeleteProductCategory(ctx context.Context, request *pb.DeleteProductCategoryRequest) (*pb.DeleteProductCategoryResponse, error) {
+	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	// レスポンスにデータが不要なRPCでも、protoの都合上「空のメッセージ」を返す必要がある。
@@ -119,16 +119,16 @@ func (s *ProductCategoryServer) DeleteProductCategory(ctx context.Context, req *
 // toProtoCategory はDBのモデル(model.ProductCategory)を
 // gRPCでやり取りするためのメッセージ(pb.ProductCategory)に変換するヘルパー。
 // DBの型とprotoの型は別物なので、RPCの戻り値を作る際は必ずこの変換を通す。
-func toProtoCategory(c *model.ProductCategory) *pb.ProductCategory {
-	p := &pb.ProductCategory{
-		Id:        uint32(c.ID),
-		Name:      c.Name,
-		CreatedAt: timestamppb.New(c.CreatedAt), // time.Time → protobuf標準のTimestamp型へ変換
-		UpdatedAt: timestamppb.New(c.UpdatedAt),
+func toProtoCategory(category *model.ProductCategory) *pb.ProductCategory {
+	protoCategory := &pb.ProductCategory{
+		Id:        uint32(category.ID),
+		Name:      category.Name,
+		CreatedAt: timestamppb.New(category.CreatedAt), // time.Time → protobuf標準のTimestamp型へ変換
+		UpdatedAt: timestamppb.New(category.UpdatedAt),
 	}
-	if c.ParentID != nil {
-		v := uint32(*c.ParentID)
-		p.ParentId = &v
+	if category.ParentID != nil {
+		parentID := uint32(*category.ParentID)
+		protoCategory.ParentId = &parentID
 	}
-	return p
+	return protoCategory
 }

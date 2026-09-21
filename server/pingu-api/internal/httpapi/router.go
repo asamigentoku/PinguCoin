@@ -30,19 +30,20 @@ import (
 //   - GET  /orders       : 自分の注文一覧
 //   - GET  /orders/{id}  : 注文詳細
 func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository) http.Handler {
+	//muxはapp_router
 	mux := http.NewServeMux()
 
-	gqlSrv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{Orcan: orcan}}))
-	gqlSrv.AddTransport(transport.Options{})
-	gqlSrv.AddTransport(transport.GET{})
-	gqlSrv.AddTransport(transport.POST{})
-	gqlSrv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	gqlSrv.Use(extension.Introspection{})
-	gqlSrv.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
-	gqlSrv.SetErrorPresenter(newErrorPresenter(logger))
+	graphqlServer := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{Orcan: orcan}}))
+	graphqlServer.AddTransport(transport.Options{})
+	graphqlServer.AddTransport(transport.GET{})
+	graphqlServer.AddTransport(transport.POST{})
+	graphqlServer.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	graphqlServer.Use(extension.Introspection{})
+	graphqlServer.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
+	graphqlServer.SetErrorPresenter(newErrorPresenter(logger))
 
 	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", "/graphql"))
-	mux.Handle("/graphql", gqlSrv)
+	mux.Handle("/graphql", graphqlServer)
 
 	orderHandler := NewOrderHandler(orcan, payment, orderRepo)
 	mux.HandleFunc("POST /orders", orderHandler.CreateOrder)

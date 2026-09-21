@@ -23,87 +23,87 @@ func NewProductDetailServer(repo *repository.ProductDetailRepository) *ProductDe
 }
 
 // ListProductDetails は詳細一覧を返す。product_id を指定するとその商品の詳細だけに絞り込む。
-func (s *ProductDetailServer) ListProductDetails(ctx context.Context, req *pb.ListProductDetailsRequest) (*pb.ListProductDetailsResponse, error) {
+func (server *ProductDetailServer) ListProductDetails(ctx context.Context, request *pb.ListProductDetailsRequest) (*pb.ListProductDetailsResponse, error) {
 	var productID uint
-	if req.ProductId != nil {
-		productID = uint(req.GetProductId())
+	if request.ProductId != nil {
+		productID = uint(request.GetProductId())
 	}
 
-	details, err := s.repo.FindAll(productID)
+	details, err := server.repo.FindAll(productID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListProductDetailsResponse{}
+	response := &pb.ListProductDetailsResponse{}
 	for i := range details {
-		resp.Details = append(resp.Details, toProtoDetail(&details[i]))
+		response.Details = append(response.Details, toProtoDetail(&details[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
-func (s *ProductDetailServer) GetProductDetail(ctx context.Context, req *pb.GetProductDetailRequest) (*pb.GetProductDetailResponse, error) {
-	detail, err := s.repo.FindByID(uint(req.GetId()))
+func (server *ProductDetailServer) GetProductDetail(ctx context.Context, request *pb.GetProductDetailRequest) (*pb.GetProductDetailResponse, error) {
+	detail, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product detail", err)
 	}
 	return &pb.GetProductDetailResponse{Detail: toProtoDetail(detail)}, nil
 }
 
-func (s *ProductDetailServer) CreateProductDetail(ctx context.Context, req *pb.CreateProductDetailRequest) (*pb.CreateProductDetailResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductDetailServer) CreateProductDetail(ctx context.Context, request *pb.CreateProductDetailRequest) (*pb.CreateProductDetailResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
 
 	detail := &model.ProductDetail{
-		ProductID:   uint(req.GetProductId()),
-		ImageURL:    req.GetImageUrl(),
-		Description: req.GetDescription(),
-		SortOrder:   int(req.GetSortOrder()),
+		ProductID:   uint(request.GetProductId()),
+		ImageURL:    request.GetImageUrl(),
+		Description: request.GetDescription(),
+		SortOrder:   int(request.GetSortOrder()),
 	}
 
-	if err := s.repo.Create(detail); err != nil {
+	if err := server.repo.Create(detail); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreateProductDetailResponse{Detail: toProtoDetail(detail)}, nil
 }
 
-func (s *ProductDetailServer) UpdateProductDetail(ctx context.Context, req *pb.UpdateProductDetailRequest) (*pb.UpdateProductDetailResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductDetailServer) UpdateProductDetail(ctx context.Context, request *pb.UpdateProductDetailRequest) (*pb.UpdateProductDetailResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
 
-	detail, err := s.repo.FindByID(uint(req.GetId()))
+	detail, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product detail", err)
 	}
 
-	detail.ProductID = uint(req.GetProductId())
-	detail.ImageURL = req.GetImageUrl()
-	detail.Description = req.GetDescription()
-	detail.SortOrder = int(req.GetSortOrder())
+	detail.ProductID = uint(request.GetProductId())
+	detail.ImageURL = request.GetImageUrl()
+	detail.Description = request.GetDescription()
+	detail.SortOrder = int(request.GetSortOrder())
 
-	if err := s.repo.Update(detail); err != nil {
+	if err := server.repo.Update(detail); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.UpdateProductDetailResponse{Detail: toProtoDetail(detail)}, nil
 }
 
-func (s *ProductDetailServer) DeleteProductDetail(ctx context.Context, req *pb.DeleteProductDetailRequest) (*pb.DeleteProductDetailResponse, error) {
-	if err := s.repo.Delete(uint(req.GetId())); err != nil {
+func (server *ProductDetailServer) DeleteProductDetail(ctx context.Context, request *pb.DeleteProductDetailRequest) (*pb.DeleteProductDetailResponse, error) {
+	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.DeleteProductDetailResponse{}, nil
 }
 
 // toProtoDetail はDBのmodel.ProductDetailをレスポンス用のpb.ProductDetailに変換する。
-func toProtoDetail(d *model.ProductDetail) *pb.ProductDetail {
+func toProtoDetail(detail *model.ProductDetail) *pb.ProductDetail {
 	return &pb.ProductDetail{
-		Id:          uint32(d.ID),
-		ProductId:   uint32(d.ProductID),
-		ImageUrl:    d.ImageURL,
-		Description: d.Description,
-		SortOrder:   int32(d.SortOrder),
-		CreatedAt:   timestamppb.New(d.CreatedAt),
-		UpdatedAt:   timestamppb.New(d.UpdatedAt),
+		Id:          uint32(detail.ID),
+		ProductId:   uint32(detail.ProductID),
+		ImageUrl:    detail.ImageURL,
+		Description: detail.Description,
+		SortOrder:   int32(detail.SortOrder),
+		CreatedAt:   timestamppb.New(detail.CreatedAt),
+		UpdatedAt:   timestamppb.New(detail.UpdatedAt),
 	}
 }

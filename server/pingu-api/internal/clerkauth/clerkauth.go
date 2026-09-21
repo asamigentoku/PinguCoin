@@ -33,26 +33,26 @@ func VerifySessionToken(ctx context.Context, token string) (string, error) {
 // orcan-apiにまだプロフィールが無い(初回アクセス)場合の作成時のみ呼ぶ
 // (毎リクエストでClerk APIを叩かないように、既存ユーザーの解決はorcan-api側のDBで完結させる)。
 func FetchProfile(ctx context.Context, clerkUserID string) (email, name string, err error) {
-	u, err := user.Get(ctx, clerkUserID)
+	clerkUser, err := user.Get(ctx, clerkUserID)
 	if err != nil {
 		return "", "", err
 	}
 
-	if u.PrimaryEmailAddressID != nil {
-		for _, e := range u.EmailAddresses {
-			if e.ID == *u.PrimaryEmailAddressID {
-				email = e.EmailAddress
+	if clerkUser.PrimaryEmailAddressID != nil {
+		for _, emailAddr := range clerkUser.EmailAddresses {
+			if emailAddr.ID == *clerkUser.PrimaryEmailAddressID {
+				email = emailAddr.EmailAddress
 				break
 			}
 		}
 	}
 
 	var first, last string
-	if u.FirstName != nil {
-		first = *u.FirstName
+	if clerkUser.FirstName != nil {
+		first = *clerkUser.FirstName
 	}
-	if u.LastName != nil {
-		last = *u.LastName
+	if clerkUser.LastName != nil {
+		last = *clerkUser.LastName
 	}
 	name = strings.TrimSpace(strings.TrimSpace(first) + " " + strings.TrimSpace(last))
 

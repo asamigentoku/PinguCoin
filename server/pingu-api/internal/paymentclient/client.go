@@ -27,6 +27,6 @@ func New(addr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Close() error {
-	return c.conn.Close()
+func (client *Client) Close() error {
+	return client.conn.Close()
 }

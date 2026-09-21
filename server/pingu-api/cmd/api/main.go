@@ -44,6 +44,7 @@ func main() {
 		logger.Error("failed to connect payment-api", slog.Any("error", err))
 		os.Exit(1)
 	}
+	//main関数が終了後に実行することを定義
 	defer payment.Close()
 
 	orderRepo := repository.NewOrderRepository(db)

@@ -48,76 +48,76 @@ type orderResponse struct {
 	Status      string `json:"status"`
 }
 
-func toOrderResponse(o *model.Order) orderResponse {
+func toOrderResponse(order *model.Order) orderResponse {
 	return orderResponse{
-		ID:          o.ID,
-		UserID:      o.UserID,
-		ProductID:   o.ProductID,
-		Quantity:    o.Quantity,
-		UnitPrice:   o.UnitPrice,
-		TotalAmount: o.TotalAmount,
-		PaymentID:   o.PaymentID,
-		Status:      o.Status,
+		ID:          order.ID,
+		UserID:      order.UserID,
+		ProductID:   order.ProductID,
+		Quantity:    order.Quantity,
+		UnitPrice:   order.UnitPrice,
+		TotalAmount: order.TotalAmount,
+		PaymentID:   order.PaymentID,
+		Status:      order.Status,
 	}
 }
 
 // CreateOrder は POST /orders。ログイン中ユーザーが買い手(user_id)となる。
 // 1) orcan-apiで商品を確認 → 2) payment-apiで決済 → 3) 注文としてDBに記録、の順で処理する。
-func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
+func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
 		writeError(w, apperr.Unauthenticated("login is required"))
 		return
 	}
 
-	var req createOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var request createOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeError(w, apperr.InvalidArgument("invalid request body"))
 		return
 	}
-	if req.ProductID == 0 {
+	if request.ProductID == 0 {
 		writeError(w, apperr.InvalidArgument("product_id is required"))
 		return
 	}
-	if req.Quantity <= 0 {
-		req.Quantity = 1
+	if request.Quantity <= 0 {
+		request.Quantity = 1
 	}
-	if req.PaymentMethod == "" {
-		req.PaymentMethod = "point"
+	if request.PaymentMethod == "" {
+		request.PaymentMethod = "point"
 	}
 
-	productResp, err := h.orcan.Product.GetProduct(r.Context(), &orcanpb.GetProductRequest{Id: req.ProductID})
+	productResponse, err := handler.orcan.Product.GetProduct(r.Context(), &orcanpb.GetProductRequest{Id: request.ProductID})
 	if err != nil {
 		writeError(w, apperr.FromGRPC(err))
 		return
 	}
-	product := productResp.GetProduct()
+	product := productResponse.GetProduct()
 
-	totalAmount := product.GetPrice() * req.Quantity
+	totalAmount := product.GetPrice() * request.Quantity
 
-	paymentResp, err := h.payment.Payment.CreatePayment(r.Context(), &paymentpb.CreatePaymentRequest{
+	paymentResponse, err := handler.payment.Payment.CreatePayment(r.Context(), &paymentpb.CreatePaymentRequest{
 		UserId:        uint32(claims.UserID),
-		ProductId:     req.ProductID,
+		ProductId:     request.ProductID,
 		Amount:        totalAmount,
 		Currency:      "JPY",
-		PaymentMethod: req.PaymentMethod,
+		PaymentMethod: request.PaymentMethod,
 	})
 	if err != nil {
 		writeError(w, apperr.FromGRPC(err))
 		return
 	}
-	payment := paymentResp.GetPayment()
+	payment := paymentResponse.GetPayment()
 
 	order := &model.Order{
 		UserID:      claims.UserID,
-		ProductID:   uint(req.ProductID),
-		Quantity:    req.Quantity,
+		ProductID:   uint(request.ProductID),
+		Quantity:    request.Quantity,
 		UnitPrice:   product.GetPrice(),
 		TotalAmount: totalAmount,
 		PaymentID:   uint(payment.GetId()),
 		Status:      orderStatusFromPayment(payment.GetStatus()),
 	}
-	if err := h.repo.Create(order); err != nil {
+	if err := handler.repo.Create(order); err != nil {
 		writeError(w, apperr.Internal(err))
 		return
 	}
@@ -126,28 +126,28 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListOrders は GET /orders。ログイン中ユーザー自身の注文一覧を返す。
-func (h *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
+func (handler *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
 		writeError(w, apperr.Unauthenticated("login is required"))
 		return
 	}
 
-	orders, err := h.repo.FindByUser(claims.UserID)
+	orders, err := handler.repo.FindByUser(claims.UserID)
 	if err != nil {
 		writeError(w, apperr.Internal(err))
 		return
 	}
 
-	resp := make([]orderResponse, 0, len(orders))
+	response := make([]orderResponse, 0, len(orders))
 	for i := range orders {
-		resp = append(resp, toOrderResponse(&orders[i]))
+		response = append(response, toOrderResponse(&orders[i]))
 	}
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, response)
 }
 
 // GetOrder は GET /orders/{id}。他ユーザーの注文は(存在を推測されないよう)404として扱う。
-func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
+func (handler *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
 		writeError(w, apperr.Unauthenticated("login is required"))
@@ -160,7 +160,7 @@ func (h *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := h.repo.FindByID(uint(id))
+	order, err := handler.repo.FindByID(uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeError(w, apperr.NotFound("order"))

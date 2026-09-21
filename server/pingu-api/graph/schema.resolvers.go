@@ -15,8 +15,8 @@ import (
 )
 
 // CreateProduct is the resolver for the createProduct field.
-func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
-	resp, err := r.Orcan.Product.CreateProduct(ctx, &orcanpb.CreateProductRequest{
+func (resolver *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
+	response, err := resolver.Orcan.Product.CreateProduct(ctx, &orcanpb.CreateProductRequest{
 		UserId:      uint32(input.UserID),
 		CategoryId:  uint32(input.CategoryID),
 		Name:        input.Name,
@@ -28,12 +28,12 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return productFromPB(resp.GetProduct()), nil
+	return productFromPB(response.GetProduct()), nil
 }
 
 // UpdateProduct is the resolver for the updateProduct field.
-func (r *mutationResolver) UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error) {
-	resp, err := r.Orcan.Product.UpdateProduct(ctx, &orcanpb.UpdateProductRequest{
+func (resolver *mutationResolver) UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error) {
+	response, err := resolver.Orcan.Product.UpdateProduct(ctx, &orcanpb.UpdateProductRequest{
 		Id:          uint32(id),
 		UserId:      uint32(input.UserID),
 		CategoryId:  uint32(input.CategoryID),
@@ -46,19 +46,19 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id int32, input mo
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return productFromPB(resp.GetProduct()), nil
+	return productFromPB(response.GetProduct()), nil
 }
 
 // DeleteProduct is the resolver for the deleteProduct field.
-func (r *mutationResolver) DeleteProduct(ctx context.Context, id int32) (bool, error) {
-	if _, err := r.Orcan.Product.DeleteProduct(ctx, &orcanpb.DeleteProductRequest{Id: uint32(id)}); err != nil {
+func (resolver *mutationResolver) DeleteProduct(ctx context.Context, id int32) (bool, error) {
+	if _, err := resolver.Orcan.Product.DeleteProduct(ctx, &orcanpb.DeleteProductRequest{Id: uint32(id)}); err != nil {
 		return false, apperr.FromGRPC(err)
 	}
 	return true, nil
 }
 
 // UpdateUser is the resolver for the updateUser field。ログイン中の本人のみ更新できる。
-func (r *mutationResolver) UpdateUser(ctx context.Context, id int32, input model.UpdateUserInput) (*model.User, error) {
+func (resolver *mutationResolver) UpdateUser(ctx context.Context, id int32, input model.UpdateUserInput) (*model.User, error) {
 	claims, ok := reqcontext.UserFromContext(ctx)
 	if !ok {
 		return nil, apperr.Unauthenticated("login is required")
@@ -67,87 +67,87 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id int32, input model
 		return nil, apperr.Unauthenticated("cannot update another user")
 	}
 
-	resp, err := r.Orcan.User.UpdateUser(ctx, &orcanpb.UpdateUserRequest{
+	response, err := resolver.Orcan.User.UpdateUser(ctx, &orcanpb.UpdateUserRequest{
 		Id:   uint32(id),
 		Name: input.Name,
 	})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return userFromPB(resp.GetUser()), nil
+	return userFromPB(response.GetUser()), nil
 }
 
 // Products is the resolver for the products field.
-func (r *queryResolver) Products(ctx context.Context, userID *int32) ([]*model.Product, error) {
-	req := &orcanpb.ListProductsRequest{}
+func (resolver *queryResolver) Products(ctx context.Context, userID *int32) ([]*model.Product, error) {
+	request := &orcanpb.ListProductsRequest{}
 	if userID != nil {
-		v := uint32(*userID)
-		req.UserId = &v
+		userIDValue := uint32(*userID)
+		request.UserId = &userIDValue
 	}
 
-	resp, err := r.Orcan.Product.ListProducts(ctx, req)
+	response, err := resolver.Orcan.Product.ListProducts(ctx, request)
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
 
-	products := make([]*model.Product, 0, len(resp.GetProducts()))
-	for _, p := range resp.GetProducts() {
-		products = append(products, productFromPB(p))
+	products := make([]*model.Product, 0, len(response.GetProducts()))
+	for _, product := range response.GetProducts() {
+		products = append(products, productFromPB(product))
 	}
 	return products, nil
 }
 
 // Product is the resolver for the product field.
-func (r *queryResolver) Product(ctx context.Context, id int32) (*model.Product, error) {
-	resp, err := r.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(id)})
+func (resolver *queryResolver) Product(ctx context.Context, id int32) (*model.Product, error) {
+	response, err := resolver.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(id)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return productFromPB(resp.GetProduct()), nil
+	return productFromPB(response.GetProduct()), nil
 }
 
 // Users is the resolver for the users field.
-func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	resp, err := r.Orcan.User.ListUsers(ctx, &orcanpb.ListUsersRequest{})
+func (resolver *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
+	response, err := resolver.Orcan.User.ListUsers(ctx, &orcanpb.ListUsersRequest{})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
 
-	users := make([]*model.User, 0, len(resp.GetUsers()))
-	for _, u := range resp.GetUsers() {
-		users = append(users, userFromPB(u))
+	users := make([]*model.User, 0, len(response.GetUsers()))
+	for _, user := range response.GetUsers() {
+		users = append(users, userFromPB(user))
 	}
 	return users, nil
 }
 
 // User is the resolver for the user field.
-func (r *queryResolver) User(ctx context.Context, id int32) (*model.User, error) {
-	resp, err := r.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(id)})
+func (resolver *queryResolver) User(ctx context.Context, id int32) (*model.User, error) {
+	response, err := resolver.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(id)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return userFromPB(resp.GetUser()), nil
+	return userFromPB(response.GetUser()), nil
 }
 
 // Me is the resolver for the me field.
-func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
+func (resolver *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	claims, ok := reqcontext.UserFromContext(ctx)
 	if !ok {
 		return nil, apperr.Unauthenticated("login is required")
 	}
 
-	resp, err := r.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(claims.UserID)})
+	response, err := resolver.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(claims.UserID)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
-	return userFromPB(resp.GetUser()), nil
+	return userFromPB(response.GetUser()), nil
 }
 
 // Mutation returns MutationResolver implementation.
-func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
+func (resolver *Resolver) Mutation() MutationResolver { return &mutationResolver{resolver} }
 
 // Query returns QueryResolver implementation.
-func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
+func (resolver *Resolver) Query() QueryResolver { return &queryResolver{resolver} }
 
 type (
 	mutationResolver struct{ *Resolver }

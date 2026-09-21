@@ -25,27 +25,27 @@ func NewProductListingServer(repo *repository.ProductListingRepository) *Product
 }
 
 // ListProductListings は出品情報の一覧を返す。product_id を指定するとその商品の出品だけに絞り込む。
-func (s *ProductListingServer) ListProductListings(ctx context.Context, req *pb.ListProductListingsRequest) (*pb.ListProductListingsResponse, error) {
+func (server *ProductListingServer) ListProductListings(ctx context.Context, request *pb.ListProductListingsRequest) (*pb.ListProductListingsResponse, error) {
 	var productID uint
-	if req.ProductId != nil {
-		productID = uint(req.GetProductId())
+	if request.ProductId != nil {
+		productID = uint(request.GetProductId())
 	}
 
-	listings, err := s.repo.FindAll(productID)
+	listings, err := server.repo.FindAll(productID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListProductListingsResponse{}
+	response := &pb.ListProductListingsResponse{}
 	for i := range listings {
-		resp.Listings = append(resp.Listings, toProtoListing(&listings[i]))
+		response.Listings = append(response.Listings, toProtoListing(&listings[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
 // GetProductListing はIDを1件指定して出品情報を取得する。
-func (s *ProductListingServer) GetProductListing(ctx context.Context, req *pb.GetProductListingRequest) (*pb.GetProductListingResponse, error) {
-	listing, err := s.repo.FindByID(uint(req.GetId()))
+func (server *ProductListingServer) GetProductListing(ctx context.Context, request *pb.GetProductListingRequest) (*pb.GetProductListingResponse, error) {
+	listing, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product listing", err)
 	}
@@ -54,27 +54,27 @@ func (s *ProductListingServer) GetProductListing(ctx context.Context, req *pb.Ge
 
 // CreateProductListing は新規出品を1件作成する。
 // listed_at が未指定(nil)なら「今このリクエストが来た時刻」を出品日時として使う。
-func (s *ProductListingServer) CreateProductListing(ctx context.Context, req *pb.CreateProductListingRequest) (*pb.CreateProductListingResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductListingServer) CreateProductListing(ctx context.Context, request *pb.CreateProductListingRequest) (*pb.CreateProductListingResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
-	if req.GetPrice() < 0 {
+	if request.GetPrice() < 0 {
 		return nil, apperr.InvalidArgument("price must not be negative")
 	}
 
 	listedAt := time.Now()
-	if req.GetListedAt() != nil {
-		listedAt = req.GetListedAt().AsTime()
+	if request.GetListedAt() != nil {
+		listedAt = request.GetListedAt().AsTime()
 	}
 
 	listing := &model.ProductListing{
-		ProductID: uint(req.GetProductId()),
-		Price:     req.GetPrice(),
-		Status:    req.GetStatus(),
+		ProductID: uint(request.GetProductId()),
+		Price:     request.GetPrice(),
+		Status:    request.GetStatus(),
 		ListedAt:  listedAt,
 	}
 
-	if err := s.repo.Create(listing); err != nil {
+	if err := server.repo.Create(listing); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreateProductListingResponse{Listing: toProtoListing(listing)}, nil
@@ -82,41 +82,41 @@ func (s *ProductListingServer) CreateProductListing(ctx context.Context, req *pb
 
 // UpdateProductListing は既存の出品情報を更新する。
 // ended_at を指定すると出品終了日時をセットし、未指定に戻すとnil(出品中)に戻す。
-func (s *ProductListingServer) UpdateProductListing(ctx context.Context, req *pb.UpdateProductListingRequest) (*pb.UpdateProductListingResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductListingServer) UpdateProductListing(ctx context.Context, request *pb.UpdateProductListingRequest) (*pb.UpdateProductListingResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
-	if req.GetPrice() < 0 {
+	if request.GetPrice() < 0 {
 		return nil, apperr.InvalidArgument("price must not be negative")
 	}
 
-	listing, err := s.repo.FindByID(uint(req.GetId()))
+	listing, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product listing", err)
 	}
 
-	listing.ProductID = uint(req.GetProductId())
-	listing.Price = req.GetPrice()
-	listing.Status = req.GetStatus()
-	if req.GetListedAt() != nil {
-		listing.ListedAt = req.GetListedAt().AsTime()
+	listing.ProductID = uint(request.GetProductId())
+	listing.Price = request.GetPrice()
+	listing.Status = request.GetStatus()
+	if request.GetListedAt() != nil {
+		listing.ListedAt = request.GetListedAt().AsTime()
 	}
-	if req.GetEndedAt() != nil {
-		endedAt := req.GetEndedAt().AsTime()
+	if request.GetEndedAt() != nil {
+		endedAt := request.GetEndedAt().AsTime()
 		listing.EndedAt = &endedAt
 	} else {
 		listing.EndedAt = nil
 	}
 
-	if err := s.repo.Update(listing); err != nil {
+	if err := server.repo.Update(listing); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.UpdateProductListingResponse{Listing: toProtoListing(listing)}, nil
 }
 
 // DeleteProductListing はIDを指定して出品情報を削除する。
-func (s *ProductListingServer) DeleteProductListing(ctx context.Context, req *pb.DeleteProductListingRequest) (*pb.DeleteProductListingResponse, error) {
-	if err := s.repo.Delete(uint(req.GetId())); err != nil {
+func (server *ProductListingServer) DeleteProductListing(ctx context.Context, request *pb.DeleteProductListingRequest) (*pb.DeleteProductListingResponse, error) {
+	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.DeleteProductListingResponse{}, nil
@@ -124,18 +124,18 @@ func (s *ProductListingServer) DeleteProductListing(ctx context.Context, req *pb
 
 // toProtoListing はDBのmodel.ProductListingをレスポンス用のpb.ProductListingに変換する。
 // EndedAt は *time.Time (未終了ならnil) なので、nilなら変換自体をスキップしてprotoのフィールドもnilにする。
-func toProtoListing(l *model.ProductListing) *pb.ProductListing {
-	p := &pb.ProductListing{
-		Id:        uint32(l.ID),
-		ProductId: uint32(l.ProductID),
-		Price:     l.Price,
-		Status:    l.Status,
-		ListedAt:  timestamppb.New(l.ListedAt),
-		CreatedAt: timestamppb.New(l.CreatedAt),
-		UpdatedAt: timestamppb.New(l.UpdatedAt),
+func toProtoListing(listing *model.ProductListing) *pb.ProductListing {
+	protoListing := &pb.ProductListing{
+		Id:        uint32(listing.ID),
+		ProductId: uint32(listing.ProductID),
+		Price:     listing.Price,
+		Status:    listing.Status,
+		ListedAt:  timestamppb.New(listing.ListedAt),
+		CreatedAt: timestamppb.New(listing.CreatedAt),
+		UpdatedAt: timestamppb.New(listing.UpdatedAt),
 	}
-	if l.EndedAt != nil {
-		p.EndedAt = timestamppb.New(*l.EndedAt)
+	if listing.EndedAt != nil {
+		protoListing.EndedAt = timestamppb.New(*listing.EndedAt)
 	}
-	return p
+	return protoListing
 }

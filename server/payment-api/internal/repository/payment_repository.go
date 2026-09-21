@@ -16,33 +16,33 @@ func NewPaymentRepository(db *gorm.DB) *PaymentRepository {
 
 // WithTx はトランザクション用の *gorm.DB に差し替えた同じRepositoryを返す。
 // point払いの決済のように、ポイント増減と1つのトランザクションにまとめたい場合に使う。
-func (r *PaymentRepository) WithTx(tx *gorm.DB) *PaymentRepository {
+func (repo *PaymentRepository) WithTx(tx *gorm.DB) *PaymentRepository {
 	return &PaymentRepository{db: tx}
 }
 
-func (r *PaymentRepository) Create(p *model.Payment) error {
-	return r.db.Create(p).Error
+func (repo *PaymentRepository) Create(payment *model.Payment) error {
+	return repo.db.Create(payment).Error
 }
 
 // FindAll は決済履歴を返す。userIDを指定するとそのユーザーの決済に絞り込む。
-func (r *PaymentRepository) FindAll(userID uint) ([]model.Payment, error) {
+func (repo *PaymentRepository) FindAll(userID uint) ([]model.Payment, error) {
 	var payments []model.Payment
-	q := r.db.Order("id desc")
+	query := repo.db.Order("id desc")
 	if userID != 0 {
-		q = q.Where("user_id = ?", userID)
+		query = query.Where("user_id = ?", userID)
 	}
-	err := q.Find(&payments).Error
+	err := query.Find(&payments).Error
 	return payments, err
 }
 
-func (r *PaymentRepository) FindByID(id uint) (*model.Payment, error) {
+func (repo *PaymentRepository) FindByID(id uint) (*model.Payment, error) {
 	var payment model.Payment
-	if err := r.db.First(&payment, id).Error; err != nil {
+	if err := repo.db.First(&payment, id).Error; err != nil {
 		return nil, err
 	}
 	return &payment, nil
 }
 
-func (r *PaymentRepository) Update(p *model.Payment) error {
-	return r.db.Save(p).Error
+func (repo *PaymentRepository) Update(payment *model.Payment) error {
+	return repo.db.Save(payment).Error
 }

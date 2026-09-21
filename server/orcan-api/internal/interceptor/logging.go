@@ -19,9 +19,9 @@ import (
 // 各ハンドラー(internal/grpcserver配下)で個別にログを書く必要がないよう、
 // ここ一箇所でリクエスト単位のログを一元的に出す。
 func Logging(logger *slog.Logger) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
-		resp, err := handler(ctx, req)
+		response, err := handler(ctx, request)
 		duration := time.Since(start)
 
 		st, _ := status.FromError(err)
@@ -44,7 +44,7 @@ func Logging(logger *slog.Logger) grpc.UnaryServerInterceptor {
 			logger.LogAttrs(ctx, slog.LevelError, "grpc request failed", attrs...)
 		}
 
-		return resp, err
+		return response, err
 	}
 }
 

@@ -14,32 +14,32 @@ func NewProductDetailRepository(db *gorm.DB) *ProductDetailRepository {
 	return &ProductDetailRepository{db: db}
 }
 
-func (r *ProductDetailRepository) Create(d *model.ProductDetail) error {
-	return r.db.Create(d).Error
+func (repo *ProductDetailRepository) Create(detail *model.ProductDetail) error {
+	return repo.db.Create(detail).Error
 }
 
-func (r *ProductDetailRepository) FindAll(productID uint) ([]model.ProductDetail, error) {
+func (repo *ProductDetailRepository) FindAll(productID uint) ([]model.ProductDetail, error) {
 	var details []model.ProductDetail
-	q := r.db.Order("sort_order, id")
+	query := repo.db.Order("sort_order, id")
 	if productID != 0 {
-		q = q.Where("product_id = ?", productID)
+		query = query.Where("product_id = ?", productID)
 	}
-	err := q.Find(&details).Error
+	err := query.Find(&details).Error
 	return details, err
 }
 
-func (r *ProductDetailRepository) FindByID(id uint) (*model.ProductDetail, error) {
+func (repo *ProductDetailRepository) FindByID(id uint) (*model.ProductDetail, error) {
 	var detail model.ProductDetail
-	if err := r.db.First(&detail, id).Error; err != nil {
+	if err := repo.db.First(&detail, id).Error; err != nil {
 		return nil, err
 	}
 	return &detail, nil
 }
 
-func (r *ProductDetailRepository) Update(d *model.ProductDetail) error {
-	return r.db.Save(d).Error
+func (repo *ProductDetailRepository) Update(detail *model.ProductDetail) error {
+	return repo.db.Save(detail).Error
 }
 
-func (r *ProductDetailRepository) Delete(id uint) error {
-	return r.db.Delete(&model.ProductDetail{}, id).Error
+func (repo *ProductDetailRepository) Delete(id uint) error {
+	return repo.db.Delete(&model.ProductDetail{}, id).Error
 }

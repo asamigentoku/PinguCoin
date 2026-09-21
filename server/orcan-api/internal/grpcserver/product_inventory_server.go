@@ -23,85 +23,85 @@ func NewProductInventoryServer(repo *repository.ProductInventoryRepository) *Pro
 }
 
 // ListProductInventories は在庫一覧を返す(絞り込みなし、全件)。
-func (s *ProductInventoryServer) ListProductInventories(ctx context.Context, req *pb.ListProductInventoriesRequest) (*pb.ListProductInventoriesResponse, error) {
-	inventories, err := s.repo.FindAll()
+func (server *ProductInventoryServer) ListProductInventories(ctx context.Context, request *pb.ListProductInventoriesRequest) (*pb.ListProductInventoriesResponse, error) {
+	inventories, err := server.repo.FindAll()
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListProductInventoriesResponse{}
+	response := &pb.ListProductInventoriesResponse{}
 	for i := range inventories {
-		resp.Inventories = append(resp.Inventories, toProtoInventory(&inventories[i]))
+		response.Inventories = append(response.Inventories, toProtoInventory(&inventories[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
-func (s *ProductInventoryServer) GetProductInventory(ctx context.Context, req *pb.GetProductInventoryRequest) (*pb.GetProductInventoryResponse, error) {
-	inventory, err := s.repo.FindByID(uint(req.GetId()))
+func (server *ProductInventoryServer) GetProductInventory(ctx context.Context, request *pb.GetProductInventoryRequest) (*pb.GetProductInventoryResponse, error) {
+	inventory, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product inventory", err)
 	}
 	return &pb.GetProductInventoryResponse{Inventory: toProtoInventory(inventory)}, nil
 }
 
-func (s *ProductInventoryServer) CreateProductInventory(ctx context.Context, req *pb.CreateProductInventoryRequest) (*pb.CreateProductInventoryResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductInventoryServer) CreateProductInventory(ctx context.Context, request *pb.CreateProductInventoryRequest) (*pb.CreateProductInventoryResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
-	if req.GetQuantity() < 0 || req.GetReserved() < 0 {
+	if request.GetQuantity() < 0 || request.GetReserved() < 0 {
 		return nil, apperr.InvalidArgument("quantity and reserved must not be negative")
 	}
 
 	inventory := &model.ProductInventory{
-		ProductID: uint(req.GetProductId()),
-		Quantity:  int(req.GetQuantity()),
-		Reserved:  int(req.GetReserved()),
+		ProductID: uint(request.GetProductId()),
+		Quantity:  int(request.GetQuantity()),
+		Reserved:  int(request.GetReserved()),
 	}
 
-	if err := s.repo.Create(inventory); err != nil {
+	if err := server.repo.Create(inventory); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreateProductInventoryResponse{Inventory: toProtoInventory(inventory)}, nil
 }
 
-func (s *ProductInventoryServer) UpdateProductInventory(ctx context.Context, req *pb.UpdateProductInventoryRequest) (*pb.UpdateProductInventoryResponse, error) {
-	if req.GetProductId() == 0 {
+func (server *ProductInventoryServer) UpdateProductInventory(ctx context.Context, request *pb.UpdateProductInventoryRequest) (*pb.UpdateProductInventoryResponse, error) {
+	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
-	if req.GetQuantity() < 0 || req.GetReserved() < 0 {
+	if request.GetQuantity() < 0 || request.GetReserved() < 0 {
 		return nil, apperr.InvalidArgument("quantity and reserved must not be negative")
 	}
 
-	inventory, err := s.repo.FindByID(uint(req.GetId()))
+	inventory, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product inventory", err)
 	}
 
-	inventory.ProductID = uint(req.GetProductId())
-	inventory.Quantity = int(req.GetQuantity())
-	inventory.Reserved = int(req.GetReserved())
+	inventory.ProductID = uint(request.GetProductId())
+	inventory.Quantity = int(request.GetQuantity())
+	inventory.Reserved = int(request.GetReserved())
 
-	if err := s.repo.Update(inventory); err != nil {
+	if err := server.repo.Update(inventory); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.UpdateProductInventoryResponse{Inventory: toProtoInventory(inventory)}, nil
 }
 
-func (s *ProductInventoryServer) DeleteProductInventory(ctx context.Context, req *pb.DeleteProductInventoryRequest) (*pb.DeleteProductInventoryResponse, error) {
-	if err := s.repo.Delete(uint(req.GetId())); err != nil {
+func (server *ProductInventoryServer) DeleteProductInventory(ctx context.Context, request *pb.DeleteProductInventoryRequest) (*pb.DeleteProductInventoryResponse, error) {
+	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.DeleteProductInventoryResponse{}, nil
 }
 
 // toProtoInventory はDBのmodel.ProductInventoryをレスポンス用のpb.ProductInventoryに変換する。
-func toProtoInventory(i *model.ProductInventory) *pb.ProductInventory {
+func toProtoInventory(inventory *model.ProductInventory) *pb.ProductInventory {
 	return &pb.ProductInventory{
-		Id:        uint32(i.ID),
-		ProductId: uint32(i.ProductID),
-		Quantity:  int32(i.Quantity),
-		Reserved:  int32(i.Reserved),
-		CreatedAt: timestamppb.New(i.CreatedAt),
-		UpdatedAt: timestamppb.New(i.UpdatedAt),
+		Id:        uint32(inventory.ID),
+		ProductId: uint32(inventory.ProductID),
+		Quantity:  int32(inventory.Quantity),
+		Reserved:  int32(inventory.Reserved),
+		CreatedAt: timestamppb.New(inventory.CreatedAt),
+		UpdatedAt: timestamppb.New(inventory.UpdatedAt),
 	}
 }

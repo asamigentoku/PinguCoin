@@ -20,27 +20,27 @@ import (
 // 混在するため、必須化は各resolver/handler側で行う)。
 func WithOptionalAuth(orcan *orcanclient.Client) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			token := extractBearerToken(req)
+		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			token := extractBearerToken(request)
 			if token == "" {
-				next.ServeHTTP(w, req)
+				next.ServeHTTP(w, request)
 				return
 			}
 
-			clerkUserID, err := clerkauth.VerifySessionToken(req.Context(), token)
+			clerkUserID, err := clerkauth.VerifySessionToken(request.Context(), token)
 			if err != nil {
-				next.ServeHTTP(w, req)
+				next.ServeHTTP(w, request)
 				return
 			}
 
-			claims, err := resolveUser(req.Context(), orcan, clerkUserID)
+			claims, err := resolveUser(request.Context(), orcan, clerkUserID)
 			if err != nil {
-				next.ServeHTTP(w, req)
+				next.ServeHTTP(w, request)
 				return
 			}
 
-			ctx := reqcontext.WithUser(req.Context(), claims)
-			next.ServeHTTP(w, req.WithContext(ctx))
+			ctx := reqcontext.WithUser(request.Context(), claims)
+			next.ServeHTTP(w, request.WithContext(ctx))
 		})
 	}
 }
@@ -49,9 +49,9 @@ func WithOptionalAuth(orcan *orcanclient.Client) func(http.Handler) http.Handler
 // 既に存在すればそれをそのまま使い(Clerk APIへの追加呼び出しは発生しない)、
 // 初回アクセスの場合のみClerkのBackend APIからemail/nameを取得してorcan-apiにプロフィールを作成する。
 func resolveUser(ctx context.Context, orcan *orcanclient.Client, clerkUserID string) (*reqcontext.Claims, error) {
-	resp, err := orcan.User.GetUserByClerkID(ctx, &orcanpb.GetUserByClerkIDRequest{ClerkUserId: clerkUserID})
+	response, err := orcan.User.GetUserByClerkID(ctx, &orcanpb.GetUserByClerkIDRequest{ClerkUserId: clerkUserID})
 	if err == nil {
-		return claimsFromPB(resp.GetUser()), nil
+		return claimsFromPB(response.GetUser()), nil
 	}
 	if status.Code(err) != codes.NotFound {
 		return nil, err
@@ -62,7 +62,7 @@ func resolveUser(ctx context.Context, orcan *orcanclient.Client, clerkUserID str
 		return nil, err
 	}
 
-	ensureResp, err := orcan.User.EnsureUser(ctx, &orcanpb.EnsureUserRequest{
+	ensureResponse, err := orcan.User.EnsureUser(ctx, &orcanpb.EnsureUserRequest{
 		ClerkUserId: clerkUserID,
 		Email:       email,
 		Name:        name,
@@ -70,21 +70,21 @@ func resolveUser(ctx context.Context, orcan *orcanclient.Client, clerkUserID str
 	if err != nil {
 		return nil, err
 	}
-	return claimsFromPB(ensureResp.GetUser()), nil
+	return claimsFromPB(ensureResponse.GetUser()), nil
 }
 
-func claimsFromPB(u *orcanpb.User) *reqcontext.Claims {
+func claimsFromPB(user *orcanpb.User) *reqcontext.Claims {
 	return &reqcontext.Claims{
-		UserID:      uint(u.GetId()),
-		ClerkUserID: u.GetClerkUserId(),
-		Email:       u.GetEmail(),
-		Name:        u.GetName(),
+		UserID:      uint(user.GetId()),
+		ClerkUserID: user.GetClerkUserId(),
+		Email:       user.GetEmail(),
+		Name:        user.GetName(),
 	}
 }
 
-func extractBearerToken(req *http.Request) string {
-	h := req.Header.Get("Authorization")
-	if after, ok := strings.CutPrefix(h, "Bearer "); ok {
+func extractBearerToken(request *http.Request) string {
+	header := request.Header.Get("Authorization")
+	if after, ok := strings.CutPrefix(header, "Bearer "); ok {
 		return strings.TrimSpace(after)
 	}
 	return ""

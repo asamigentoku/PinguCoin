@@ -13,9 +13,9 @@ type statusRecorder struct {
 	status int
 }
 
-func (r *statusRecorder) WriteHeader(status int) {
-	r.status = status
-	r.ResponseWriter.WriteHeader(status)
+func (recorder *statusRecorder) WriteHeader(status int) {
+	recorder.status = status
+	recorder.ResponseWriter.WriteHeader(status)
 }
 
 // WithLogging は全HTTPリクエスト(GraphQL/RESTの両方)を構造化ログに出すミドルウェア。
@@ -26,21 +26,21 @@ func WithLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
-			next.ServeHTTP(rec, r)
+			next.ServeHTTP(recorder, r)
 
 			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
-				slog.Int("status", rec.status),
+				slog.Int("status", recorder.status),
 				slog.Duration("duration", time.Since(start)),
 			}
 
 			switch {
-			case rec.status >= http.StatusInternalServerError:
+			case recorder.status >= http.StatusInternalServerError:
 				logger.LogAttrs(r.Context(), slog.LevelError, "http request failed", attrs...)
-			case rec.status >= http.StatusBadRequest:
+			case recorder.status >= http.StatusBadRequest:
 				logger.LogAttrs(r.Context(), slog.LevelWarn, "http request rejected", attrs...)
 			default:
 				logger.LogAttrs(r.Context(), slog.LevelInfo, "http request completed", attrs...)

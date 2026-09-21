@@ -27,63 +27,63 @@ type slogGormLogger struct {
 }
 
 // NewGormLogger はslogベースのGORM用ロガーを作る。
-func NewGormLogger(l *slog.Logger) logger.Interface {
+func NewGormLogger(slogLogger *slog.Logger) logger.Interface {
 	return &slogGormLogger{
-		logger:   l,
+		logger:   slogLogger,
 		logLevel: logger.Warn,
 	}
 }
 
-func (l *slogGormLogger) LogMode(level logger.LogLevel) logger.Interface {
-	newLogger := *l
+func (gormLogger *slogGormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	newLogger := *gormLogger
 	newLogger.logLevel = level
 	return &newLogger
 }
 
-func (l *slogGormLogger) Info(_ context.Context, msg string, args ...interface{}) {
-	if l.logLevel >= logger.Info {
-		l.logger.Info(fmt.Sprintf(msg, args...))
+func (gormLogger *slogGormLogger) Info(_ context.Context, msg string, args ...interface{}) {
+	if gormLogger.logLevel >= logger.Info {
+		gormLogger.logger.Info(fmt.Sprintf(msg, args...))
 	}
 }
 
-func (l *slogGormLogger) Warn(_ context.Context, msg string, args ...interface{}) {
-	if l.logLevel >= logger.Warn {
-		l.logger.Warn(fmt.Sprintf(msg, args...))
+func (gormLogger *slogGormLogger) Warn(_ context.Context, msg string, args ...interface{}) {
+	if gormLogger.logLevel >= logger.Warn {
+		gormLogger.logger.Warn(fmt.Sprintf(msg, args...))
 	}
 }
 
-func (l *slogGormLogger) Error(_ context.Context, msg string, args ...interface{}) {
-	if l.logLevel >= logger.Error {
-		l.logger.Error(fmt.Sprintf(msg, args...))
+func (gormLogger *slogGormLogger) Error(_ context.Context, msg string, args ...interface{}) {
+	if gormLogger.logLevel >= logger.Error {
+		gormLogger.logger.Error(fmt.Sprintf(msg, args...))
 	}
 }
 
-func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (string, int64), err error) {
-	if l.logLevel <= logger.Silent {
+func (gormLogger *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if gormLogger.logLevel <= logger.Silent {
 		return
 	}
 
 	elapsed := time.Since(begin)
 
 	switch {
-	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound) && l.logLevel >= logger.Error:
+	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound) && gormLogger.logLevel >= logger.Error:
 		sql, rows := fc()
-		l.logger.Error("gorm query failed",
+		gormLogger.logger.Error("gorm query failed",
 			slog.String("sql", sql),
 			slog.Int64("rows", rows),
 			slog.Duration("elapsed", elapsed),
 			slog.String("error", err.Error()),
 		)
-	case elapsed > slowQueryThreshold && l.logLevel >= logger.Warn:
+	case elapsed > slowQueryThreshold && gormLogger.logLevel >= logger.Warn:
 		sql, rows := fc()
-		l.logger.Warn("gorm slow query",
+		gormLogger.logger.Warn("gorm slow query",
 			slog.String("sql", sql),
 			slog.Int64("rows", rows),
 			slog.Duration("elapsed", elapsed),
 		)
-	case l.logLevel >= logger.Info:
+	case gormLogger.logLevel >= logger.Info:
 		sql, rows := fc()
-		l.logger.Debug("gorm query",
+		gormLogger.logger.Debug("gorm query",
 			slog.String("sql", sql),
 			slog.Int64("rows", rows),
 			slog.Duration("elapsed", elapsed),

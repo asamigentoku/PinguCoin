@@ -35,23 +35,23 @@ type AppError struct {
 	Err      error  // ログ用の元エラー。クライアントのレスポンスには含めない。
 }
 
-func (e *AppError) Error() string {
-	if e.Err != nil {
-		return e.Message + ": " + e.Err.Error()
+func (appErr *AppError) Error() string {
+	if appErr.Err != nil {
+		return appErr.Message + ": " + appErr.Err.Error()
 	}
-	return e.Message
+	return appErr.Message
 }
 
-func (e *AppError) Unwrap() error {
-	return e.Err
+func (appErr *AppError) Unwrap() error {
+	return appErr.Err
 }
 
 // GRPCStatus を実装すると、grpc-go の status.FromError / status.Convert が
 // このErrorInfo付きのステータスをそのまま使ってくれる。
-func (e *AppError) GRPCStatus() *status.Status {
-	st := status.New(e.GRPCCode, e.Message)
+func (appErr *AppError) GRPCStatus() *status.Status {
+	st := status.New(appErr.GRPCCode, appErr.Message)
 	withDetails, err := st.WithDetails(&errdetails.ErrorInfo{
-		Reason: string(e.Reason),
+		Reason: string(appErr.Reason),
 		Domain: domain,
 	})
 	if err != nil {

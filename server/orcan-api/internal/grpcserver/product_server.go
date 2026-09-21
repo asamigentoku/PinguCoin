@@ -26,79 +26,79 @@ func NewProductServer(repo *repository.ProductRepository) *ProductServer {
 
 // ListProducts は商品一覧を返す。user_id はproto側でoptionalなので、
 // 指定なし(nil)なら全件、指定ありなら出品者で絞り込む。
-func (s *ProductServer) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
+func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
 	var userID uint
-	if req.UserId != nil {
-		userID = uint(req.GetUserId())
+	if request.UserId != nil {
+		userID = uint(request.GetUserId())
 	}
 
-	products, err := s.repo.FindAll(userID)
+	products, err := server.repo.FindAll(userID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	resp := &pb.ListProductsResponse{}
+	response := &pb.ListProductsResponse{}
 	for i := range products {
-		resp.Products = append(resp.Products, toProtoProduct(&products[i]))
+		response.Products = append(response.Products, toProtoProduct(&products[i]))
 	}
-	return resp, nil
+	return response, nil
 }
 
-func (s *ProductServer) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.GetProductResponse, error) {
-	product, err := s.repo.FindByID(uint(req.GetId()))
+func (server *ProductServer) GetProduct(ctx context.Context, request *pb.GetProductRequest) (*pb.GetProductResponse, error) {
+	product, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product", err)
 	}
 	return &pb.GetProductResponse{Product: toProtoProduct(product)}, nil
 }
 
-func (s *ProductServer) CreateProduct(ctx context.Context, req *pb.CreateProductRequest) (*pb.CreateProductResponse, error) {
-	if err := validateProductInput(req.GetName(), req.GetUserId(), req.GetCategoryId()); err != nil {
+func (server *ProductServer) CreateProduct(ctx context.Context, request *pb.CreateProductRequest) (*pb.CreateProductResponse, error) {
+	if err := validateProductInput(request.GetName(), request.GetUserId(), request.GetCategoryId()); err != nil {
 		return nil, err
 	}
 
 	product := &model.Product{
-		UserID:      uint(req.GetUserId()),
-		CategoryID:  uint(req.GetCategoryId()),
-		Name:        strings.TrimSpace(req.GetName()),
-		Description: req.GetDescription(),
-		ImageURL:    req.GetImageUrl(),
-		Price:       req.GetPrice(),
-		Status:      req.GetStatus(),
+		UserID:      uint(request.GetUserId()),
+		CategoryID:  uint(request.GetCategoryId()),
+		Name:        strings.TrimSpace(request.GetName()),
+		Description: request.GetDescription(),
+		ImageURL:    request.GetImageUrl(),
+		Price:       request.GetPrice(),
+		Status:      request.GetStatus(),
 	}
 
-	if err := s.repo.Create(product); err != nil {
+	if err := server.repo.Create(product); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreateProductResponse{Product: toProtoProduct(product)}, nil
 }
 
-func (s *ProductServer) UpdateProduct(ctx context.Context, req *pb.UpdateProductRequest) (*pb.UpdateProductResponse, error) {
-	if err := validateProductInput(req.GetName(), req.GetUserId(), req.GetCategoryId()); err != nil {
+func (server *ProductServer) UpdateProduct(ctx context.Context, request *pb.UpdateProductRequest) (*pb.UpdateProductResponse, error) {
+	if err := validateProductInput(request.GetName(), request.GetUserId(), request.GetCategoryId()); err != nil {
 		return nil, err
 	}
 
-	product, err := s.repo.FindByID(uint(req.GetId()))
+	product, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product", err)
 	}
 
-	product.UserID = uint(req.GetUserId())
-	product.CategoryID = uint(req.GetCategoryId())
-	product.Name = strings.TrimSpace(req.GetName())
-	product.Description = req.GetDescription()
-	product.ImageURL = req.GetImageUrl()
-	product.Price = req.GetPrice()
-	product.Status = req.GetStatus()
+	product.UserID = uint(request.GetUserId())
+	product.CategoryID = uint(request.GetCategoryId())
+	product.Name = strings.TrimSpace(request.GetName())
+	product.Description = request.GetDescription()
+	product.ImageURL = request.GetImageUrl()
+	product.Price = request.GetPrice()
+	product.Status = request.GetStatus()
 
-	if err := s.repo.Update(product); err != nil {
+	if err := server.repo.Update(product); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.UpdateProductResponse{Product: toProtoProduct(product)}, nil
 }
 
-func (s *ProductServer) DeleteProduct(ctx context.Context, req *pb.DeleteProductRequest) (*pb.DeleteProductResponse, error) {
-	if err := s.repo.Delete(uint(req.GetId())); err != nil {
+func (server *ProductServer) DeleteProduct(ctx context.Context, request *pb.DeleteProductRequest) (*pb.DeleteProductResponse, error) {
+	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
 	return &pb.DeleteProductResponse{}, nil
@@ -120,17 +120,17 @@ func validateProductInput(name string, userID, categoryID uint32) error {
 }
 
 // toProtoProduct はDBのmodel.Productをレスポンス用のpb.Productに変換する。
-func toProtoProduct(p *model.Product) *pb.Product {
+func toProtoProduct(product *model.Product) *pb.Product {
 	return &pb.Product{
-		Id:          uint32(p.ID),
-		UserId:      uint32(p.UserID),
-		CategoryId:  uint32(p.CategoryID),
-		Name:        p.Name,
-		Description: p.Description,
-		ImageUrl:    p.ImageURL,
-		Price:       p.Price,
-		Status:      p.Status,
-		CreatedAt:   timestamppb.New(p.CreatedAt),
-		UpdatedAt:   timestamppb.New(p.UpdatedAt),
+		Id:          uint32(product.ID),
+		UserId:      uint32(product.UserID),
+		CategoryId:  uint32(product.CategoryID),
+		Name:        product.Name,
+		Description: product.Description,
+		ImageUrl:    product.ImageURL,
+		Price:       product.Price,
+		Status:      product.Status,
+		CreatedAt:   timestamppb.New(product.CreatedAt),
+		UpdatedAt:   timestamppb.New(product.UpdatedAt),
 	}
 }

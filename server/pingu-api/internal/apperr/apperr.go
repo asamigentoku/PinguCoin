@@ -34,15 +34,15 @@ type AppError struct {
 	Err        error  // ログ用の元エラー。クライアントのレスポンスには含めない。
 }
 
-func (e *AppError) Error() string {
-	if e.Err != nil {
-		return e.Message + ": " + e.Err.Error()
+func (appErr *AppError) Error() string {
+	if appErr.Err != nil {
+		return appErr.Message + ": " + appErr.Err.Error()
 	}
-	return e.Message
+	return appErr.Message
 }
 
-func (e *AppError) Unwrap() error {
-	return e.Err
+func (appErr *AppError) Unwrap() error {
+	return appErr.Err
 }
 
 func NotFound(resource string) *AppError {
@@ -84,29 +84,29 @@ func FromGRPC(err error) *AppError {
 		return nil
 	}
 
-	st, ok := status.FromError(err)
+	grpcStatus, ok := status.FromError(err)
 	if !ok {
 		return Internal(err)
 	}
 
-	reason := Reason(st.Code().String())
-	for _, d := range st.Details() {
-		if info, ok := d.(*errdetails.ErrorInfo); ok {
+	reason := Reason(grpcStatus.Code().String())
+	for _, detail := range grpcStatus.Details() {
+		if info, ok := detail.(*errdetails.ErrorInfo); ok {
 			reason = Reason(info.GetReason())
 		}
 	}
 
-	switch st.Code() {
+	switch grpcStatus.Code() {
 	case codes.NotFound:
-		return &AppError{HTTPStatus: http.StatusNotFound, Reason: reason, Message: st.Message()}
+		return &AppError{HTTPStatus: http.StatusNotFound, Reason: reason, Message: grpcStatus.Message()}
 	case codes.InvalidArgument:
-		return &AppError{HTTPStatus: http.StatusBadRequest, Reason: reason, Message: st.Message()}
+		return &AppError{HTTPStatus: http.StatusBadRequest, Reason: reason, Message: grpcStatus.Message()}
 	case codes.AlreadyExists:
-		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: st.Message()}
+		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: grpcStatus.Message()}
 	case codes.Unauthenticated:
-		return &AppError{HTTPStatus: http.StatusUnauthorized, Reason: reason, Message: st.Message()}
+		return &AppError{HTTPStatus: http.StatusUnauthorized, Reason: reason, Message: grpcStatus.Message()}
 	case codes.FailedPrecondition:
-		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: st.Message()}
+		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: grpcStatus.Message()}
 	default:
 		return Internal(err)
 	}

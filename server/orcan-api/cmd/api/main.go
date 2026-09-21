@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// gRPCはHTTPサーバーと同じくTCPソケットで待ち受ける。
-	lis, err := net.Listen("tcp", ":"+cfg.Port)
+	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
 		logger.Error("failed to listen", slog.Any("error", err))
 		os.Exit(1)
@@ -67,9 +67,9 @@ func main() {
 	reflection.Register(server)
 
 	logger.Info("orcan-api (gRPC) listening", slog.String("port", cfg.Port))
-	// listenしているTCPソケット(lis)に対してリクエストの受付・処理ループを開始する。
+	// listenしているTCPソケット(listener)に対してリクエストの受付・処理ループを開始する。
 	// ここでブロックし、プロセスが終了するまで返ってこない。
-	if err := server.Serve(lis); err != nil {
+	if err := server.Serve(listener); err != nil {
 		logger.Error("failed to serve", slog.Any("error", err))
 		os.Exit(1)
 	}
