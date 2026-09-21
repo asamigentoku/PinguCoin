@@ -12,12 +12,23 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 | キャンセル | `PaymentService.CancelPayment` | `status: pending`の決済のみキャンセル可。それ以外は`FAILED_PRECONDITION` |
 | 返金 | `PaymentService.RefundPayment` | `status: succeeded`/`partially_refunded`の決済に対して`amount`を指定して返金。累計返金額が決済額を超える場合は`INVALID_ARGUMENT`。全額一致で`status: refunded`、一部なら`status: partially_refunded`に更新 |
 
+## ポイント管理(PinguCoin)
+
+| 機能 | 規格(RPC) | フロー |
+| --- | --- | --- |
+| 残高管理(user_idごと) | `PointService.GetPointAccount` | 取引が1件もないユーザーはレコードなしでも残高0として返す |
+| 履歴取得 | `PointService.ListPointTransactions`(`user_id`で絞り込み) | 付与・消費の全履歴(`type`で用途を区別) |
+| 手動付与・消費 | `PointService.CreditPoints` / `DebitPoints` | キャンペーン付与など決済に紐づかない増減。`DebitPoints`は残高不足で`FAILED_PRECONDITION` |
+| 決済との自動連携 | `PaymentService.CreatePayment` / `RefundPayment`(`payment_method: "point"`時) | `db.Transaction`で決済とポイント増減を1つのトランザクションにまとめて原子的に処理する。残高不足なら決済ごとロールバックされ`FAILED_PRECONDITION` |
+
 ## リソース
 
 | テーブル | 説明 |
 | --- | --- |
 | `payments` | 決済(`user_id`=購入者, `product_id`=orcan-apiの`products.id`への参照) |
 | `refunds` | 返金(1決済に対して複数件になり得る = 部分返金対応) |
+| `point_accounts` | ユーザーごとのポイント残高(1ユーザー1件) |
+| `point_transactions` | ポイント増減履歴(`type`: `credit`/`debit`/`payment`/`refund`) |
 
 決済ステータス(`payments.status`): `pending` / `succeeded` / `failed` / `canceled` / `refunded` / `partially_refunded`
 返金ステータス(`refunds.status`): `pending` / `succeeded` / `failed`
@@ -54,4 +65,4 @@ go run ./cmd/api
 
 `DB_NAME`のデータベース(デフォルト`payment`)は事前に作成しておく必要がある
 (`orcan-api`と同じPostgresインスタンスを使う場合、`orcan`用に自動作成される`orcan`とは別に作成が必要)。
-起動時に `internal/database.AutoMigrate` がテーブル(`payments`, `refunds`)のマイグレーションを実行する。
+起動時に `internal/database.AutoMigrate` がテーブル(`payments`, `refunds`, `point_accounts`, `point_transactions`)のマイグレーションを実行する。

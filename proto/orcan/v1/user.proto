@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1";
+
+// User はサービス利用者を表す。認証はClerk(フロントエンド)が担い、orcan-apiはパスワード等の
+// 認証情報を一切保持しない。clerk_user_id でClerkのユーザーと1:1に対応する、アプリ内プロフィールのみ。
+message User {
+  uint32 id = 1;
+  string clerk_user_id = 2;
+  string email = 3;
+  string name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+service UserService {
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUserByClerkID(GetUserByClerkIDRequest) returns (GetUserByClerkIDResponse);
+  // EnsureUser はclerk_user_idに対応するUserを取得し、無ければ作成する(見つかった場合、
+  // email/nameは上書きしない。プロフィール更新は明示的にUpdateUserで行う)。
+  // pingu-apiがClerkトークン検証後、初回アクセス時のJITプロビジョニングに使う。
+  rpc EnsureUser(EnsureUserRequest) returns (EnsureUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+}
+
+message ListUsersRequest {}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
+message GetUserRequest {
+  uint32 id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetUserByClerkIDRequest {
+  string clerk_user_id = 1;
+}
+
+message GetUserByClerkIDResponse {
+  User user = 1;
+}
+
+message EnsureUserRequest {
+  string clerk_user_id = 1;
+  string email = 2;
+  string name = 3;
+}
+
+message EnsureUserResponse {
+  User user = 1;
+}
+
+// UpdateUserRequest は氏名の更新のみ扱う(emailはClerk側が真実の記録を持つため今回のスコープ外)。
+message UpdateUserRequest {
+  uint32 id = 1;
+  string name = 2;
+}
+
+message UpdateUserResponse {
+  User user = 1;
+}
+
+message DeleteUserRequest {
+  uint32 id = 1;
+}
+
+message DeleteUserResponse {}

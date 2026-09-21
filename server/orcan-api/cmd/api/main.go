@@ -60,6 +60,8 @@ func main() {
 	pb.RegisterProductInventoryServiceServer(server, grpcserver.NewProductInventoryServer(repository.NewProductInventoryRepository(db)))
 	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServer(repository.NewProductListingRepository(db)))
 
+	pb.RegisterUserServiceServer(server, grpcserver.NewUserServer(repository.NewUserRepository(db)))
+
 	// reflectionを有効にすると、.protoファイルを配らなくても
 	// grpcurl等のツールがサーバーに直接問い合わせてスキーマ(サービス一覧・メッセージ構造)を取得できる。
 	reflection.Register(server)

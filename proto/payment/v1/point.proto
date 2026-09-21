@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package payment.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/payment-api/internal/pb/payment/v1;paymentv1";
+
+// PointAccount はユーザーごとのポイント残高(user_idごとに1件)。
+message PointAccount {
+  uint32 user_id = 1;
+  int64 balance = 2;
+  google.protobuf.Timestamp updated_at = 3;
+}
+
+// PointTransaction はポイントの増減履歴。1件が1回の付与/消費に対応する。
+message PointTransaction {
+  uint32 id = 1;
+  uint32 user_id = 2;
+  int64 amount = 3; // 正の値=付与、負の値=消費
+  string type = 4;  // "credit" / "debit" / "payment" / "refund"
+  // Payment(決済)に紐づく増減(point払い/その返金)の場合のみ設定される。
+  optional uint32 payment_id = 5;
+  string reason = 6;
+  int64 balance_after = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+service PointService {
+  // 残高取得
+  rpc GetPointAccount(GetPointAccountRequest) returns (GetPointAccountResponse);
+  // 履歴取得
+  rpc ListPointTransactions(ListPointTransactionsRequest) returns (ListPointTransactionsResponse);
+  // 決済連携以外の手動付与・消費(例: キャンペーン付与、運用による調整)
+  rpc CreditPoints(CreditPointsRequest) returns (CreditPointsResponse);
+  rpc DebitPoints(DebitPointsRequest) returns (DebitPointsResponse);
+}
+
+message GetPointAccountRequest {
+  uint32 user_id = 1;
+}
+
+message GetPointAccountResponse {
+  PointAccount account = 1;
+}
+
+message ListPointTransactionsRequest {
+  optional uint32 user_id = 1;
+}
+
+message ListPointTransactionsResponse {
+  repeated PointTransaction transactions = 1;
+}
+
+message CreditPointsRequest {
+  uint32 user_id = 1;
+  int64 amount = 2; // 正の値を指定する
+  string reason = 3;
+}
+
+message CreditPointsResponse {
+  PointTransaction transaction = 1;
+  PointAccount account = 2;
+}
+
+message DebitPointsRequest {
+  uint32 user_id = 1;
+  int64 amount = 2; // 正の値を指定する(内部で残高から減算する)
+  string reason = 3;
+}
+
+message DebitPointsResponse {
+  PointTransaction transaction = 1;
+  PointAccount account = 2;
+}

@@ -14,6 +14,11 @@ func NewRefundRepository(db *gorm.DB) *RefundRepository {
 	return &RefundRepository{db: db}
 }
 
+// WithTx はトランザクション用の *gorm.DB に差し替えた同じRepositoryを返す。
+func (r *RefundRepository) WithTx(tx *gorm.DB) *RefundRepository {
+	return &RefundRepository{db: tx}
+}
+
 func (r *RefundRepository) Create(refund *model.Refund) error {
 	return r.db.Create(refund).Error
 }

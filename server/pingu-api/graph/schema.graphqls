@@ -1,0 +1,70 @@
+# pingu-api GraphQL schema
+#
+# 商品(Product)・ユーザー(User)はどちらもorcan-apiのUserService/ProductServiceを、
+# gRPC経由でそのまま反映する薄いゲートウェイ。
+# 認証・ユーザー登録はClerk(フロントエンド)が担う。会員登録用のミューテーションは無く、
+# Clerkでログイン済みのユーザーがAuthorizationヘッダ付きで初めてリクエストした時点で、
+# pingu-api側が自動的にorcan-api側のプロフィール(User)を作成する(JITプロビジョニング)。
+
+type Product {
+  id: Int!
+  userId: Int!
+  categoryId: Int!
+  name: String!
+  description: String!
+  imageUrl: String!
+  price: Int!
+  status: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type User {
+  id: Int!
+  email: String!
+  name: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Query {
+  products(userId: Int): [Product!]!
+  product(id: Int!): Product
+
+  users: [User!]!
+  user(id: Int!): User
+  # me はリクエストのAuthorizationヘッダ(Clerkのセッショントークン)から解決される、ログイン中ユーザー。
+  me: User
+}
+
+input CreateProductInput {
+  userId: Int!
+  categoryId: Int!
+  name: String!
+  description: String
+  imageUrl: String
+  price: Int!
+  status: String
+}
+
+input UpdateProductInput {
+  userId: Int!
+  categoryId: Int!
+  name: String!
+  description: String
+  imageUrl: String
+  price: Int!
+  status: String
+}
+
+input UpdateUserInput {
+  name: String!
+}
+
+type Mutation {
+  createProduct(input: CreateProductInput!): Product!
+  updateProduct(id: Int!, input: UpdateProductInput!): Product!
+  deleteProduct(id: Int!): Boolean!
+
+  updateUser(id: Int!, input: UpdateUserInput!): User!
+}

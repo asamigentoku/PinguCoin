@@ -14,6 +14,12 @@ func NewPaymentRepository(db *gorm.DB) *PaymentRepository {
 	return &PaymentRepository{db: db}
 }
 
+// WithTx はトランザクション用の *gorm.DB に差し替えた同じRepositoryを返す。
+// point払いの決済のように、ポイント増減と1つのトランザクションにまとめたい場合に使う。
+func (r *PaymentRepository) WithTx(tx *gorm.DB) *PaymentRepository {
+	return &PaymentRepository{db: tx}
+}
+
 func (r *PaymentRepository) Create(p *model.Payment) error {
 	return r.db.Create(p).Error
 }

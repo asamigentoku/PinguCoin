@@ -43,10 +43,15 @@ func main() {
 		grpc.ChainUnaryInterceptor(interceptor.Logging(logger)),
 	)
 
+	pointRepo := repository.NewPointRepository(db)
+
 	pb.RegisterPaymentServiceServer(server, grpcserver.NewPaymentServer(
+		db,
 		repository.NewPaymentRepository(db),
 		repository.NewRefundRepository(db),
+		pointRepo,
 	))
+	pb.RegisterPointServiceServer(server, grpcserver.NewPointServer(pointRepo))
 
 	reflection.Register(server)
 

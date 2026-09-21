@@ -16,6 +16,10 @@ const (
 	PaymentStatusPartiallyRefunded = "partially_refunded"
 )
 
+// PaymentMethodPoint はポイント払いを表す payment_method の値。
+// この方式で決済・返金するとポイント残高(PointAccount)が自動で増減する。
+const PaymentMethodPoint = "point"
+
 // Payment は1回の決済を表す。
 type Payment struct {
 	ID     uint `gorm:"primaryKey" json:"id"`

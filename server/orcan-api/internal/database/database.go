@@ -32,11 +32,25 @@ func Connect(cfg config.Config, logger *slog.Logger) (*gorm.DB, error) {
 
 // AutoMigrate はorcan-apiが扱う全モデルのマイグレーションを実行する。
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.ProductCategory{},
 		&model.Product{},
 		&model.ProductDetail{},
 		&model.ProductInventory{},
 		&model.ProductListing{},
-	)
+		&model.User{},
+	); err != nil {
+		return err
+	}
+
+	// AutoMigrateはカラムの追加のみ行い削除はしないため、認証をClerkへ移行したことで
+	// 不要になった旧カラム(平文パスワードのハッシュ)は明示的に落とす。
+	// 残したままだとNOT NULL制約により新規ユーザー作成(clerk_user_idのみ指定)が失敗する。
+	if db.Migrator().HasColumn(&model.User{}, "password_hash") {
+		if err := db.Migrator().DropColumn(&model.User{}, "password_hash"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

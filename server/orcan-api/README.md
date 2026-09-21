@@ -12,6 +12,7 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 | `product_detail` | 商品画像・詳細 |
 | `product_inventory` | 在庫 |
 | `product_listings` | 出品情報 |
+| `users` | ユーザーのアプリ内プロフィール(`clerk_user_id`でClerkのユーザーと1:1対応。パスワード等の認証情報は一切保持しない) |
 
 ## サービス
 
@@ -22,6 +23,12 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 - `orcan.v1.ProductDetailService`: `ListProductDetails`(`product_id`で絞り込み可), `GetProductDetail`, `CreateProductDetail`, `UpdateProductDetail`, `DeleteProductDetail`
 - `orcan.v1.ProductInventoryService`: `ListProductInventories`, `GetProductInventory`, `CreateProductInventory`, `UpdateProductInventory`, `DeleteProductInventory`
 - `orcan.v1.ProductListingService`: `ListProductListings`(`product_id`で絞り込み可), `GetProductListing`, `CreateProductListing`, `UpdateProductListing`, `DeleteProductListing`
+- `orcan.v1.UserService`: `ListUsers`, `GetUser`, `GetUserByClerkID`, `EnsureUser`(clerk_user_idで取得、無ければ作成。存在確認/新規作成のJITプロビジョニング用),
+  `UpdateUser`(氏名のみ), `DeleteUser`
+
+認証はClerk(フロントエンド)が担う。orcan-apiはログイン処理やトークン発行を一切行わず、
+`pingu-api`がClerkのセッショントークンを検証した上で`EnsureUser`/`GetUserByClerkID`を呼び出し、
+アプリ内のユーザープロフィール(`users`テーブル)と紐づける。
 
 サーバー起動時に [gRPC reflection](https://pkg.go.dev/google.golang.org/grpc/reflection) を有効化しているため、
 [grpcurl](https://github.com/fullstorydev/grpcurl) 等でスキーマなしに疎通確認できる。

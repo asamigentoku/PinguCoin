@@ -2,9 +2,12 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
+	"strconv"
 	"strings"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/model"
@@ -14,14 +17,18 @@ import (
 
 // PaymentServer は proto の `service PaymentService` の実装。
 // 決済処理・履歴取得・キャンセル/返金の3機能をこの1サービスにまとめている。
+// payment_method="point" の場合、db.Transaction で決済とポイント増減(internal/repository.PointRepository)を
+// 1つのトランザクションにまとめて原子的に処理する(片方だけ成功する状態を作らないため)。
 type PaymentServer struct {
 	pb.UnimplementedPaymentServiceServer
+	db       *gorm.DB
 	payments *repository.PaymentRepository
 	refunds  *repository.RefundRepository
+	points   *repository.PointRepository
 }
 
-func NewPaymentServer(payments *repository.PaymentRepository, refunds *repository.RefundRepository) *PaymentServer {
-	return &PaymentServer{payments: payments, refunds: refunds}
+func NewPaymentServer(db *gorm.DB, payments *repository.PaymentRepository, refunds *repository.RefundRepository, points *repository.PointRepository) *PaymentServer {
+	return &PaymentServer{db: db, payments: payments, refunds: refunds, points: points}
 }
 
 // CreatePayment は決済処理そのもの。
@@ -52,6 +59,26 @@ func (s *PaymentServer) CreatePayment(ctx context.Context, req *pb.CreatePayment
 		Currency:      req.GetCurrency(),
 		PaymentMethod: req.GetPaymentMethod(),
 		Status:        model.PaymentStatusSucceeded,
+	}
+
+	// point払いの場合は「決済の作成」と「ポイント残高の消費」を1トランザクションにまとめる。
+	// 片方だけ成功する(決済は作られたのにポイントは減っていない、等)状態を防ぐため。
+	if payment.PaymentMethod == model.PaymentMethodPoint {
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := s.payments.WithTx(tx).Create(payment); err != nil {
+				return err
+			}
+			paymentID := payment.ID
+			_, err := s.points.WithTx(tx).Adjust(payment.UserID, -payment.Amount, model.PointTransactionTypePayment, "payment #"+strconv.FormatUint(uint64(payment.ID), 10), &paymentID)
+			return err
+		})
+		if err != nil {
+			if errors.Is(err, repository.ErrInsufficientPoints) {
+				return nil, apperr.FailedPrecondition("insufficient points")
+			}
+			return nil, apperr.Internal(err)
+		}
+		return &pb.CreatePaymentResponse{Payment: toProtoPayment(payment)}, nil
 	}
 
 	if err := s.payments.Create(payment); err != nil {
@@ -161,15 +188,38 @@ func (s *PaymentServer) RefundPayment(ctx context.Context, req *pb.RefundPayment
 		Reason:    req.GetReason(),
 		Status:    model.RefundStatusSucceeded,
 	}
+
+	newStatus := model.PaymentStatusPartiallyRefunded
+	if req.GetAmount() == remaining {
+		newStatus = model.PaymentStatusRefunded
+	}
+
+	// point払いの決済を返金する場合は、返金の記録・決済ステータス更新・ポイント払い戻しを
+	// 1トランザクションにまとめる(CreatePaymentと同じ考え方)。
+	if payment.PaymentMethod == model.PaymentMethodPoint {
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := s.refunds.WithTx(tx).Create(refund); err != nil {
+				return err
+			}
+			payment.Status = newStatus
+			if err := s.payments.WithTx(tx).Update(payment); err != nil {
+				return err
+			}
+			paymentID := payment.ID
+			_, err := s.points.WithTx(tx).Adjust(payment.UserID, refund.Amount, model.PointTransactionTypeRefund, "refund #"+strconv.FormatUint(uint64(refund.ID), 10), &paymentID)
+			return err
+		})
+		if err != nil {
+			return nil, apperr.Internal(err)
+		}
+		return &pb.RefundPaymentResponse{Refund: toProtoRefund(refund), Payment: toProtoPayment(payment)}, nil
+	}
+
 	if err := s.refunds.Create(refund); err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	if req.GetAmount() == remaining {
-		payment.Status = model.PaymentStatusRefunded
-	} else {
-		payment.Status = model.PaymentStatusPartiallyRefunded
-	}
+	payment.Status = newStatus
 	if err := s.payments.Update(payment); err != nil {
 		return nil, apperr.Internal(err)
 	}
