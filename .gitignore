@@ -14,6 +14,7 @@ desktop.ini
 .env
 .env.*
 !.env.example
+!.env.*.example
 *.pem
 *.key
 !infrastructure/**/*.example.key
@@ -42,6 +43,15 @@ target/
 gradle-app.setting
 !gradlew
 !gradlew.bat
+
+# === Go (server/*) ===
+/bin/
+server/*/bin/
+server/*/tmp/
+*.exe
+*.exe~
+*.test
+*.out
 
 # === Python (worker) ===
 __pycache__/

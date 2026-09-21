@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package payment.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/payment-api/internal/pb/payment/v1;paymentv1";
+
+// Payment は1回の決済を表す。
+message Payment {
+  uint32 id = 1;
+  uint32 user_id = 2;
+  // orcan-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
+  uint32 product_id = 3;
+  int64 amount = 4;
+  string currency = 5;        // "JPY", "POINT" など
+  string payment_method = 6;  // "credit_card", "point" など
+  // "pending" / "succeeded" / "failed" / "canceled" / "refunded" / "partially_refunded"
+  string status = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+// Refund は決済に対する返金(全額 or 一部)を表す。1決済に対して複数件になり得る。
+message Refund {
+  uint32 id = 1;
+  uint32 payment_id = 2;
+  int64 amount = 3;
+  string reason = 4;
+  string status = 5; // "pending" / "succeeded" / "failed"
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+service PaymentService {
+  // 決済処理
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse);
+  // 履歴取得
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+  rpc ListPayments(ListPaymentsRequest) returns (ListPaymentsResponse);
+  rpc ListRefunds(ListRefundsRequest) returns (ListRefundsResponse);
+  // キャンセル・返金
+  rpc CancelPayment(CancelPaymentRequest) returns (CancelPaymentResponse);
+  rpc RefundPayment(RefundPaymentRequest) returns (RefundPaymentResponse);
+}
+
+message CreatePaymentRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+  int64 amount = 3;
+  string currency = 4;
+  string payment_method = 5;
+}
+
+message CreatePaymentResponse {
+  Payment payment = 1;
+}
+
+message GetPaymentRequest {
+  uint32 id = 1;
+}
+
+message GetPaymentResponse {
+  Payment payment = 1;
+}
+
+message ListPaymentsRequest {
+  optional uint32 user_id = 1;
+}
+
+message ListPaymentsResponse {
+  repeated Payment payments = 1;
+}
+
+message ListRefundsRequest {
+  optional uint32 payment_id = 1;
+}
+
+message ListRefundsResponse {
+  repeated Refund refunds = 1;
+}
+
+// CancelPayment は決済が完了する前(status=pending)のキャンセルを想定。
+// 完了済み決済の取り消しは RefundPayment を使う。
+message CancelPaymentRequest {
+  uint32 id = 1;
+  string reason = 2;
+}
+
+message CancelPaymentResponse {
+  Payment payment = 1;
+}
+
+// RefundPayment は完了済み決済(status=succeeded/partially_refunded)に対する返金。
+// amount を指定することで部分返金にも対応する。
+message RefundPaymentRequest {
+  uint32 payment_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+}
+
+message RefundPaymentResponse {
+  Refund refund = 1;
+  Payment payment = 2; // 返金後の最新ステータスを併せて返す
+}

@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1";
+
+message ProductListing {
+  uint32 id = 1;
+  uint32 product_id = 2;
+  int64 price = 3;
+  string status = 4;
+  google.protobuf.Timestamp listed_at = 5;
+  google.protobuf.Timestamp ended_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+service ProductListingService {
+  rpc ListProductListings(ListProductListingsRequest) returns (ListProductListingsResponse);
+  rpc GetProductListing(GetProductListingRequest) returns (GetProductListingResponse);
+  rpc CreateProductListing(CreateProductListingRequest) returns (CreateProductListingResponse);
+  rpc UpdateProductListing(UpdateProductListingRequest) returns (UpdateProductListingResponse);
+  rpc DeleteProductListing(DeleteProductListingRequest) returns (DeleteProductListingResponse);
+}
+
+message ListProductListingsRequest {
+  optional uint32 product_id = 1;
+}
+
+message ListProductListingsResponse {
+  repeated ProductListing listings = 1;
+}
+
+message GetProductListingRequest {
+  uint32 id = 1;
+}
+
+message GetProductListingResponse {
+  ProductListing listing = 1;
+}
+
+message CreateProductListingRequest {
+  uint32 product_id = 1;
+  int64 price = 2;
+  string status = 3;
+  google.protobuf.Timestamp listed_at = 4;
+}
+
+message CreateProductListingResponse {
+  ProductListing listing = 1;
+}
+
+message UpdateProductListingRequest {
+  uint32 id = 1;
+  uint32 product_id = 2;
+  int64 price = 3;
+  string status = 4;
+  google.protobuf.Timestamp listed_at = 5;
+  google.protobuf.Timestamp ended_at = 6;
+}
+
+message UpdateProductListingResponse {
+  ProductListing listing = 1;
+}
+
+message DeleteProductListingRequest {
+  uint32 id = 1;
+}
+
+message DeleteProductListingResponse {}

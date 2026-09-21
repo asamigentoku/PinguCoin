@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1";
+
+message ProductInventory {
+  uint32 id = 1;
+  uint32 product_id = 2;
+  int32 quantity = 3;
+  int32 reserved = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+service ProductInventoryService {
+  rpc ListProductInventories(ListProductInventoriesRequest) returns (ListProductInventoriesResponse);
+  rpc GetProductInventory(GetProductInventoryRequest) returns (GetProductInventoryResponse);
+  rpc CreateProductInventory(CreateProductInventoryRequest) returns (CreateProductInventoryResponse);
+  rpc UpdateProductInventory(UpdateProductInventoryRequest) returns (UpdateProductInventoryResponse);
+  rpc DeleteProductInventory(DeleteProductInventoryRequest) returns (DeleteProductInventoryResponse);
+}
+
+message ListProductInventoriesRequest {}
+
+message ListProductInventoriesResponse {
+  repeated ProductInventory inventories = 1;
+}
+
+message GetProductInventoryRequest {
+  uint32 id = 1;
+}
+
+message GetProductInventoryResponse {
+  ProductInventory inventory = 1;
+}
+
+message CreateProductInventoryRequest {
+  uint32 product_id = 1;
+  int32 quantity = 2;
+  int32 reserved = 3;
+}
+
+message CreateProductInventoryResponse {
+  ProductInventory inventory = 1;
+}
+
+message UpdateProductInventoryRequest {
+  uint32 id = 1;
+  uint32 product_id = 2;
+  int32 quantity = 3;
+  int32 reserved = 4;
+}
+
+message UpdateProductInventoryResponse {
+  ProductInventory inventory = 1;
+}
+
+message DeleteProductInventoryRequest {
+  uint32 id = 1;
+}
+
+message DeleteProductInventoryResponse {}

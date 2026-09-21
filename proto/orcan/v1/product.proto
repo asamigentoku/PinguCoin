@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1";
+
+message Product {
+  uint32 id = 1;
+  uint32 user_id = 2;
+  uint32 category_id = 3;
+  string name = 4;
+  string description = 5;
+  string image_url = 6;
+  int64 price = 7;
+  string status = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+service ProductService {
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+  rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+}
+
+message ListProductsRequest {
+  optional uint32 user_id = 1;
+}
+
+message ListProductsResponse {
+  // repeated は Protocol Buffers で「配列(リスト)」を表すキーワード。
+  // Go に変換されると以下のようになる:
+  //   type ListProductsResponse struct {
+  //       Products []*Product `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+  //   }
+  repeated Product products = 1;
+}
+
+message GetProductRequest {
+  uint32 id = 1;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+message CreateProductRequest {
+  uint32 user_id = 1;
+  uint32 category_id = 2;
+  string name = 3;
+  string description = 4;
+  string image_url = 5;
+  int64 price = 6;
+  string status = 7;
+}
+
+message CreateProductResponse {
+  Product product = 1;
+}
+
+message UpdateProductRequest {
+  uint32 id = 1;
+  uint32 user_id = 2;
+  uint32 category_id = 3;
+  string name = 4;
+  string description = 5;
+  string image_url = 6;
+  int64 price = 7;
+  string status = 8;
+}
+
+message UpdateProductResponse {
+  Product product = 1;
+}
+
+message DeleteProductRequest {
+  uint32 id = 1;
+}
+
+message DeleteProductResponse {}

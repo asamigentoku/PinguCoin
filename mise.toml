@@ -1,0 +1,4 @@
+[tools]
+buf = "latest"
+go = "1.27.1"
+grpcurl = "latest"

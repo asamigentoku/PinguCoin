@@ -1,0 +1,85 @@
+name: pingucoin-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pingucoin-postgres
+    restart: unless-stopped
+    env_file:
+      - ./postgres/.env.local
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # $$ はCompose自身に解決させず、コンテナ内のシェルにそのまま渡して
+      # postgres/.env の値(env_file)で展開させるためのエスケープ。
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pingucoin
+
+  redis:
+    image: redis:7-alpine
+    container_name: pingucoin-redis
+    restart: unless-stopped
+    env_file:
+      - ./redis/.env.local
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pingucoin
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: pingucoin-kafka
+    hostname: kafka
+    restart: unless-stopped
+    env_file:
+      - ./kafka/.env.local
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - pingucoin
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: pingucoin-azurite
+    restart: unless-stopped
+    env_file:
+      - ./azurite/.env.local
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--debug", "/data/debug.log"]
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite_data:/data
+    networks:
+      - pingucoin
+
+volumes:
+  postgres_data:
+  redis_data:
+  kafka_data:
+  azurite_data:
+
+networks:
+  pingucoin:
+    driver: bridge

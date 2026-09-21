@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1";
+
+message ProductCategory {
+  uint32 id = 1;
+  optional uint32 parent_id = 2;
+  string name = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+service ProductCategoryService {
+  rpc ListProductCategories(ListProductCategoriesRequest) returns (ListProductCategoriesResponse);
+  rpc GetProductCategory(GetProductCategoryRequest) returns (GetProductCategoryResponse);
+  rpc CreateProductCategory(CreateProductCategoryRequest) returns (CreateProductCategoryResponse);
+  rpc UpdateProductCategory(UpdateProductCategoryRequest) returns (UpdateProductCategoryResponse);
+  rpc DeleteProductCategory(DeleteProductCategoryRequest) returns (DeleteProductCategoryResponse);
+}
+
+message ListProductCategoriesRequest {}
+
+message ListProductCategoriesResponse {
+  repeated ProductCategory categories = 1;
+}
+
+message GetProductCategoryRequest {
+  uint32 id = 1;
+}
+
+message GetProductCategoryResponse {
+  ProductCategory category = 1;
+}
+
+message CreateProductCategoryRequest {
+  optional uint32 parent_id = 1;
+  string name = 2;
+}
+
+message CreateProductCategoryResponse {
+  ProductCategory category = 1;
+}
+
+message UpdateProductCategoryRequest {
+  uint32 id = 1;
+  optional uint32 parent_id = 2;
+  string name = 3;
+}
+
+message UpdateProductCategoryResponse {
+  ProductCategory category = 1;
+}
+
+message DeleteProductCategoryRequest {
+  uint32 id = 1;
+}
+
+message DeleteProductCategoryResponse {}
