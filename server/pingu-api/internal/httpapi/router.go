@@ -37,7 +37,7 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	//muxはapp_router
 	mux := http.NewServeMux()
 
-	graphqlServer := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{Orcan: orcan}}))
+	graphqlServer := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{Orcan: orcan, Orders: orderRepo}}))
 	graphqlServer.AddTransport(transport.Options{})
 	graphqlServer.AddTransport(transport.GET{})
 	graphqlServer.AddTransport(transport.POST{})

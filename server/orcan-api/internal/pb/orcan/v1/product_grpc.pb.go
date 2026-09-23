@@ -19,11 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProductService_ListProducts_FullMethodName  = "/orcan.v1.ProductService/ListProducts"
-	ProductService_GetProduct_FullMethodName    = "/orcan.v1.ProductService/GetProduct"
-	ProductService_CreateProduct_FullMethodName = "/orcan.v1.ProductService/CreateProduct"
-	ProductService_UpdateProduct_FullMethodName = "/orcan.v1.ProductService/UpdateProduct"
-	ProductService_DeleteProduct_FullMethodName = "/orcan.v1.ProductService/DeleteProduct"
+	ProductService_ListProducts_FullMethodName              = "/orcan.v1.ProductService/ListProducts"
+	ProductService_GetProduct_FullMethodName                = "/orcan.v1.ProductService/GetProduct"
+	ProductService_CreateProduct_FullMethodName             = "/orcan.v1.ProductService/CreateProduct"
+	ProductService_UpdateProduct_FullMethodName             = "/orcan.v1.ProductService/UpdateProduct"
+	ProductService_DeleteProduct_FullMethodName             = "/orcan.v1.ProductService/DeleteProduct"
+	ProductService_GetProductImageUploadURL_FullMethodName  = "/orcan.v1.ProductService/GetProductImageUploadURL"
+	ProductService_ConfirmProductImageUpload_FullMethodName = "/orcan.v1.ProductService/ConfirmProductImageUpload"
+	ProductService_DeleteProductImageUpload_FullMethodName  = "/orcan.v1.ProductService/DeleteProductImageUpload"
+	ProductService_GetProductFileUploadURL_FullMethodName   = "/orcan.v1.ProductService/GetProductFileUploadURL"
+	ProductService_ConfirmProductFileUpload_FullMethodName  = "/orcan.v1.ProductService/ConfirmProductFileUpload"
+	ProductService_DeleteProductFileUpload_FullMethodName   = "/orcan.v1.ProductService/DeleteProductFileUpload"
+	ProductService_GetProductDownloadURL_FullMethodName     = "/orcan.v1.ProductService/GetProductDownloadURL"
 )
 
 // ProductServiceClient is the client API for ProductService service.
@@ -35,6 +42,29 @@ type ProductServiceClient interface {
 	CreateProduct(ctx context.Context, in *CreateProductRequest, opts ...grpc.CallOption) (*CreateProductResponse, error)
 	UpdateProduct(ctx context.Context, in *UpdateProductRequest, opts ...grpc.CallOption) (*UpdateProductResponse, error)
 	DeleteProduct(ctx context.Context, in *DeleteProductRequest, opts ...grpc.CallOption) (*DeleteProductResponse, error)
+	// GetProductImageUploadURL は商品画像をAzure Blob Storageにアップロードするための
+	// 署名付きURL(SAS)を発行する。pingu-api経由で呼ばれる想定(呼び出し元がClerkで
+	// ログイン確認済みのuser_idを渡す)。商品の所有者(user_id)本人のみ発行できる。
+	GetProductImageUploadURL(ctx context.Context, in *GetProductImageUploadURLRequest, opts ...grpc.CallOption) (*GetProductImageUploadURLResponse, error)
+	// ConfirmProductImageUpload はアップロード完了後に呼ばれる。
+	// main_image/配下ならimage_urlとして、sub_images/配下ならproduct_detailの1件として保存する。
+	ConfirmProductImageUpload(ctx context.Context, in *ConfirmProductImageUploadRequest, opts ...grpc.CallOption) (*ConfirmProductImageUploadResponse, error)
+	// DeleteProductImageUpload はアップロード済みの画像ファイルを削除する。
+	DeleteProductImageUpload(ctx context.Context, in *DeleteProductImageUploadRequest, opts ...grpc.CallOption) (*DeleteProductImageUploadResponse, error)
+	// GetProductFileUploadURL は商品ファイルをアップロードするための署名付きURL(SAS)を発行する。
+	// 商品の所有者(user_id)本人のみ発行できる。
+	GetProductFileUploadURL(ctx context.Context, in *GetProductFileUploadURLRequest, opts ...grpc.CallOption) (*GetProductFileUploadURLResponse, error)
+	// ConfirmProductFileUpload はアップロード完了後に呼ばれ、実際に置かれたファイルのURLを
+	// 商品のfile_urlとして保存する。
+	ConfirmProductFileUpload(ctx context.Context, in *ConfirmProductFileUploadRequest, opts ...grpc.CallOption) (*ConfirmProductFileUploadResponse, error)
+	// DeleteProductFileUpload はアップロード済みの商品ファイルを削除する。
+	DeleteProductFileUpload(ctx context.Context, in *DeleteProductFileUploadRequest, opts ...grpc.CallOption) (*DeleteProductFileUploadResponse, error)
+	// GetProductDownloadURL は商品ファイル(file_url)をダウンロードするための
+	// 署名付きURL(有効期限付き、対象のBlob1つだけに限定したSAS)を発行する。
+	// 注意: orcan-apiは購入(決済)状況を持たないため、呼び出し元(pingu-api)が
+	// 「このユーザーはこの商品を取得済みか(所有者本人 or 購入済み)」を事前に検証した上で
+	// 呼び出すこと。orcan-api側では権限チェックを行わない。
+	GetProductDownloadURL(ctx context.Context, in *GetProductDownloadURLRequest, opts ...grpc.CallOption) (*GetProductDownloadURLResponse, error)
 }
 
 type productServiceClient struct {
@@ -95,6 +125,76 @@ func (c *productServiceClient) DeleteProduct(ctx context.Context, in *DeleteProd
 	return out, nil
 }
 
+func (c *productServiceClient) GetProductImageUploadURL(ctx context.Context, in *GetProductImageUploadURLRequest, opts ...grpc.CallOption) (*GetProductImageUploadURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProductImageUploadURLResponse)
+	err := c.cc.Invoke(ctx, ProductService_GetProductImageUploadURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) ConfirmProductImageUpload(ctx context.Context, in *ConfirmProductImageUploadRequest, opts ...grpc.CallOption) (*ConfirmProductImageUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmProductImageUploadResponse)
+	err := c.cc.Invoke(ctx, ProductService_ConfirmProductImageUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) DeleteProductImageUpload(ctx context.Context, in *DeleteProductImageUploadRequest, opts ...grpc.CallOption) (*DeleteProductImageUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteProductImageUploadResponse)
+	err := c.cc.Invoke(ctx, ProductService_DeleteProductImageUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) GetProductFileUploadURL(ctx context.Context, in *GetProductFileUploadURLRequest, opts ...grpc.CallOption) (*GetProductFileUploadURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProductFileUploadURLResponse)
+	err := c.cc.Invoke(ctx, ProductService_GetProductFileUploadURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) ConfirmProductFileUpload(ctx context.Context, in *ConfirmProductFileUploadRequest, opts ...grpc.CallOption) (*ConfirmProductFileUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConfirmProductFileUploadResponse)
+	err := c.cc.Invoke(ctx, ProductService_ConfirmProductFileUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) DeleteProductFileUpload(ctx context.Context, in *DeleteProductFileUploadRequest, opts ...grpc.CallOption) (*DeleteProductFileUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteProductFileUploadResponse)
+	err := c.cc.Invoke(ctx, ProductService_DeleteProductFileUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *productServiceClient) GetProductDownloadURL(ctx context.Context, in *GetProductDownloadURLRequest, opts ...grpc.CallOption) (*GetProductDownloadURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProductDownloadURLResponse)
+	err := c.cc.Invoke(ctx, ProductService_GetProductDownloadURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductServiceServer is the server API for ProductService service.
 // All implementations must embed UnimplementedProductServiceServer
 // for forward compatibility.
@@ -104,6 +204,29 @@ type ProductServiceServer interface {
 	CreateProduct(context.Context, *CreateProductRequest) (*CreateProductResponse, error)
 	UpdateProduct(context.Context, *UpdateProductRequest) (*UpdateProductResponse, error)
 	DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error)
+	// GetProductImageUploadURL は商品画像をAzure Blob Storageにアップロードするための
+	// 署名付きURL(SAS)を発行する。pingu-api経由で呼ばれる想定(呼び出し元がClerkで
+	// ログイン確認済みのuser_idを渡す)。商品の所有者(user_id)本人のみ発行できる。
+	GetProductImageUploadURL(context.Context, *GetProductImageUploadURLRequest) (*GetProductImageUploadURLResponse, error)
+	// ConfirmProductImageUpload はアップロード完了後に呼ばれる。
+	// main_image/配下ならimage_urlとして、sub_images/配下ならproduct_detailの1件として保存する。
+	ConfirmProductImageUpload(context.Context, *ConfirmProductImageUploadRequest) (*ConfirmProductImageUploadResponse, error)
+	// DeleteProductImageUpload はアップロード済みの画像ファイルを削除する。
+	DeleteProductImageUpload(context.Context, *DeleteProductImageUploadRequest) (*DeleteProductImageUploadResponse, error)
+	// GetProductFileUploadURL は商品ファイルをアップロードするための署名付きURL(SAS)を発行する。
+	// 商品の所有者(user_id)本人のみ発行できる。
+	GetProductFileUploadURL(context.Context, *GetProductFileUploadURLRequest) (*GetProductFileUploadURLResponse, error)
+	// ConfirmProductFileUpload はアップロード完了後に呼ばれ、実際に置かれたファイルのURLを
+	// 商品のfile_urlとして保存する。
+	ConfirmProductFileUpload(context.Context, *ConfirmProductFileUploadRequest) (*ConfirmProductFileUploadResponse, error)
+	// DeleteProductFileUpload はアップロード済みの商品ファイルを削除する。
+	DeleteProductFileUpload(context.Context, *DeleteProductFileUploadRequest) (*DeleteProductFileUploadResponse, error)
+	// GetProductDownloadURL は商品ファイル(file_url)をダウンロードするための
+	// 署名付きURL(有効期限付き、対象のBlob1つだけに限定したSAS)を発行する。
+	// 注意: orcan-apiは購入(決済)状況を持たないため、呼び出し元(pingu-api)が
+	// 「このユーザーはこの商品を取得済みか(所有者本人 or 購入済み)」を事前に検証した上で
+	// 呼び出すこと。orcan-api側では権限チェックを行わない。
+	GetProductDownloadURL(context.Context, *GetProductDownloadURLRequest) (*GetProductDownloadURLResponse, error)
 	mustEmbedUnimplementedProductServiceServer()
 }
 
@@ -128,6 +251,27 @@ func (UnimplementedProductServiceServer) UpdateProduct(context.Context, *UpdateP
 }
 func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteProduct not implemented")
+}
+func (UnimplementedProductServiceServer) GetProductImageUploadURL(context.Context, *GetProductImageUploadURLRequest) (*GetProductImageUploadURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProductImageUploadURL not implemented")
+}
+func (UnimplementedProductServiceServer) ConfirmProductImageUpload(context.Context, *ConfirmProductImageUploadRequest) (*ConfirmProductImageUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmProductImageUpload not implemented")
+}
+func (UnimplementedProductServiceServer) DeleteProductImageUpload(context.Context, *DeleteProductImageUploadRequest) (*DeleteProductImageUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteProductImageUpload not implemented")
+}
+func (UnimplementedProductServiceServer) GetProductFileUploadURL(context.Context, *GetProductFileUploadURLRequest) (*GetProductFileUploadURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProductFileUploadURL not implemented")
+}
+func (UnimplementedProductServiceServer) ConfirmProductFileUpload(context.Context, *ConfirmProductFileUploadRequest) (*ConfirmProductFileUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ConfirmProductFileUpload not implemented")
+}
+func (UnimplementedProductServiceServer) DeleteProductFileUpload(context.Context, *DeleteProductFileUploadRequest) (*DeleteProductFileUploadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteProductFileUpload not implemented")
+}
+func (UnimplementedProductServiceServer) GetProductDownloadURL(context.Context, *GetProductDownloadURLRequest) (*GetProductDownloadURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProductDownloadURL not implemented")
 }
 func (UnimplementedProductServiceServer) mustEmbedUnimplementedProductServiceServer() {}
 func (UnimplementedProductServiceServer) testEmbeddedByValue()                        {}
@@ -240,6 +384,132 @@ func _ProductService_DeleteProduct_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductService_GetProductImageUploadURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductImageUploadURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).GetProductImageUploadURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_GetProductImageUploadURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).GetProductImageUploadURL(ctx, req.(*GetProductImageUploadURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_ConfirmProductImageUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmProductImageUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).ConfirmProductImageUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_ConfirmProductImageUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).ConfirmProductImageUpload(ctx, req.(*ConfirmProductImageUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_DeleteProductImageUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProductImageUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).DeleteProductImageUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_DeleteProductImageUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).DeleteProductImageUpload(ctx, req.(*DeleteProductImageUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_GetProductFileUploadURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductFileUploadURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).GetProductFileUploadURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_GetProductFileUploadURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).GetProductFileUploadURL(ctx, req.(*GetProductFileUploadURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_ConfirmProductFileUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConfirmProductFileUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).ConfirmProductFileUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_ConfirmProductFileUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).ConfirmProductFileUpload(ctx, req.(*ConfirmProductFileUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_DeleteProductFileUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteProductFileUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).DeleteProductFileUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_DeleteProductFileUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).DeleteProductFileUpload(ctx, req.(*DeleteProductFileUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProductService_GetProductDownloadURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProductDownloadURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductServiceServer).GetProductDownloadURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductService_GetProductDownloadURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductServiceServer).GetProductDownloadURL(ctx, req.(*GetProductDownloadURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductService_ServiceDesc is the grpc.ServiceDesc for ProductService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +536,34 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteProduct",
 			Handler:    _ProductService_DeleteProduct_Handler,
+		},
+		{
+			MethodName: "GetProductImageUploadURL",
+			Handler:    _ProductService_GetProductImageUploadURL_Handler,
+		},
+		{
+			MethodName: "ConfirmProductImageUpload",
+			Handler:    _ProductService_ConfirmProductImageUpload_Handler,
+		},
+		{
+			MethodName: "DeleteProductImageUpload",
+			Handler:    _ProductService_DeleteProductImageUpload_Handler,
+		},
+		{
+			MethodName: "GetProductFileUploadURL",
+			Handler:    _ProductService_GetProductFileUploadURL_Handler,
+		},
+		{
+			MethodName: "ConfirmProductFileUpload",
+			Handler:    _ProductService_ConfirmProductFileUpload_Handler,
+		},
+		{
+			MethodName: "DeleteProductFileUpload",
+			Handler:    _ProductService_DeleteProductFileUpload_Handler,
+		},
+		{
+			MethodName: "GetProductDownloadURL",
+			Handler:    _ProductService_GetProductDownloadURL_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

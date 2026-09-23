@@ -13,10 +13,60 @@ type Product {
   name: String!
   description: String!
   imageUrl: String!
+  # fileUrl は販売対象のデジタルコンテンツのBlob URL(非公開コンテナ)。
+  # このURL自体では閲覧・ダウンロードできず、getProductDownloadUrlで発行した
+  # 署名付きURLが別途必要。
+  fileUrl: String!
   price: Int!
   status: String!
   createdAt: String!
   updatedAt: String!
+}
+
+# 商品画像(main_image/sub_images)を置くための署名付きアップロード先。
+# アップロード先URLは blobEndpoint + "/" + container + "/" + (mainImagePrefix または
+# subImagesPrefix) + <任意のファイル名> + "?" + sasToken という形でクライアントが組み立てる(PUT)。
+# 画像は公開コンテナに置かれるため、アップロード完了後は同じパス(sasToken無し)が
+# そのまま公開URL(署名不要)として使える。
+type ProductImageUploadTarget {
+  blobEndpoint: String!
+  container: String!
+  mainImagePrefix: String!
+  subImagesPrefix: String!
+  sasToken: String!
+  expiresAt: String!
+}
+
+# 商品画像の1件(1商品に対して複数件持てる、main_image以外の追加画像)。
+type ProductDetail {
+  id: Int!
+  productId: Int!
+  imageUrl: String!
+  description: String!
+  sortOrder: Int!
+}
+
+type ConfirmProductImageUploadResult {
+  product: Product!
+  # アップロードしたファイルがsub_images配下だった場合のみ設定される。
+  detail: ProductDetail
+}
+
+# 商品ファイル(販売対象のデジタルコンテンツ)を置くための署名付きアップロード先。
+# アップロード先URLは blobEndpoint + "/" + container + "/" + pathPrefix +
+# <任意のファイル名> + "?" + sasToken という形でクライアントが組み立てる(PUT)。
+# このコンテナは非公開のため、アップロード後の閲覧にはgetProductDownloadUrlが必要。
+type ProductFileUploadTarget {
+  blobEndpoint: String!
+  container: String!
+  pathPrefix: String!
+  sasToken: String!
+  expiresAt: String!
+}
+
+type ProductDownloadTarget {
+  downloadUrl: String!
+  expiresAt: String!
 }
 
 type User {
@@ -67,4 +117,18 @@ type Mutation {
   deleteProduct(id: Int!): Boolean!
 
   updateUser(id: Int!, input: UpdateUserInput!): User!
+
+  # 商品画像(main_image/sub_images)。商品の所有者(ログイン中の本人)のみ実行できる。
+  getProductImageUploadUrl(productId: Int!): ProductImageUploadTarget!
+  confirmProductImageUpload(productId: Int!, fileUrl: String!, description: String, sortOrder: Int): ConfirmProductImageUploadResult!
+  deleteProductImageUpload(productId: Int!, fileUrl: String!): Product!
+
+  # 商品ファイル(販売対象のデジタルコンテンツ)。商品の所有者(ログイン中の本人)のみ実行できる。
+  getProductFileUploadUrl(productId: Int!): ProductFileUploadTarget!
+  confirmProductFileUpload(productId: Int!, fileUrl: String!): Product!
+  deleteProductFileUpload(productId: Int!, fileUrl: String!): Product!
+
+  # 商品ファイルのダウンロードURL発行。商品の所有者本人、またはその商品を購入済み(paid)の
+  # ユーザーのみ実行できる。
+  getProductDownloadUrl(productId: Int!): ProductDownloadTarget!
 }

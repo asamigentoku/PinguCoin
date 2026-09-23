@@ -32,3 +32,13 @@ func (repo *OrderRepository) FindByUser(userID uint) ([]model.Order, error) {
 	err := repo.db.Where("user_id = ?", userID).Order("id desc").Find(&orders).Error
 	return orders, err
 }
+
+// HasPaidOrder はuserIDがproductIDを支払い済み(status="paid")で注文したことがあるかを返す。
+// 商品ファイルのダウンロード許可判定に使う。
+func (repo *OrderRepository) HasPaidOrder(userID, productID uint) (bool, error) {
+	var count int64
+	err := repo.db.Model(&model.Order{}).
+		Where("user_id = ? AND product_id = ? AND status = ?", userID, productID, "paid").
+		Count(&count).Error
+	return count > 0, err
+}

@@ -17,6 +17,10 @@ type Config struct {
 
 	// ClerkSecretKey はClerkのBackend API(JWKS取得・ユーザー情報取得)を呼ぶためのSecret Key。
 	ClerkSecretKey string
+
+	// InternalAPIToken はorcan-api/payment-apiへのgRPC呼び出しに付与する共有シークレット。
+	// pingu-api/orcan-api/payment-apiで同じ値を設定する。
+	InternalAPIToken string
 }
 
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
@@ -34,6 +38,8 @@ func Load() Config {
 		PaymentAddr: getEnv("PAYMENT_API_ADDR", "localhost:8081"),
 
 		ClerkSecretKey: getEnv("CLERK_SECRET_KEY", ""),
+
+		InternalAPIToken: getEnv("INTERNAL_API_TOKEN", ""),
 	}
 }
 

@@ -2,6 +2,11 @@
 
 package model
 
+type ConfirmProductImageUploadResult struct {
+	Product *Product       `json:"product"`
+	Detail  *ProductDetail `json:"detail,omitempty"`
+}
+
 type CreateProductInput struct {
 	UserID      int32   `json:"userId"`
 	CategoryID  int32   `json:"categoryId"`
@@ -22,10 +27,41 @@ type Product struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	ImageURL    string `json:"imageUrl"`
+	FileURL     string `json:"fileUrl"`
 	Price       int32  `json:"price"`
 	Status      string `json:"status"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
+}
+
+type ProductDetail struct {
+	ID          int32  `json:"id"`
+	ProductID   int32  `json:"productId"`
+	ImageURL    string `json:"imageUrl"`
+	Description string `json:"description"`
+	SortOrder   int32  `json:"sortOrder"`
+}
+
+type ProductDownloadTarget struct {
+	DownloadURL string `json:"downloadUrl"`
+	ExpiresAt   string `json:"expiresAt"`
+}
+
+type ProductFileUploadTarget struct {
+	BlobEndpoint string `json:"blobEndpoint"`
+	Container    string `json:"container"`
+	PathPrefix   string `json:"pathPrefix"`
+	SasToken     string `json:"sasToken"`
+	ExpiresAt    string `json:"expiresAt"`
+}
+
+type ProductImageUploadTarget struct {
+	BlobEndpoint    string `json:"blobEndpoint"`
+	Container       string `json:"container"`
+	MainImagePrefix string `json:"mainImagePrefix"`
+	SubImagesPrefix string `json:"subImagesPrefix"`
+	SasToken        string `json:"sasToken"`
+	ExpiresAt       string `json:"expiresAt"`
 }
 
 type Query struct {

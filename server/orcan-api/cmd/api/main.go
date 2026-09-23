@@ -14,6 +14,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/interceptor"
 	pb "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1"
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/repository"
+	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/storage"
 )
 
 func main() {
@@ -22,6 +23,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	if cfg.InternalAPIToken == "" {
+		logger.Error("INTERNAL_API_TOKEN is required")
+		os.Exit(1)
+	}
 
 	db, err := database.Connect(cfg, logger)
 	if err != nil {
@@ -35,6 +40,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	blobStorage, err := storage.New(cfg.AzureStorageConnectionString, cfg.AzureStoragePublicContainer, cfg.AzureStoragePrivateContainer, cfg.AppEnv)
+	if err != nil {
+		logger.Error("failed to init blob storage client", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	// gRPCはHTTPサーバーと同じくTCPソケットで待ち受ける。
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -45,8 +56,12 @@ func main() {
 	// interceptor.Logging を挟むことで、以降登録する全RPCの
 	// 呼び出しログ(メソッド名・処理時間・結果コード)が自動的に出るようになる。
 	// 各ハンドラー(internal/grpcserver)側で個別にログを書く必要はない。
+	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(interceptor.Logging(logger)),
+		grpc.ChainUnaryInterceptor(
+			interceptor.Logging(logger),
+			interceptor.Auth(cfg.InternalAPIToken),
+		),
 	)
 
 	// proto定義した各サービス(ProductService等)の実装を登録する。
@@ -54,9 +69,10 @@ func main() {
 	// 「このgRPCサーバーに、このRPCが来たらこの実装(grpcserver.NewXxxServer)を呼ぶ」
 	// というルーティングをserverの内部に登録する処理。
 	// 各実装(grpcserver.NewXxxServer)はDBアクセス用のrepositoryを注入されて動く。
-	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(repository.NewProductRepository(db)))
+	detailRepo := repository.NewProductDetailRepository(db)
+	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(repository.NewProductRepository(db), detailRepo, blobStorage))
 	pb.RegisterProductCategoryServiceServer(server, grpcserver.NewProductCategoryServer(repository.NewProductCategoryRepository(db)))
-	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(repository.NewProductDetailRepository(db)))
+	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(detailRepo))
 	pb.RegisterProductInventoryServiceServer(server, grpcserver.NewProductInventoryServer(repository.NewProductInventoryRepository(db)))
 	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServer(repository.NewProductListingRepository(db)))
 

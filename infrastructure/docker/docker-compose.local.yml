@@ -66,7 +66,9 @@ services:
     restart: unless-stopped
     env_file:
       - ./azurite/.env.local
-    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--debug", "/data/debug.log"]
+    # --skipApiVersionCheck: Azure SDKが送るx-ms-versionがAzuriteの対応バージョンより新しい場合に
+    # 拒否されてしまう問題を回避する(ローカル開発用エミュレーターのみの設定、本番のAzureには影響しない)。
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--debug", "/data/debug.log", "--skipApiVersionCheck"]
     ports:
       - "10000:10000"
     volumes:

@@ -15,8 +15,8 @@ import (
 )
 
 // CreateProduct is the resolver for the createProduct field.
-func (resolver *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
-	response, err := resolver.Orcan.Product.CreateProduct(ctx, &orcanpb.CreateProductRequest{
+func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
+	response, err := r.Orcan.Product.CreateProduct(ctx, &orcanpb.CreateProductRequest{
 		UserId:      uint32(input.UserID),
 		CategoryId:  uint32(input.CategoryID),
 		Name:        input.Name,
@@ -32,8 +32,8 @@ func (resolver *mutationResolver) CreateProduct(ctx context.Context, input model
 }
 
 // UpdateProduct is the resolver for the updateProduct field.
-func (resolver *mutationResolver) UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error) {
-	response, err := resolver.Orcan.Product.UpdateProduct(ctx, &orcanpb.UpdateProductRequest{
+func (r *mutationResolver) UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error) {
+	response, err := r.Orcan.Product.UpdateProduct(ctx, &orcanpb.UpdateProductRequest{
 		Id:          uint32(id),
 		UserId:      uint32(input.UserID),
 		CategoryId:  uint32(input.CategoryID),
@@ -50,15 +50,15 @@ func (resolver *mutationResolver) UpdateProduct(ctx context.Context, id int32, i
 }
 
 // DeleteProduct is the resolver for the deleteProduct field.
-func (resolver *mutationResolver) DeleteProduct(ctx context.Context, id int32) (bool, error) {
-	if _, err := resolver.Orcan.Product.DeleteProduct(ctx, &orcanpb.DeleteProductRequest{Id: uint32(id)}); err != nil {
+func (r *mutationResolver) DeleteProduct(ctx context.Context, id int32) (bool, error) {
+	if _, err := r.Orcan.Product.DeleteProduct(ctx, &orcanpb.DeleteProductRequest{Id: uint32(id)}); err != nil {
 		return false, apperr.FromGRPC(err)
 	}
 	return true, nil
 }
 
 // UpdateUser is the resolver for the updateUser field。ログイン中の本人のみ更新できる。
-func (resolver *mutationResolver) UpdateUser(ctx context.Context, id int32, input model.UpdateUserInput) (*model.User, error) {
+func (r *mutationResolver) UpdateUser(ctx context.Context, id int32, input model.UpdateUserInput) (*model.User, error) {
 	claims, ok := reqcontext.UserFromContext(ctx)
 	if !ok {
 		return nil, apperr.Unauthenticated("login is required")
@@ -67,7 +67,7 @@ func (resolver *mutationResolver) UpdateUser(ctx context.Context, id int32, inpu
 		return nil, apperr.Unauthenticated("cannot update another user")
 	}
 
-	response, err := resolver.Orcan.User.UpdateUser(ctx, &orcanpb.UpdateUserRequest{
+	response, err := r.Orcan.User.UpdateUser(ctx, &orcanpb.UpdateUserRequest{
 		Id:   uint32(id),
 		Name: input.Name,
 	})
@@ -77,15 +77,192 @@ func (resolver *mutationResolver) UpdateUser(ctx context.Context, id int32, inpu
 	return userFromPB(response.GetUser()), nil
 }
 
+// GetProductImageUploadURL is the resolver for the getProductImageUploadUrl field.
+func (r *mutationResolver) GetProductImageUploadURL(ctx context.Context, productID int32) (*model.ProductImageUploadTarget, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	response, err := r.Orcan.Product.GetProductImageUploadURL(ctx, &orcanpb.GetProductImageUploadURLRequest{
+		UserId:    uint32(claims.UserID),
+		ProductId: uint32(productID),
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+
+	return &model.ProductImageUploadTarget{
+		BlobEndpoint:    response.GetBlobEndpoint(),
+		Container:       response.GetContainer(),
+		MainImagePrefix: response.GetMainImagePrefix(),
+		SubImagesPrefix: response.GetSubImagesPrefix(),
+		SasToken:        response.GetSasToken(),
+		ExpiresAt:       formatTimestamp(response.GetExpiresAt().AsTime()),
+	}, nil
+}
+
+// ConfirmProductImageUpload is the resolver for the confirmProductImageUpload field.
+func (r *mutationResolver) ConfirmProductImageUpload(ctx context.Context, productID int32, fileURL string, description *string, sortOrder *int32) (*model.ConfirmProductImageUploadResult, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	var sortOrderValue int32
+	if sortOrder != nil {
+		sortOrderValue = *sortOrder
+	}
+
+	response, err := r.Orcan.Product.ConfirmProductImageUpload(ctx, &orcanpb.ConfirmProductImageUploadRequest{
+		UserId:      uint32(claims.UserID),
+		ProductId:   uint32(productID),
+		FileUrl:     fileURL,
+		Description: strOrEmpty(description),
+		SortOrder:   sortOrderValue,
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+
+	result := &model.ConfirmProductImageUploadResult{Product: productFromPB(response.GetProduct())}
+	// detail_idはsub_images配下だった場合のみproto側で設定される(0=未設定)。
+	if response.GetDetailId() != 0 {
+		result.Detail = &model.ProductDetail{
+			ID:          int32(response.GetDetailId()),
+			ProductID:   productID,
+			ImageURL:    response.GetDetailImageUrl(),
+			Description: response.GetDetailDescription(),
+			SortOrder:   response.GetDetailSortOrder(),
+		}
+	}
+	return result, nil
+}
+
+// DeleteProductImageUpload is the resolver for the deleteProductImageUpload field.
+func (r *mutationResolver) DeleteProductImageUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	response, err := r.Orcan.Product.DeleteProductImageUpload(ctx, &orcanpb.DeleteProductImageUploadRequest{
+		UserId:    uint32(claims.UserID),
+		ProductId: uint32(productID),
+		FileUrl:   fileURL,
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+	return productFromPB(response.GetProduct()), nil
+}
+
+// GetProductFileUploadURL is the resolver for the getProductFileUploadUrl field.
+func (r *mutationResolver) GetProductFileUploadURL(ctx context.Context, productID int32) (*model.ProductFileUploadTarget, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	response, err := r.Orcan.Product.GetProductFileUploadURL(ctx, &orcanpb.GetProductFileUploadURLRequest{
+		UserId:    uint32(claims.UserID),
+		ProductId: uint32(productID),
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+
+	return &model.ProductFileUploadTarget{
+		BlobEndpoint: response.GetBlobEndpoint(),
+		Container:    response.GetContainer(),
+		PathPrefix:   response.GetPathPrefix(),
+		SasToken:     response.GetSasToken(),
+		ExpiresAt:    formatTimestamp(response.GetExpiresAt().AsTime()),
+	}, nil
+}
+
+// ConfirmProductFileUpload is the resolver for the confirmProductFileUpload field.
+func (r *mutationResolver) ConfirmProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	response, err := r.Orcan.Product.ConfirmProductFileUpload(ctx, &orcanpb.ConfirmProductFileUploadRequest{
+		UserId:    uint32(claims.UserID),
+		ProductId: uint32(productID),
+		FileUrl:   fileURL,
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+	return productFromPB(response.GetProduct()), nil
+}
+
+// DeleteProductFileUpload is the resolver for the deleteProductFileUpload field.
+func (r *mutationResolver) DeleteProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	response, err := r.Orcan.Product.DeleteProductFileUpload(ctx, &orcanpb.DeleteProductFileUploadRequest{
+		UserId:    uint32(claims.UserID),
+		ProductId: uint32(productID),
+		FileUrl:   fileURL,
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+	return productFromPB(response.GetProduct()), nil
+}
+
+// GetProductDownloadURL is the resolver for the getProductDownloadUrl field.
+// 商品の所有者本人、またはその商品を購入済み(status="paid")のユーザーのみ許可する。
+// orcan-api自身は購入状況を持たないため、この権限チェックはpingu-api側の責務になる。
+func (r *mutationResolver) GetProductDownloadURL(ctx context.Context, productID int32) (*model.ProductDownloadTarget, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+
+	productResponse, err := r.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(productID)})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+
+	if productResponse.GetProduct().GetUserId() != uint32(claims.UserID) {
+		purchased, err := r.Orders.HasPaidOrder(claims.UserID, uint(productID))
+		if err != nil {
+			return nil, apperr.Internal(err)
+		}
+		if !purchased {
+			return nil, apperr.Unauthenticated("product not purchased")
+		}
+	}
+
+	response, err := r.Orcan.Product.GetProductDownloadURL(ctx, &orcanpb.GetProductDownloadURLRequest{
+		ProductId: uint32(productID),
+	})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+
+	return &model.ProductDownloadTarget{
+		DownloadURL: response.GetDownloadUrl(),
+		ExpiresAt:   formatTimestamp(response.GetExpiresAt().AsTime()),
+	}, nil
+}
+
 // Products is the resolver for the products field.
-func (resolver *queryResolver) Products(ctx context.Context, userID *int32) ([]*model.Product, error) {
+func (r *queryResolver) Products(ctx context.Context, userID *int32) ([]*model.Product, error) {
 	request := &orcanpb.ListProductsRequest{}
 	if userID != nil {
 		userIDValue := uint32(*userID)
 		request.UserId = &userIDValue
 	}
 
-	response, err := resolver.Orcan.Product.ListProducts(ctx, request)
+	response, err := r.Orcan.Product.ListProducts(ctx, request)
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
@@ -98,8 +275,8 @@ func (resolver *queryResolver) Products(ctx context.Context, userID *int32) ([]*
 }
 
 // Product is the resolver for the product field.
-func (resolver *queryResolver) Product(ctx context.Context, id int32) (*model.Product, error) {
-	response, err := resolver.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(id)})
+func (r *queryResolver) Product(ctx context.Context, id int32) (*model.Product, error) {
+	response, err := r.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(id)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
@@ -107,8 +284,8 @@ func (resolver *queryResolver) Product(ctx context.Context, id int32) (*model.Pr
 }
 
 // Users is the resolver for the users field.
-func (resolver *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
-	response, err := resolver.Orcan.User.ListUsers(ctx, &orcanpb.ListUsersRequest{})
+func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
+	response, err := r.Orcan.User.ListUsers(ctx, &orcanpb.ListUsersRequest{})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
@@ -121,8 +298,8 @@ func (resolver *queryResolver) Users(ctx context.Context) ([]*model.User, error)
 }
 
 // User is the resolver for the user field.
-func (resolver *queryResolver) User(ctx context.Context, id int32) (*model.User, error) {
-	response, err := resolver.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(id)})
+func (r *queryResolver) User(ctx context.Context, id int32) (*model.User, error) {
+	response, err := r.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(id)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
@@ -130,13 +307,13 @@ func (resolver *queryResolver) User(ctx context.Context, id int32) (*model.User,
 }
 
 // Me is the resolver for the me field.
-func (resolver *queryResolver) Me(ctx context.Context) (*model.User, error) {
+func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	claims, ok := reqcontext.UserFromContext(ctx)
 	if !ok {
 		return nil, apperr.Unauthenticated("login is required")
 	}
 
-	response, err := resolver.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(claims.UserID)})
+	response, err := r.Orcan.User.GetUser(ctx, &orcanpb.GetUserRequest{Id: uint32(claims.UserID)})
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
@@ -144,10 +321,10 @@ func (resolver *queryResolver) Me(ctx context.Context) (*model.User, error) {
 }
 
 // Mutation returns MutationResolver implementation.
-func (resolver *Resolver) Mutation() MutationResolver { return &mutationResolver{resolver} }
+func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 // Query returns QueryResolver implementation.
-func (resolver *Resolver) Query() QueryResolver { return &queryResolver{resolver} }
+func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type (
 	mutationResolver struct{ *Resolver }

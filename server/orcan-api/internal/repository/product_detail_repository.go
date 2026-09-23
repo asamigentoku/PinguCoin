@@ -43,3 +43,9 @@ func (repo *ProductDetailRepository) Update(detail *model.ProductDetail) error {
 func (repo *ProductDetailRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.ProductDetail{}, id).Error
 }
+
+// DeleteByImageURL はproduct_id + image_urlに一致するレコードを削除する
+// (アップロード済みのサブ画像ファイルを削除した際に、対応するレコードも消すために使う)。
+func (repo *ProductDetailRepository) DeleteByImageURL(productID uint, imageURL string) error {
+	return repo.db.Where("product_id = ? AND image_url = ?", productID, imageURL).Delete(&model.ProductDetail{}).Error
+}

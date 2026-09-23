@@ -7,7 +7,7 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 
 | テーブル | 説明 |
 | --- | --- |
-| `products` | 商品(`user_id`=出品者, `image_url`=メイン画像のblob URL) |
+| `products` | 商品(`user_id`=出品者, `image_url`=メイン画像のblob URL, `file_url`=販売対象のデジタルコンテンツのblob URL) |
 | `product_categories` | 商品カテゴリ |
 | `product_detail` | 商品画像・詳細 |
 | `product_inventory` | 在庫 |
@@ -18,7 +18,15 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 
 各リソースに対して標準的なCRUDのgRPCサービスを提供する(定義: `proto/orcan/v1/*.proto`)。
 
-- `orcan.v1.ProductService`: `ListProducts`(`user_id`で絞り込み可), `GetProduct`, `CreateProduct`, `UpdateProduct`, `DeleteProduct`
+- `orcan.v1.ProductService`: `ListProducts`(`user_id`で絞り込み可), `GetProduct`, `CreateProduct`, `UpdateProduct`, `DeleteProduct`。
+  加えてAzure Blob Storageへの画像/ファイルアップロード・ダウンロード用に以下を提供する(いずれも商品の所有者本人のみ実行可、詳細は`internal/storage`参照):
+  - `GetProductImageUploadURL` / `ConfirmProductImageUpload` / `DeleteProductImageUpload`:
+    商品画像(`main_image`/`sub_images`)用。公開コンテナに保存するため、アップロード後は署名不要の公開URLでそのまま閲覧できる。
+    `main_image`配下は`products.image_url`、`sub_images`配下は`product_detail`の1件として保存する。
+  - `GetProductFileUploadURL` / `ConfirmProductFileUpload` / `DeleteProductFileUpload` / `GetProductDownloadURL`:
+    販売対象のデジタルコンテンツ(`products.file_url`)用。非公開コンテナに保存し、ダウンロードのたびに
+    `GetProductDownloadURL`で発行する署名付きURL(Blob単位、有効期限付き)が必要。
+    orcan-apiは購入状況を持たないため、呼び出し元(pingu-api)が権限確認済みであることを前提とする。
 - `orcan.v1.ProductCategoryService`: `ListProductCategories`, `GetProductCategory`, `CreateProductCategory`, `UpdateProductCategory`, `DeleteProductCategory`
 - `orcan.v1.ProductDetailService`: `ListProductDetails`(`product_id`で絞り込み可), `GetProductDetail`, `CreateProductDetail`, `UpdateProductDetail`, `DeleteProductDetail`
 - `orcan.v1.ProductInventoryService`: `ListProductInventories`, `GetProductInventory`, `CreateProductInventory`, `UpdateProductInventory`, `DeleteProductInventory`

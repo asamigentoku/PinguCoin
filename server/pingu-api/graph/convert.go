@@ -21,6 +21,7 @@ func productFromPB(product *orcanpb.Product) *model.Product {
 		Name:        product.GetName(),
 		Description: product.GetDescription(),
 		ImageURL:    product.GetImageUrl(),
+		FileURL:     product.GetFileUrl(),
 		Price:       int32(product.GetPrice()),
 		Status:      product.GetStatus(),
 		CreatedAt:   formatTimestamp(product.GetCreatedAt().AsTime()),

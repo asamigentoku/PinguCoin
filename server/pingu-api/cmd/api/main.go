@@ -19,6 +19,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	if cfg.InternalAPIToken == "" {
+		logger.Error("INTERNAL_API_TOKEN is required")
+		os.Exit(1)
+	}
 	clerkauth.Init(cfg.ClerkSecretKey)
 
 	db, err := database.Connect(cfg, logger)
@@ -32,14 +36,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	orcan, err := orcanclient.New(cfg.OrcanAddr)
+	orcan, err := orcanclient.New(cfg.OrcanAddr, cfg.InternalAPIToken)
 	if err != nil {
 		logger.Error("failed to connect orcan-api", slog.Any("error", err))
 		os.Exit(1)
 	}
 	defer orcan.Close()
 
-	payment, err := paymentclient.New(cfg.PaymentAddr)
+	payment, err := paymentclient.New(cfg.PaymentAddr, cfg.InternalAPIToken)
 	if err != nil {
 		logger.Error("failed to connect payment-api", slog.Any("error", err))
 		os.Exit(1)

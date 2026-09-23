@@ -21,6 +21,10 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	if cfg.InternalAPIToken == "" {
+		logger.Error("INTERNAL_API_TOKEN is required")
+		os.Exit(1)
+	}
 
 	db, err := database.Connect(cfg, logger)
 	if err != nil {
@@ -39,8 +43,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(interceptor.Logging(logger)),
+		grpc.ChainUnaryInterceptor(
+			interceptor.Logging(logger),
+			interceptor.Auth(cfg.InternalAPIToken),
+		),
 	)
 
 	pointRepo := repository.NewPointRepository(db)

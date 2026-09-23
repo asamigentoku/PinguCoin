@@ -18,9 +18,10 @@ import (
 type Reason string
 
 const (
-	ReasonNotFound        Reason = "NOT_FOUND"
-	ReasonInvalidArgument Reason = "INVALID_ARGUMENT"
-	ReasonInternal        Reason = "INTERNAL"
+	ReasonNotFound         Reason = "NOT_FOUND"
+	ReasonInvalidArgument  Reason = "INVALID_ARGUMENT"
+	ReasonPermissionDenied Reason = "PERMISSION_DENIED"
+	ReasonInternal         Reason = "INTERNAL"
 )
 
 const domain = "orcan-api"
@@ -76,6 +77,15 @@ func InvalidArgument(message string) *AppError {
 	return &AppError{
 		GRPCCode: codes.InvalidArgument,
 		Reason:   ReasonInvalidArgument,
+		Message:  message,
+	}
+}
+
+// PermissionDenied はリソースへのアクセス権限が無いことを表す(例: 他人の商品を操作しようとした)。
+func PermissionDenied(message string) *AppError {
+	return &AppError{
+		GRPCCode: codes.PermissionDenied,
+		Reason:   ReasonPermissionDenied,
 		Message:  message,
 	}
 }

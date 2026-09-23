@@ -15,6 +15,7 @@ type Product struct {
 	Name        string          `gorm:"size:255;not null" json:"name"`
 	Description string          `gorm:"type:text" json:"description"`
 	ImageURL    string          `gorm:"size:512" json:"image_url"`
+	FileURL     string          `gorm:"size:512" json:"file_url"`
 	Price       int64           `gorm:"not null" json:"price"`
 	Status      string          `gorm:"size:20;not null;default:'draft'" json:"status"`
 	CreatedAt   time.Time       `json:"created_at"`

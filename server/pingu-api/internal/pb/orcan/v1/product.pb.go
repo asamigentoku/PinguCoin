@@ -23,17 +23,21 @@ const (
 )
 
 type Product struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId        uint32                 `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	CategoryId    uint32                 `protobuf:"varint,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	ImageUrl      string                 `protobuf:"bytes,6,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	Price         int64                  `protobuf:"varint,7,opt,name=price,proto3" json:"price,omitempty"`
-	Status        string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId      uint32                 `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	CategoryId  uint32                 `protobuf:"varint,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Name        string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	ImageUrl    string                 `protobuf:"bytes,6,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	Price       int64                  `protobuf:"varint,7,opt,name=price,proto3" json:"price,omitempty"`
+	Status      string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedAt   *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// file_url は販売対象のデジタルコンテンツ(購入者がダウンロードする実体ファイル)のBlob URL。
+	// 非公開コンテナに置かれるため、これ自体では閲覧・ダウンロードできず、
+	// GetProductDownloadURLで発行した署名付きURLが別途必要。
+	FileUrl       string `protobuf:"bytes,11,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,6 +140,13 @@ func (x *Product) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Product) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
 }
 
 type ListProductsRequest struct {
@@ -328,6 +339,7 @@ type CreateProductRequest struct {
 	ImageUrl      string                 `protobuf:"bytes,5,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
 	Price         int64                  `protobuf:"varint,6,opt,name=price,proto3" json:"price,omitempty"`
 	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	FileUrl       string                 `protobuf:"bytes,8,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -411,6 +423,13 @@ func (x *CreateProductRequest) GetStatus() string {
 	return ""
 }
 
+func (x *CreateProductRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
+}
+
 type CreateProductResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
@@ -465,6 +484,7 @@ type UpdateProductRequest struct {
 	ImageUrl      string                 `protobuf:"bytes,6,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
 	Price         int64                  `protobuf:"varint,7,opt,name=price,proto3" json:"price,omitempty"`
 	Status        string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`
+	FileUrl       string                 `protobuf:"bytes,9,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -551,6 +571,13 @@ func (x *UpdateProductRequest) GetPrice() int64 {
 func (x *UpdateProductRequest) GetStatus() string {
 	if x != nil {
 		return x.Status
+	}
+	return ""
+}
+
+func (x *UpdateProductRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
 	}
 	return ""
 }
@@ -679,11 +706,845 @@ func (*DeleteProductResponse) Descriptor() ([]byte, []int) {
 	return file_orcan_v1_product_proto_rawDescGZIP(), []int{10}
 }
 
+type GetProductImageUploadURLRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductImageUploadURLRequest) Reset() {
+	*x = GetProductImageUploadURLRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductImageUploadURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductImageUploadURLRequest) ProtoMessage() {}
+
+func (x *GetProductImageUploadURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductImageUploadURLRequest.ProtoReflect.Descriptor instead.
+func (*GetProductImageUploadURLRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetProductImageUploadURLRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *GetProductImageUploadURLRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+type GetProductImageUploadURLResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// blob_endpoint + "/" + container + "/" + (main_image_prefix または sub_images_prefix) +
+	// <任意のファイル名> + "?" + sas_token という形でアップロード先URLを組み立てる(PUTでアップロード)。
+	// コンテナ全体に書き込めるSASのため、上記2つのプレフィックス配下にしか置かないことは
+	// クライアント側の実装による取り決めである点に注意。
+	// アップロード完了後は、同じパス(blob_endpoint+"/"+container+"/"+blob名、SASクエリ無し)が
+	// そのまま公開URL(署名不要)として使える。
+	BlobEndpoint    string                 `protobuf:"bytes,1,opt,name=blob_endpoint,json=blobEndpoint,proto3" json:"blob_endpoint,omitempty"`
+	Container       string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	MainImagePrefix string                 `protobuf:"bytes,3,opt,name=main_image_prefix,json=mainImagePrefix,proto3" json:"main_image_prefix,omitempty"`
+	SubImagesPrefix string                 `protobuf:"bytes,4,opt,name=sub_images_prefix,json=subImagesPrefix,proto3" json:"sub_images_prefix,omitempty"`
+	SasToken        string                 `protobuf:"bytes,5,opt,name=sas_token,json=sasToken,proto3" json:"sas_token,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetProductImageUploadURLResponse) Reset() {
+	*x = GetProductImageUploadURLResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductImageUploadURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductImageUploadURLResponse) ProtoMessage() {}
+
+func (x *GetProductImageUploadURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductImageUploadURLResponse.ProtoReflect.Descriptor instead.
+func (*GetProductImageUploadURLResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetProductImageUploadURLResponse) GetBlobEndpoint() string {
+	if x != nil {
+		return x.BlobEndpoint
+	}
+	return ""
+}
+
+func (x *GetProductImageUploadURLResponse) GetContainer() string {
+	if x != nil {
+		return x.Container
+	}
+	return ""
+}
+
+func (x *GetProductImageUploadURLResponse) GetMainImagePrefix() string {
+	if x != nil {
+		return x.MainImagePrefix
+	}
+	return ""
+}
+
+func (x *GetProductImageUploadURLResponse) GetSubImagesPrefix() string {
+	if x != nil {
+		return x.SubImagesPrefix
+	}
+	return ""
+}
+
+func (x *GetProductImageUploadURLResponse) GetSasToken() string {
+	if x != nil {
+		return x.SasToken
+	}
+	return ""
+}
+
+func (x *GetProductImageUploadURLResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type ConfirmProductImageUploadRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	UserId    uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	FileUrl   string                 `protobuf:"bytes,3,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	// 以下はfile_urlがsub_images/配下の場合のみ使う(main_image/の場合は無視する)。
+	Description   string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	SortOrder     int32  `protobuf:"varint,5,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmProductImageUploadRequest) Reset() {
+	*x = ConfirmProductImageUploadRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmProductImageUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmProductImageUploadRequest) ProtoMessage() {}
+
+func (x *ConfirmProductImageUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmProductImageUploadRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmProductImageUploadRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ConfirmProductImageUploadRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *ConfirmProductImageUploadRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *ConfirmProductImageUploadRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
+}
+
+func (x *ConfirmProductImageUploadRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ConfirmProductImageUploadRequest) GetSortOrder() int32 {
+	if x != nil {
+		return x.SortOrder
+	}
+	return 0
+}
+
+type ConfirmProductImageUploadResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Product *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	// file_urlがsub_images/配下だった場合のみ設定される(作成されたproduct_detailの情報)。
+	DetailId          uint32 `protobuf:"varint,2,opt,name=detail_id,json=detailId,proto3" json:"detail_id,omitempty"`
+	DetailImageUrl    string `protobuf:"bytes,3,opt,name=detail_image_url,json=detailImageUrl,proto3" json:"detail_image_url,omitempty"`
+	DetailDescription string `protobuf:"bytes,4,opt,name=detail_description,json=detailDescription,proto3" json:"detail_description,omitempty"`
+	DetailSortOrder   int32  `protobuf:"varint,5,opt,name=detail_sort_order,json=detailSortOrder,proto3" json:"detail_sort_order,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConfirmProductImageUploadResponse) Reset() {
+	*x = ConfirmProductImageUploadResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmProductImageUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmProductImageUploadResponse) ProtoMessage() {}
+
+func (x *ConfirmProductImageUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmProductImageUploadResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmProductImageUploadResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ConfirmProductImageUploadResponse) GetProduct() *Product {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+func (x *ConfirmProductImageUploadResponse) GetDetailId() uint32 {
+	if x != nil {
+		return x.DetailId
+	}
+	return 0
+}
+
+func (x *ConfirmProductImageUploadResponse) GetDetailImageUrl() string {
+	if x != nil {
+		return x.DetailImageUrl
+	}
+	return ""
+}
+
+func (x *ConfirmProductImageUploadResponse) GetDetailDescription() string {
+	if x != nil {
+		return x.DetailDescription
+	}
+	return ""
+}
+
+func (x *ConfirmProductImageUploadResponse) GetDetailSortOrder() int32 {
+	if x != nil {
+		return x.DetailSortOrder
+	}
+	return 0
+}
+
+type DeleteProductImageUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	FileUrl       string                 `protobuf:"bytes,3,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductImageUploadRequest) Reset() {
+	*x = DeleteProductImageUploadRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductImageUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductImageUploadRequest) ProtoMessage() {}
+
+func (x *DeleteProductImageUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductImageUploadRequest.ProtoReflect.Descriptor instead.
+func (*DeleteProductImageUploadRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *DeleteProductImageUploadRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *DeleteProductImageUploadRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *DeleteProductImageUploadRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
+}
+
+type DeleteProductImageUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductImageUploadResponse) Reset() {
+	*x = DeleteProductImageUploadResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductImageUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductImageUploadResponse) ProtoMessage() {}
+
+func (x *DeleteProductImageUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductImageUploadResponse.ProtoReflect.Descriptor instead.
+func (*DeleteProductImageUploadResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DeleteProductImageUploadResponse) GetProduct() *Product {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type GetProductFileUploadURLRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductFileUploadURLRequest) Reset() {
+	*x = GetProductFileUploadURLRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductFileUploadURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductFileUploadURLRequest) ProtoMessage() {}
+
+func (x *GetProductFileUploadURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductFileUploadURLRequest.ProtoReflect.Descriptor instead.
+func (*GetProductFileUploadURLRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetProductFileUploadURLRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *GetProductFileUploadURLRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+type GetProductFileUploadURLResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// blob_endpoint + "/" + container + "/" + path_prefix + <任意のファイル名> + "?" + sas_token
+	// という形でアップロード先URLを組み立てる(PUTでアップロード)。このコンテナは非公開。
+	BlobEndpoint  string                 `protobuf:"bytes,1,opt,name=blob_endpoint,json=blobEndpoint,proto3" json:"blob_endpoint,omitempty"`
+	Container     string                 `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	PathPrefix    string                 `protobuf:"bytes,3,opt,name=path_prefix,json=pathPrefix,proto3" json:"path_prefix,omitempty"`
+	SasToken      string                 `protobuf:"bytes,4,opt,name=sas_token,json=sasToken,proto3" json:"sas_token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductFileUploadURLResponse) Reset() {
+	*x = GetProductFileUploadURLResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductFileUploadURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductFileUploadURLResponse) ProtoMessage() {}
+
+func (x *GetProductFileUploadURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductFileUploadURLResponse.ProtoReflect.Descriptor instead.
+func (*GetProductFileUploadURLResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetProductFileUploadURLResponse) GetBlobEndpoint() string {
+	if x != nil {
+		return x.BlobEndpoint
+	}
+	return ""
+}
+
+func (x *GetProductFileUploadURLResponse) GetContainer() string {
+	if x != nil {
+		return x.Container
+	}
+	return ""
+}
+
+func (x *GetProductFileUploadURLResponse) GetPathPrefix() string {
+	if x != nil {
+		return x.PathPrefix
+	}
+	return ""
+}
+
+func (x *GetProductFileUploadURLResponse) GetSasToken() string {
+	if x != nil {
+		return x.SasToken
+	}
+	return ""
+}
+
+func (x *GetProductFileUploadURLResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type ConfirmProductFileUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	FileUrl       string                 `protobuf:"bytes,3,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmProductFileUploadRequest) Reset() {
+	*x = ConfirmProductFileUploadRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmProductFileUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmProductFileUploadRequest) ProtoMessage() {}
+
+func (x *ConfirmProductFileUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmProductFileUploadRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmProductFileUploadRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ConfirmProductFileUploadRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *ConfirmProductFileUploadRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *ConfirmProductFileUploadRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
+}
+
+type ConfirmProductFileUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmProductFileUploadResponse) Reset() {
+	*x = ConfirmProductFileUploadResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmProductFileUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmProductFileUploadResponse) ProtoMessage() {}
+
+func (x *ConfirmProductFileUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmProductFileUploadResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmProductFileUploadResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ConfirmProductFileUploadResponse) GetProduct() *Product {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type DeleteProductFileUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint32                 `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	FileUrl       string                 `protobuf:"bytes,3,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductFileUploadRequest) Reset() {
+	*x = DeleteProductFileUploadRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductFileUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductFileUploadRequest) ProtoMessage() {}
+
+func (x *DeleteProductFileUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductFileUploadRequest.ProtoReflect.Descriptor instead.
+func (*DeleteProductFileUploadRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *DeleteProductFileUploadRequest) GetUserId() uint32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *DeleteProductFileUploadRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *DeleteProductFileUploadRequest) GetFileUrl() string {
+	if x != nil {
+		return x.FileUrl
+	}
+	return ""
+}
+
+type DeleteProductFileUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductFileUploadResponse) Reset() {
+	*x = DeleteProductFileUploadResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductFileUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductFileUploadResponse) ProtoMessage() {}
+
+func (x *DeleteProductFileUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductFileUploadResponse.ProtoReflect.Descriptor instead.
+func (*DeleteProductFileUploadResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *DeleteProductFileUploadResponse) GetProduct() *Product {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type GetProductDownloadURLRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     uint32                 `protobuf:"varint,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductDownloadURLRequest) Reset() {
+	*x = GetProductDownloadURLRequest{}
+	mi := &file_orcan_v1_product_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductDownloadURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductDownloadURLRequest) ProtoMessage() {}
+
+func (x *GetProductDownloadURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductDownloadURLRequest.ProtoReflect.Descriptor instead.
+func (*GetProductDownloadURLRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetProductDownloadURLRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+type GetProductDownloadURLResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DownloadUrl   string                 `protobuf:"bytes,1,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductDownloadURLResponse) Reset() {
+	*x = GetProductDownloadURLResponse{}
+	mi := &file_orcan_v1_product_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductDownloadURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductDownloadURLResponse) ProtoMessage() {}
+
+func (x *GetProductDownloadURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductDownloadURLResponse.ProtoReflect.Descriptor instead.
+func (*GetProductDownloadURLResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetProductDownloadURLResponse) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+func (x *GetProductDownloadURLResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_orcan_v1_product_proto protoreflect.FileDescriptor
 
 const file_orcan_v1_product_proto_rawDesc = "" +
 	"\n" +
-	"\x16orcan/v1/product.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xca\x02\n" +
+	"\x16orcan/v1/product.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x02\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\rR\x06userId\x12\x1f\n" +
@@ -698,7 +1559,8 @@ const file_orcan_v1_product_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"?\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x19\n" +
+	"\bfile_url\x18\v \x01(\tR\afileUrl\"?\n" +
 	"\x13ListProductsRequest\x12\x1c\n" +
 	"\auser_id\x18\x01 \x01(\rH\x00R\x06userId\x88\x01\x01B\n" +
 	"\n" +
@@ -708,7 +1570,7 @@ const file_orcan_v1_product_proto_rawDesc = "" +
 	"\x11GetProductRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\"A\n" +
 	"\x12GetProductResponse\x12+\n" +
-	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"\xd1\x01\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"\xec\x01\n" +
 	"\x14CreateProductRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1f\n" +
 	"\vcategory_id\x18\x02 \x01(\rR\n" +
@@ -717,9 +1579,10 @@ const file_orcan_v1_product_proto_rawDesc = "" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1b\n" +
 	"\timage_url\x18\x05 \x01(\tR\bimageUrl\x12\x14\n" +
 	"\x05price\x18\x06 \x01(\x03R\x05price\x12\x16\n" +
-	"\x06status\x18\a \x01(\tR\x06status\"D\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12\x19\n" +
+	"\bfile_url\x18\b \x01(\tR\afileUrl\"D\n" +
 	"\x15CreateProductResponse\x12+\n" +
-	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"\xe1\x01\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"\xfc\x01\n" +
 	"\x14UpdateProductRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\rR\x06userId\x12\x1f\n" +
@@ -729,19 +1592,93 @@ const file_orcan_v1_product_proto_rawDesc = "" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x1b\n" +
 	"\timage_url\x18\x06 \x01(\tR\bimageUrl\x12\x14\n" +
 	"\x05price\x18\a \x01(\x03R\x05price\x12\x16\n" +
-	"\x06status\x18\b \x01(\tR\x06status\"D\n" +
+	"\x06status\x18\b \x01(\tR\x06status\x12\x19\n" +
+	"\bfile_url\x18\t \x01(\tR\afileUrl\"D\n" +
 	"\x15UpdateProductResponse\x12+\n" +
 	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"&\n" +
 	"\x14DeleteProductRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\"\x17\n" +
-	"\x15DeleteProductResponse2\x9e\x03\n" +
+	"\x15DeleteProductResponse\"Y\n" +
+	"\x1fGetProductImageUploadURLRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\"\x95\x02\n" +
+	" GetProductImageUploadURLResponse\x12#\n" +
+	"\rblob_endpoint\x18\x01 \x01(\tR\fblobEndpoint\x12\x1c\n" +
+	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12*\n" +
+	"\x11main_image_prefix\x18\x03 \x01(\tR\x0fmainImagePrefix\x12*\n" +
+	"\x11sub_images_prefix\x18\x04 \x01(\tR\x0fsubImagesPrefix\x12\x1b\n" +
+	"\tsas_token\x18\x05 \x01(\tR\bsasToken\x129\n" +
+	"\n" +
+	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xb6\x01\n" +
+	" ConfirmProductImageUploadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\x12\x19\n" +
+	"\bfile_url\x18\x03 \x01(\tR\afileUrl\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1d\n" +
+	"\n" +
+	"sort_order\x18\x05 \x01(\x05R\tsortOrder\"\xf2\x01\n" +
+	"!ConfirmProductImageUploadResponse\x12+\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\x12\x1b\n" +
+	"\tdetail_id\x18\x02 \x01(\rR\bdetailId\x12(\n" +
+	"\x10detail_image_url\x18\x03 \x01(\tR\x0edetailImageUrl\x12-\n" +
+	"\x12detail_description\x18\x04 \x01(\tR\x11detailDescription\x12*\n" +
+	"\x11detail_sort_order\x18\x05 \x01(\x05R\x0fdetailSortOrder\"t\n" +
+	"\x1fDeleteProductImageUploadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\x12\x19\n" +
+	"\bfile_url\x18\x03 \x01(\tR\afileUrl\"O\n" +
+	" DeleteProductImageUploadResponse\x12+\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"X\n" +
+	"\x1eGetProductFileUploadURLRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\"\xdd\x01\n" +
+	"\x1fGetProductFileUploadURLResponse\x12#\n" +
+	"\rblob_endpoint\x18\x01 \x01(\tR\fblobEndpoint\x12\x1c\n" +
+	"\tcontainer\x18\x02 \x01(\tR\tcontainer\x12\x1f\n" +
+	"\vpath_prefix\x18\x03 \x01(\tR\n" +
+	"pathPrefix\x12\x1b\n" +
+	"\tsas_token\x18\x04 \x01(\tR\bsasToken\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"t\n" +
+	"\x1fConfirmProductFileUploadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\x12\x19\n" +
+	"\bfile_url\x18\x03 \x01(\tR\afileUrl\"O\n" +
+	" ConfirmProductFileUploadResponse\x12+\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"s\n" +
+	"\x1eDeleteProductFileUploadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\rR\tproductId\x12\x19\n" +
+	"\bfile_url\x18\x03 \x01(\tR\afileUrl\"N\n" +
+	"\x1fDeleteProductFileUploadResponse\x12+\n" +
+	"\aproduct\x18\x01 \x01(\v2\x11.orcan.v1.ProductR\aproduct\"=\n" +
+	"\x1cGetProductDownloadURLRequest\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\rR\tproductId\"}\n" +
+	"\x1dGetProductDownloadURLResponse\x12!\n" +
+	"\fdownload_url\x18\x01 \x01(\tR\vdownloadUrl\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xb7\t\n" +
 	"\x0eProductService\x12M\n" +
 	"\fListProducts\x12\x1d.orcan.v1.ListProductsRequest\x1a\x1e.orcan.v1.ListProductsResponse\x12G\n" +
 	"\n" +
 	"GetProduct\x12\x1b.orcan.v1.GetProductRequest\x1a\x1c.orcan.v1.GetProductResponse\x12P\n" +
 	"\rCreateProduct\x12\x1e.orcan.v1.CreateProductRequest\x1a\x1f.orcan.v1.CreateProductResponse\x12P\n" +
 	"\rUpdateProduct\x12\x1e.orcan.v1.UpdateProductRequest\x1a\x1f.orcan.v1.UpdateProductResponse\x12P\n" +
-	"\rDeleteProduct\x12\x1e.orcan.v1.DeleteProductRequest\x1a\x1f.orcan.v1.DeleteProductResponseBQZOgithub.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1b\x06proto3"
+	"\rDeleteProduct\x12\x1e.orcan.v1.DeleteProductRequest\x1a\x1f.orcan.v1.DeleteProductResponse\x12q\n" +
+	"\x18GetProductImageUploadURL\x12).orcan.v1.GetProductImageUploadURLRequest\x1a*.orcan.v1.GetProductImageUploadURLResponse\x12t\n" +
+	"\x19ConfirmProductImageUpload\x12*.orcan.v1.ConfirmProductImageUploadRequest\x1a+.orcan.v1.ConfirmProductImageUploadResponse\x12q\n" +
+	"\x18DeleteProductImageUpload\x12).orcan.v1.DeleteProductImageUploadRequest\x1a*.orcan.v1.DeleteProductImageUploadResponse\x12n\n" +
+	"\x17GetProductFileUploadURL\x12(.orcan.v1.GetProductFileUploadURLRequest\x1a).orcan.v1.GetProductFileUploadURLResponse\x12q\n" +
+	"\x18ConfirmProductFileUpload\x12).orcan.v1.ConfirmProductFileUploadRequest\x1a*.orcan.v1.ConfirmProductFileUploadResponse\x12n\n" +
+	"\x17DeleteProductFileUpload\x12(.orcan.v1.DeleteProductFileUploadRequest\x1a).orcan.v1.DeleteProductFileUploadResponse\x12h\n" +
+	"\x15GetProductDownloadURL\x12&.orcan.v1.GetProductDownloadURLRequest\x1a'.orcan.v1.GetProductDownloadURLResponseBQZOgithub.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1b\x06proto3"
 
 var (
 	file_orcan_v1_product_proto_rawDescOnce sync.Once
@@ -755,43 +1692,78 @@ func file_orcan_v1_product_proto_rawDescGZIP() []byte {
 	return file_orcan_v1_product_proto_rawDescData
 }
 
-var file_orcan_v1_product_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_orcan_v1_product_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_orcan_v1_product_proto_goTypes = []any{
-	(*Product)(nil),               // 0: orcan.v1.Product
-	(*ListProductsRequest)(nil),   // 1: orcan.v1.ListProductsRequest
-	(*ListProductsResponse)(nil),  // 2: orcan.v1.ListProductsResponse
-	(*GetProductRequest)(nil),     // 3: orcan.v1.GetProductRequest
-	(*GetProductResponse)(nil),    // 4: orcan.v1.GetProductResponse
-	(*CreateProductRequest)(nil),  // 5: orcan.v1.CreateProductRequest
-	(*CreateProductResponse)(nil), // 6: orcan.v1.CreateProductResponse
-	(*UpdateProductRequest)(nil),  // 7: orcan.v1.UpdateProductRequest
-	(*UpdateProductResponse)(nil), // 8: orcan.v1.UpdateProductResponse
-	(*DeleteProductRequest)(nil),  // 9: orcan.v1.DeleteProductRequest
-	(*DeleteProductResponse)(nil), // 10: orcan.v1.DeleteProductResponse
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*Product)(nil),                           // 0: orcan.v1.Product
+	(*ListProductsRequest)(nil),               // 1: orcan.v1.ListProductsRequest
+	(*ListProductsResponse)(nil),              // 2: orcan.v1.ListProductsResponse
+	(*GetProductRequest)(nil),                 // 3: orcan.v1.GetProductRequest
+	(*GetProductResponse)(nil),                // 4: orcan.v1.GetProductResponse
+	(*CreateProductRequest)(nil),              // 5: orcan.v1.CreateProductRequest
+	(*CreateProductResponse)(nil),             // 6: orcan.v1.CreateProductResponse
+	(*UpdateProductRequest)(nil),              // 7: orcan.v1.UpdateProductRequest
+	(*UpdateProductResponse)(nil),             // 8: orcan.v1.UpdateProductResponse
+	(*DeleteProductRequest)(nil),              // 9: orcan.v1.DeleteProductRequest
+	(*DeleteProductResponse)(nil),             // 10: orcan.v1.DeleteProductResponse
+	(*GetProductImageUploadURLRequest)(nil),   // 11: orcan.v1.GetProductImageUploadURLRequest
+	(*GetProductImageUploadURLResponse)(nil),  // 12: orcan.v1.GetProductImageUploadURLResponse
+	(*ConfirmProductImageUploadRequest)(nil),  // 13: orcan.v1.ConfirmProductImageUploadRequest
+	(*ConfirmProductImageUploadResponse)(nil), // 14: orcan.v1.ConfirmProductImageUploadResponse
+	(*DeleteProductImageUploadRequest)(nil),   // 15: orcan.v1.DeleteProductImageUploadRequest
+	(*DeleteProductImageUploadResponse)(nil),  // 16: orcan.v1.DeleteProductImageUploadResponse
+	(*GetProductFileUploadURLRequest)(nil),    // 17: orcan.v1.GetProductFileUploadURLRequest
+	(*GetProductFileUploadURLResponse)(nil),   // 18: orcan.v1.GetProductFileUploadURLResponse
+	(*ConfirmProductFileUploadRequest)(nil),   // 19: orcan.v1.ConfirmProductFileUploadRequest
+	(*ConfirmProductFileUploadResponse)(nil),  // 20: orcan.v1.ConfirmProductFileUploadResponse
+	(*DeleteProductFileUploadRequest)(nil),    // 21: orcan.v1.DeleteProductFileUploadRequest
+	(*DeleteProductFileUploadResponse)(nil),   // 22: orcan.v1.DeleteProductFileUploadResponse
+	(*GetProductDownloadURLRequest)(nil),      // 23: orcan.v1.GetProductDownloadURLRequest
+	(*GetProductDownloadURLResponse)(nil),     // 24: orcan.v1.GetProductDownloadURLResponse
+	(*timestamppb.Timestamp)(nil),             // 25: google.protobuf.Timestamp
 }
 var file_orcan_v1_product_proto_depIdxs = []int32{
-	11, // 0: orcan.v1.Product.created_at:type_name -> google.protobuf.Timestamp
-	11, // 1: orcan.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
+	25, // 0: orcan.v1.Product.created_at:type_name -> google.protobuf.Timestamp
+	25, // 1: orcan.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: orcan.v1.ListProductsResponse.products:type_name -> orcan.v1.Product
 	0,  // 3: orcan.v1.GetProductResponse.product:type_name -> orcan.v1.Product
 	0,  // 4: orcan.v1.CreateProductResponse.product:type_name -> orcan.v1.Product
 	0,  // 5: orcan.v1.UpdateProductResponse.product:type_name -> orcan.v1.Product
-	1,  // 6: orcan.v1.ProductService.ListProducts:input_type -> orcan.v1.ListProductsRequest
-	3,  // 7: orcan.v1.ProductService.GetProduct:input_type -> orcan.v1.GetProductRequest
-	5,  // 8: orcan.v1.ProductService.CreateProduct:input_type -> orcan.v1.CreateProductRequest
-	7,  // 9: orcan.v1.ProductService.UpdateProduct:input_type -> orcan.v1.UpdateProductRequest
-	9,  // 10: orcan.v1.ProductService.DeleteProduct:input_type -> orcan.v1.DeleteProductRequest
-	2,  // 11: orcan.v1.ProductService.ListProducts:output_type -> orcan.v1.ListProductsResponse
-	4,  // 12: orcan.v1.ProductService.GetProduct:output_type -> orcan.v1.GetProductResponse
-	6,  // 13: orcan.v1.ProductService.CreateProduct:output_type -> orcan.v1.CreateProductResponse
-	8,  // 14: orcan.v1.ProductService.UpdateProduct:output_type -> orcan.v1.UpdateProductResponse
-	10, // 15: orcan.v1.ProductService.DeleteProduct:output_type -> orcan.v1.DeleteProductResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	25, // 6: orcan.v1.GetProductImageUploadURLResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: orcan.v1.ConfirmProductImageUploadResponse.product:type_name -> orcan.v1.Product
+	0,  // 8: orcan.v1.DeleteProductImageUploadResponse.product:type_name -> orcan.v1.Product
+	25, // 9: orcan.v1.GetProductFileUploadURLResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 10: orcan.v1.ConfirmProductFileUploadResponse.product:type_name -> orcan.v1.Product
+	0,  // 11: orcan.v1.DeleteProductFileUploadResponse.product:type_name -> orcan.v1.Product
+	25, // 12: orcan.v1.GetProductDownloadURLResponse.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 13: orcan.v1.ProductService.ListProducts:input_type -> orcan.v1.ListProductsRequest
+	3,  // 14: orcan.v1.ProductService.GetProduct:input_type -> orcan.v1.GetProductRequest
+	5,  // 15: orcan.v1.ProductService.CreateProduct:input_type -> orcan.v1.CreateProductRequest
+	7,  // 16: orcan.v1.ProductService.UpdateProduct:input_type -> orcan.v1.UpdateProductRequest
+	9,  // 17: orcan.v1.ProductService.DeleteProduct:input_type -> orcan.v1.DeleteProductRequest
+	11, // 18: orcan.v1.ProductService.GetProductImageUploadURL:input_type -> orcan.v1.GetProductImageUploadURLRequest
+	13, // 19: orcan.v1.ProductService.ConfirmProductImageUpload:input_type -> orcan.v1.ConfirmProductImageUploadRequest
+	15, // 20: orcan.v1.ProductService.DeleteProductImageUpload:input_type -> orcan.v1.DeleteProductImageUploadRequest
+	17, // 21: orcan.v1.ProductService.GetProductFileUploadURL:input_type -> orcan.v1.GetProductFileUploadURLRequest
+	19, // 22: orcan.v1.ProductService.ConfirmProductFileUpload:input_type -> orcan.v1.ConfirmProductFileUploadRequest
+	21, // 23: orcan.v1.ProductService.DeleteProductFileUpload:input_type -> orcan.v1.DeleteProductFileUploadRequest
+	23, // 24: orcan.v1.ProductService.GetProductDownloadURL:input_type -> orcan.v1.GetProductDownloadURLRequest
+	2,  // 25: orcan.v1.ProductService.ListProducts:output_type -> orcan.v1.ListProductsResponse
+	4,  // 26: orcan.v1.ProductService.GetProduct:output_type -> orcan.v1.GetProductResponse
+	6,  // 27: orcan.v1.ProductService.CreateProduct:output_type -> orcan.v1.CreateProductResponse
+	8,  // 28: orcan.v1.ProductService.UpdateProduct:output_type -> orcan.v1.UpdateProductResponse
+	10, // 29: orcan.v1.ProductService.DeleteProduct:output_type -> orcan.v1.DeleteProductResponse
+	12, // 30: orcan.v1.ProductService.GetProductImageUploadURL:output_type -> orcan.v1.GetProductImageUploadURLResponse
+	14, // 31: orcan.v1.ProductService.ConfirmProductImageUpload:output_type -> orcan.v1.ConfirmProductImageUploadResponse
+	16, // 32: orcan.v1.ProductService.DeleteProductImageUpload:output_type -> orcan.v1.DeleteProductImageUploadResponse
+	18, // 33: orcan.v1.ProductService.GetProductFileUploadURL:output_type -> orcan.v1.GetProductFileUploadURLResponse
+	20, // 34: orcan.v1.ProductService.ConfirmProductFileUpload:output_type -> orcan.v1.ConfirmProductFileUploadResponse
+	22, // 35: orcan.v1.ProductService.DeleteProductFileUpload:output_type -> orcan.v1.DeleteProductFileUploadResponse
+	24, // 36: orcan.v1.ProductService.GetProductDownloadURL:output_type -> orcan.v1.GetProductDownloadURLResponse
+	25, // [25:37] is the sub-list for method output_type
+	13, // [13:25] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_orcan_v1_product_proto_init() }
@@ -806,7 +1778,7 @@ func file_orcan_v1_product_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orcan_v1_product_proto_rawDesc), len(file_orcan_v1_product_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

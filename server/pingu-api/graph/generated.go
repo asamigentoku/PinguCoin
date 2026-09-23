@@ -37,17 +37,30 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	ConfirmProductImageUploadResult struct {
+		Detail  func(childComplexity int) int
+		Product func(childComplexity int) int
+	}
+
 	Mutation struct {
-		CreateProduct func(childComplexity int, input model.CreateProductInput) int
-		DeleteProduct func(childComplexity int, id int32) int
-		UpdateProduct func(childComplexity int, id int32, input model.UpdateProductInput) int
-		UpdateUser    func(childComplexity int, id int32, input model.UpdateUserInput) int
+		ConfirmProductFileUpload  func(childComplexity int, productID int32, fileURL string) int
+		ConfirmProductImageUpload func(childComplexity int, productID int32, fileURL string, description *string, sortOrder *int32) int
+		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
+		DeleteProduct             func(childComplexity int, id int32) int
+		DeleteProductFileUpload   func(childComplexity int, productID int32, fileURL string) int
+		DeleteProductImageUpload  func(childComplexity int, productID int32, fileURL string) int
+		GetProductDownloadURL     func(childComplexity int, productID int32) int
+		GetProductFileUploadURL   func(childComplexity int, productID int32) int
+		GetProductImageUploadURL  func(childComplexity int, productID int32) int
+		UpdateProduct             func(childComplexity int, id int32, input model.UpdateProductInput) int
+		UpdateUser                func(childComplexity int, id int32, input model.UpdateUserInput) int
 	}
 
 	Product struct {
 		CategoryID  func(childComplexity int) int
 		CreatedAt   func(childComplexity int) int
 		Description func(childComplexity int) int
+		FileURL     func(childComplexity int) int
 		ID          func(childComplexity int) int
 		ImageURL    func(childComplexity int) int
 		Name        func(childComplexity int) int
@@ -55,6 +68,36 @@ type ComplexityRoot struct {
 		Status      func(childComplexity int) int
 		UpdatedAt   func(childComplexity int) int
 		UserID      func(childComplexity int) int
+	}
+
+	ProductDetail struct {
+		Description func(childComplexity int) int
+		ID          func(childComplexity int) int
+		ImageURL    func(childComplexity int) int
+		ProductID   func(childComplexity int) int
+		SortOrder   func(childComplexity int) int
+	}
+
+	ProductDownloadTarget struct {
+		DownloadURL func(childComplexity int) int
+		ExpiresAt   func(childComplexity int) int
+	}
+
+	ProductFileUploadTarget struct {
+		BlobEndpoint func(childComplexity int) int
+		Container    func(childComplexity int) int
+		ExpiresAt    func(childComplexity int) int
+		PathPrefix   func(childComplexity int) int
+		SasToken     func(childComplexity int) int
+	}
+
+	ProductImageUploadTarget struct {
+		BlobEndpoint    func(childComplexity int) int
+		Container       func(childComplexity int) int
+		ExpiresAt       func(childComplexity int) int
+		MainImagePrefix func(childComplexity int) int
+		SasToken        func(childComplexity int) int
+		SubImagesPrefix func(childComplexity int) int
 	}
 
 	Query struct {
@@ -83,6 +126,13 @@ type MutationResolver interface {
 	UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error)
 	DeleteProduct(ctx context.Context, id int32) (bool, error)
 	UpdateUser(ctx context.Context, id int32, input model.UpdateUserInput) (*model.User, error)
+	GetProductImageUploadURL(ctx context.Context, productID int32) (*model.ProductImageUploadTarget, error)
+	ConfirmProductImageUpload(ctx context.Context, productID int32, fileURL string, description *string, sortOrder *int32) (*model.ConfirmProductImageUploadResult, error)
+	DeleteProductImageUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error)
+	GetProductFileUploadURL(ctx context.Context, productID int32) (*model.ProductFileUploadTarget, error)
+	ConfirmProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error)
+	DeleteProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error)
+	GetProductDownloadURL(ctx context.Context, productID int32) (*model.ProductDownloadTarget, error)
 }
 type QueryResolver interface {
 	Products(ctx context.Context, userID *int32) ([]*model.Product, error)
@@ -110,6 +160,41 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
+	case "ConfirmProductImageUploadResult.detail":
+		if e.ComplexityRoot.ConfirmProductImageUploadResult.Detail == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ConfirmProductImageUploadResult.Detail(childComplexity), true
+	case "ConfirmProductImageUploadResult.product":
+		if e.ComplexityRoot.ConfirmProductImageUploadResult.Product == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ConfirmProductImageUploadResult.Product(childComplexity), true
+
+	case "Mutation.confirmProductFileUpload":
+		if e.ComplexityRoot.Mutation.ConfirmProductFileUpload == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_confirmProductFileUpload_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ConfirmProductFileUpload(childComplexity, args["productId"].(int32), args["fileUrl"].(string)), true
+	case "Mutation.confirmProductImageUpload":
+		if e.ComplexityRoot.Mutation.ConfirmProductImageUpload == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_confirmProductImageUpload_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ConfirmProductImageUpload(childComplexity, args["productId"].(int32), args["fileUrl"].(string), args["description"].(*string), args["sortOrder"].(*int32)), true
 	case "Mutation.createProduct":
 		if e.ComplexityRoot.Mutation.CreateProduct == nil {
 			break
@@ -132,6 +217,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProduct(childComplexity, args["id"].(int32)), true
+	case "Mutation.deleteProductFileUpload":
+		if e.ComplexityRoot.Mutation.DeleteProductFileUpload == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteProductFileUpload_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteProductFileUpload(childComplexity, args["productId"].(int32), args["fileUrl"].(string)), true
+	case "Mutation.deleteProductImageUpload":
+		if e.ComplexityRoot.Mutation.DeleteProductImageUpload == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteProductImageUpload_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteProductImageUpload(childComplexity, args["productId"].(int32), args["fileUrl"].(string)), true
+	case "Mutation.getProductDownloadUrl":
+		if e.ComplexityRoot.Mutation.GetProductDownloadURL == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getProductDownloadUrl_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.GetProductDownloadURL(childComplexity, args["productId"].(int32)), true
+	case "Mutation.getProductFileUploadUrl":
+		if e.ComplexityRoot.Mutation.GetProductFileUploadURL == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getProductFileUploadUrl_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.GetProductFileUploadURL(childComplexity, args["productId"].(int32)), true
+	case "Mutation.getProductImageUploadUrl":
+		if e.ComplexityRoot.Mutation.GetProductImageUploadURL == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getProductImageUploadUrl_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.GetProductImageUploadURL(childComplexity, args["productId"].(int32)), true
 	case "Mutation.updateProduct":
 		if e.ComplexityRoot.Mutation.UpdateProduct == nil {
 			break
@@ -173,6 +313,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.Description(childComplexity), true
+	case "Product.fileUrl":
+		if e.ComplexityRoot.Product.FileURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.FileURL(childComplexity), true
 	case "Product.id":
 		if e.ComplexityRoot.Product.ID == nil {
 			break
@@ -215,6 +361,118 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.UserID(childComplexity), true
+
+	case "ProductDetail.description":
+		if e.ComplexityRoot.ProductDetail.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDetail.Description(childComplexity), true
+	case "ProductDetail.id":
+		if e.ComplexityRoot.ProductDetail.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDetail.ID(childComplexity), true
+	case "ProductDetail.imageUrl":
+		if e.ComplexityRoot.ProductDetail.ImageURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDetail.ImageURL(childComplexity), true
+	case "ProductDetail.productId":
+		if e.ComplexityRoot.ProductDetail.ProductID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDetail.ProductID(childComplexity), true
+	case "ProductDetail.sortOrder":
+		if e.ComplexityRoot.ProductDetail.SortOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDetail.SortOrder(childComplexity), true
+
+	case "ProductDownloadTarget.downloadUrl":
+		if e.ComplexityRoot.ProductDownloadTarget.DownloadURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDownloadTarget.DownloadURL(childComplexity), true
+	case "ProductDownloadTarget.expiresAt":
+		if e.ComplexityRoot.ProductDownloadTarget.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductDownloadTarget.ExpiresAt(childComplexity), true
+
+	case "ProductFileUploadTarget.blobEndpoint":
+		if e.ComplexityRoot.ProductFileUploadTarget.BlobEndpoint == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductFileUploadTarget.BlobEndpoint(childComplexity), true
+	case "ProductFileUploadTarget.container":
+		if e.ComplexityRoot.ProductFileUploadTarget.Container == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductFileUploadTarget.Container(childComplexity), true
+	case "ProductFileUploadTarget.expiresAt":
+		if e.ComplexityRoot.ProductFileUploadTarget.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductFileUploadTarget.ExpiresAt(childComplexity), true
+	case "ProductFileUploadTarget.pathPrefix":
+		if e.ComplexityRoot.ProductFileUploadTarget.PathPrefix == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductFileUploadTarget.PathPrefix(childComplexity), true
+	case "ProductFileUploadTarget.sasToken":
+		if e.ComplexityRoot.ProductFileUploadTarget.SasToken == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductFileUploadTarget.SasToken(childComplexity), true
+
+	case "ProductImageUploadTarget.blobEndpoint":
+		if e.ComplexityRoot.ProductImageUploadTarget.BlobEndpoint == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.BlobEndpoint(childComplexity), true
+	case "ProductImageUploadTarget.container":
+		if e.ComplexityRoot.ProductImageUploadTarget.Container == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.Container(childComplexity), true
+	case "ProductImageUploadTarget.expiresAt":
+		if e.ComplexityRoot.ProductImageUploadTarget.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.ExpiresAt(childComplexity), true
+	case "ProductImageUploadTarget.mainImagePrefix":
+		if e.ComplexityRoot.ProductImageUploadTarget.MainImagePrefix == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.MainImagePrefix(childComplexity), true
+	case "ProductImageUploadTarget.sasToken":
+		if e.ComplexityRoot.ProductImageUploadTarget.SasToken == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.SasToken(childComplexity), true
+	case "ProductImageUploadTarget.subImagesPrefix":
+		if e.ComplexityRoot.ProductImageUploadTarget.SubImagesPrefix == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductImageUploadTarget.SubImagesPrefix(childComplexity), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -398,6 +656,16 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // Each function is generated once per unique object type, deduplicating the
 // switch statements that were previously inlined in every fieldContext_* function.
 
+func (ec *executionContext) childFields_ConfirmProductImageUploadResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "product":
+		return ec.fieldContext_ConfirmProductImageUploadResult_product(ctx, field)
+	case "detail":
+		return ec.fieldContext_ConfirmProductImageUploadResult_detail(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ConfirmProductImageUploadResult", field.Name)
+}
+
 func (ec *executionContext) childFields_Product(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -412,6 +680,8 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_description(ctx, field)
 	case "imageUrl":
 		return ec.fieldContext_Product_imageUrl(ctx, field)
+	case "fileUrl":
+		return ec.fieldContext_Product_fileUrl(ctx, field)
 	case "price":
 		return ec.fieldContext_Product_price(ctx, field)
 	case "status":
@@ -422,6 +692,66 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_updatedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductDetail(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ProductDetail_id(ctx, field)
+	case "productId":
+		return ec.fieldContext_ProductDetail_productId(ctx, field)
+	case "imageUrl":
+		return ec.fieldContext_ProductDetail_imageUrl(ctx, field)
+	case "description":
+		return ec.fieldContext_ProductDetail_description(ctx, field)
+	case "sortOrder":
+		return ec.fieldContext_ProductDetail_sortOrder(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductDetail", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductDownloadTarget(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "downloadUrl":
+		return ec.fieldContext_ProductDownloadTarget_downloadUrl(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_ProductDownloadTarget_expiresAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductDownloadTarget", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductFileUploadTarget(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "blobEndpoint":
+		return ec.fieldContext_ProductFileUploadTarget_blobEndpoint(ctx, field)
+	case "container":
+		return ec.fieldContext_ProductFileUploadTarget_container(ctx, field)
+	case "pathPrefix":
+		return ec.fieldContext_ProductFileUploadTarget_pathPrefix(ctx, field)
+	case "sasToken":
+		return ec.fieldContext_ProductFileUploadTarget_sasToken(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_ProductFileUploadTarget_expiresAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductFileUploadTarget", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductImageUploadTarget(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "blobEndpoint":
+		return ec.fieldContext_ProductImageUploadTarget_blobEndpoint(ctx, field)
+	case "container":
+		return ec.fieldContext_ProductImageUploadTarget_container(ctx, field)
+	case "mainImagePrefix":
+		return ec.fieldContext_ProductImageUploadTarget_mainImagePrefix(ctx, field)
+	case "subImagesPrefix":
+		return ec.fieldContext_ProductImageUploadTarget_subImagesPrefix(ctx, field)
+	case "sasToken":
+		return ec.fieldContext_ProductImageUploadTarget_sasToken(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_ProductImageUploadTarget_expiresAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductImageUploadTarget", field.Name)
 }
 
 func (ec *executionContext) childFields_User(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -556,6 +886,66 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_confirmProductFileUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "fileUrl",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["fileUrl"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_confirmProductImageUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "fileUrl",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["fileUrl"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "description",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["description"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "sortOrder",
+		func(ctx context.Context, v any) (*int32, error) {
+			return ec.unmarshalOInt2ᚖint32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["sortOrder"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createProduct_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -570,6 +960,50 @@ func (ec *executionContext) field_Mutation_createProduct_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteProductFileUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "fileUrl",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["fileUrl"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteProductImageUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "fileUrl",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["fileUrl"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteProduct_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -581,6 +1015,48 @@ func (ec *executionContext) field_Mutation_deleteProduct_args(ctx context.Contex
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getProductDownloadUrl_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getProductFileUploadUrl_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getProductImageUploadUrl_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
 	return args, nil
 }
 
@@ -743,6 +1219,70 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ***************************** args.gotpl *****************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _ConfirmProductImageUploadResult_product(ctx context.Context, field graphql.CollectedField, obj *model.ConfirmProductImageUploadResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ConfirmProductImageUploadResult_product(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Product, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Product) graphql.Marshaler {
+			return ec.marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProduct(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ConfirmProductImageUploadResult_product(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConfirmProductImageUploadResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Product(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConfirmProductImageUploadResult_detail(ctx context.Context, field graphql.CollectedField, obj *model.ConfirmProductImageUploadResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ConfirmProductImageUploadResult_detail(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Detail, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductDetail) graphql.Marshaler {
+			return ec.marshalOProductDetail2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDetail(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ConfirmProductImageUploadResult_detail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConfirmProductImageUploadResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductDetail(ctx, field)
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _Mutation_createProduct(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -920,6 +1460,314 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_getProductImageUploadUrl(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_getProductImageUploadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().GetProductImageUploadURL(ctx, fc.Args["productId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductImageUploadTarget) graphql.Marshaler {
+			return ec.marshalNProductImageUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductImageUploadTarget(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_getProductImageUploadUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductImageUploadTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_getProductImageUploadUrl_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_confirmProductImageUpload(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_confirmProductImageUpload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ConfirmProductImageUpload(ctx, fc.Args["productId"].(int32), fc.Args["fileUrl"].(string), fc.Args["description"].(*string), fc.Args["sortOrder"].(*int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ConfirmProductImageUploadResult) graphql.Marshaler {
+			return ec.marshalNConfirmProductImageUploadResult2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐConfirmProductImageUploadResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_confirmProductImageUpload(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ConfirmProductImageUploadResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_confirmProductImageUpload_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteProductImageUpload(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteProductImageUpload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteProductImageUpload(ctx, fc.Args["productId"].(int32), fc.Args["fileUrl"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Product) graphql.Marshaler {
+			return ec.marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProduct(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteProductImageUpload(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Product(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteProductImageUpload_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_getProductFileUploadUrl(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_getProductFileUploadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().GetProductFileUploadURL(ctx, fc.Args["productId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductFileUploadTarget) graphql.Marshaler {
+			return ec.marshalNProductFileUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductFileUploadTarget(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_getProductFileUploadUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductFileUploadTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_getProductFileUploadUrl_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_confirmProductFileUpload(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_confirmProductFileUpload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ConfirmProductFileUpload(ctx, fc.Args["productId"].(int32), fc.Args["fileUrl"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Product) graphql.Marshaler {
+			return ec.marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProduct(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_confirmProductFileUpload(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Product(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_confirmProductFileUpload_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteProductFileUpload(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteProductFileUpload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteProductFileUpload(ctx, fc.Args["productId"].(int32), fc.Args["fileUrl"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Product) graphql.Marshaler {
+			return ec.marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProduct(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteProductFileUpload(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Product(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteProductFileUpload_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_getProductDownloadUrl(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_getProductDownloadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().GetProductDownloadURL(ctx, fc.Args["productId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductDownloadTarget) graphql.Marshaler {
+			return ec.marshalNProductDownloadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDownloadTarget(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_getProductDownloadUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductDownloadTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_getProductDownloadUrl_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1058,6 +1906,29 @@ func (ec *executionContext) fieldContext_Product_imageUrl(_ context.Context, fie
 	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _Product_fileUrl(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Product_fileUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FileURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Product_fileUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Product_price(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1148,6 +2019,420 @@ func (ec *executionContext) _Product_updatedAt(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_Product_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDetail_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDetail_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDetail_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDetail", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDetail_productId(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDetail_productId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProductID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDetail_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDetail", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDetail_imageUrl(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDetail_imageUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ImageURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDetail_imageUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDetail", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDetail_description(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDetail_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDetail_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDetail", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDetail_sortOrder(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDetail_sortOrder(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SortOrder, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDetail_sortOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDetail", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDownloadTarget_downloadUrl(ctx context.Context, field graphql.CollectedField, obj *model.ProductDownloadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDownloadTarget_downloadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDownloadTarget_downloadUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDownloadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductDownloadTarget_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductDownloadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductDownloadTarget_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductDownloadTarget_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductDownloadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductFileUploadTarget_blobEndpoint(ctx context.Context, field graphql.CollectedField, obj *model.ProductFileUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductFileUploadTarget_blobEndpoint(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BlobEndpoint, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductFileUploadTarget_blobEndpoint(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductFileUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductFileUploadTarget_container(ctx context.Context, field graphql.CollectedField, obj *model.ProductFileUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductFileUploadTarget_container(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Container, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductFileUploadTarget_container(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductFileUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductFileUploadTarget_pathPrefix(ctx context.Context, field graphql.CollectedField, obj *model.ProductFileUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductFileUploadTarget_pathPrefix(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PathPrefix, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductFileUploadTarget_pathPrefix(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductFileUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductFileUploadTarget_sasToken(ctx context.Context, field graphql.CollectedField, obj *model.ProductFileUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductFileUploadTarget_sasToken(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SasToken, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductFileUploadTarget_sasToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductFileUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductFileUploadTarget_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductFileUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductFileUploadTarget_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductFileUploadTarget_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductFileUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_blobEndpoint(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_blobEndpoint(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BlobEndpoint, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_blobEndpoint(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_container(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_container(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Container, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_container(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_mainImagePrefix(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_mainImagePrefix(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MainImagePrefix, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_mainImagePrefix(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_subImagesPrefix(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_subImagesPrefix(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SubImagesPrefix, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_subImagesPrefix(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_sasToken(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_sasToken(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SasToken, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_sasToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductImageUploadTarget_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductImageUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductImageUploadTarget_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductImageUploadTarget_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductImageUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _Query_products(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2778,6 +4063,49 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 
 // region    **************************** object.gotpl ****************************
 
+var confirmProductImageUploadResultImplementors = []string{"ConfirmProductImageUploadResult"}
+
+func (ec *executionContext) _ConfirmProductImageUploadResult(ctx context.Context, sel ast.SelectionSet, obj *model.ConfirmProductImageUploadResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, confirmProductImageUploadResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConfirmProductImageUploadResult")
+		case "product":
+			out.Values[i] = ec._ConfirmProductImageUploadResult_product(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "detail":
+			out.Values[i] = ec._ConfirmProductImageUploadResult_detail(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -2822,6 +4150,55 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateUser":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateUser(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "getProductImageUploadUrl":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getProductImageUploadUrl(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "confirmProductImageUpload":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_confirmProductImageUpload(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteProductImageUpload":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteProductImageUpload(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "getProductFileUploadUrl":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getProductFileUploadUrl(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "confirmProductFileUpload":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_confirmProductFileUpload(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteProductFileUpload":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteProductFileUpload(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "getProductDownloadUrl":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getProductDownloadUrl(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -2889,6 +4266,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "fileUrl":
+			out.Values[i] = ec._Product_fileUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "price":
 			out.Values[i] = ec._Product_price(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -2906,6 +4288,228 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Product_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productDetailImplementors = []string{"ProductDetail"}
+
+func (ec *executionContext) _ProductDetail(ctx context.Context, sel ast.SelectionSet, obj *model.ProductDetail) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productDetailImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductDetail")
+		case "id":
+			out.Values[i] = ec._ProductDetail_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "productId":
+			out.Values[i] = ec._ProductDetail_productId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "imageUrl":
+			out.Values[i] = ec._ProductDetail_imageUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._ProductDetail_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sortOrder":
+			out.Values[i] = ec._ProductDetail_sortOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productDownloadTargetImplementors = []string{"ProductDownloadTarget"}
+
+func (ec *executionContext) _ProductDownloadTarget(ctx context.Context, sel ast.SelectionSet, obj *model.ProductDownloadTarget) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productDownloadTargetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductDownloadTarget")
+		case "downloadUrl":
+			out.Values[i] = ec._ProductDownloadTarget_downloadUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._ProductDownloadTarget_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productFileUploadTargetImplementors = []string{"ProductFileUploadTarget"}
+
+func (ec *executionContext) _ProductFileUploadTarget(ctx context.Context, sel ast.SelectionSet, obj *model.ProductFileUploadTarget) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productFileUploadTargetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductFileUploadTarget")
+		case "blobEndpoint":
+			out.Values[i] = ec._ProductFileUploadTarget_blobEndpoint(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "container":
+			out.Values[i] = ec._ProductFileUploadTarget_container(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pathPrefix":
+			out.Values[i] = ec._ProductFileUploadTarget_pathPrefix(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sasToken":
+			out.Values[i] = ec._ProductFileUploadTarget_sasToken(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._ProductFileUploadTarget_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productImageUploadTargetImplementors = []string{"ProductImageUploadTarget"}
+
+func (ec *executionContext) _ProductImageUploadTarget(ctx context.Context, sel ast.SelectionSet, obj *model.ProductImageUploadTarget) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productImageUploadTargetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductImageUploadTarget")
+		case "blobEndpoint":
+			out.Values[i] = ec._ProductImageUploadTarget_blobEndpoint(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "container":
+			out.Values[i] = ec._ProductImageUploadTarget_container(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "mainImagePrefix":
+			out.Values[i] = ec._ProductImageUploadTarget_mainImagePrefix(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "subImagesPrefix":
+			out.Values[i] = ec._ProductImageUploadTarget_subImagesPrefix(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sasToken":
+			out.Values[i] = ec._ProductImageUploadTarget_sasToken(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._ProductImageUploadTarget_expiresAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -3561,6 +5165,16 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNConfirmProductImageUploadResult2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐConfirmProductImageUploadResult(ctx context.Context, sel ast.SelectionSet, v *model.ConfirmProductImageUploadResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConfirmProductImageUploadResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNCreateProductInput2githubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐCreateProductInput(ctx context.Context, v any) (model.CreateProductInput, error) {
 	res, err := ec.unmarshalInputCreateProductInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3606,6 +5220,36 @@ func (ec *executionContext) marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPin
 		return graphql.Null
 	}
 	return ec._Product(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductDownloadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDownloadTarget(ctx context.Context, sel ast.SelectionSet, v *model.ProductDownloadTarget) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductDownloadTarget(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductFileUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductFileUploadTarget(ctx context.Context, sel ast.SelectionSet, v *model.ProductFileUploadTarget) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductFileUploadTarget(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductImageUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductImageUploadTarget(ctx context.Context, sel ast.SelectionSet, v *model.ProductImageUploadTarget) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductImageUploadTarget(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
@@ -3853,6 +5497,13 @@ func (ec *executionContext) marshalOProduct2ᚖgithubᚗcomᚋasamigentokuᚋPin
 		return graphql.Null
 	}
 	return ec._Product(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOProductDetail2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDetail(ctx context.Context, sel ast.SelectionSet, v *model.ProductDetail) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ProductDetail(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

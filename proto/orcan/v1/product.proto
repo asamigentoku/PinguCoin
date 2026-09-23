@@ -17,6 +17,10 @@ message Product {
   string status = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // file_url は販売対象のデジタルコンテンツ(購入者がダウンロードする実体ファイル)のBlob URL。
+  // 非公開コンテナに置かれるため、これ自体では閲覧・ダウンロードできず、
+  // GetProductDownloadURLで発行した署名付きURLが別途必要。
+  string file_url = 11;
 }
 
 service ProductService {
@@ -25,6 +29,44 @@ service ProductService {
   rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
   rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse);
   rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse);
+
+  // --- 商品画像(main_image / sub_images) ---
+  // 一般公開コンテナに保存するため、アップロード完了後は署名無しの素のURLでそのまま閲覧できる。
+  // (image_url / ConfirmProductImageUploadResponseが返すURLがそれ)
+
+  // GetProductImageUploadURL は商品画像をAzure Blob Storageにアップロードするための
+  // 署名付きURL(SAS)を発行する。pingu-api経由で呼ばれる想定(呼び出し元がClerkで
+  // ログイン確認済みのuser_idを渡す)。商品の所有者(user_id)本人のみ発行できる。
+  rpc GetProductImageUploadURL(GetProductImageUploadURLRequest) returns (GetProductImageUploadURLResponse);
+
+  // ConfirmProductImageUpload はアップロード完了後に呼ばれる。
+  // main_image/配下ならimage_urlとして、sub_images/配下ならproduct_detailの1件として保存する。
+  rpc ConfirmProductImageUpload(ConfirmProductImageUploadRequest) returns (ConfirmProductImageUploadResponse);
+
+  // DeleteProductImageUpload はアップロード済みの画像ファイルを削除する。
+  rpc DeleteProductImageUpload(DeleteProductImageUploadRequest) returns (DeleteProductImageUploadResponse);
+
+  // --- 商品ファイル(販売対象のデジタルコンテンツ) ---
+  // 非公開コンテナに保存するため、閲覧・ダウンロードには都度GetProductDownloadURLで
+  // 発行する署名付きURL(有効期限付き)が必要。
+
+  // GetProductFileUploadURL は商品ファイルをアップロードするための署名付きURL(SAS)を発行する。
+  // 商品の所有者(user_id)本人のみ発行できる。
+  rpc GetProductFileUploadURL(GetProductFileUploadURLRequest) returns (GetProductFileUploadURLResponse);
+
+  // ConfirmProductFileUpload はアップロード完了後に呼ばれ、実際に置かれたファイルのURLを
+  // 商品のfile_urlとして保存する。
+  rpc ConfirmProductFileUpload(ConfirmProductFileUploadRequest) returns (ConfirmProductFileUploadResponse);
+
+  // DeleteProductFileUpload はアップロード済みの商品ファイルを削除する。
+  rpc DeleteProductFileUpload(DeleteProductFileUploadRequest) returns (DeleteProductFileUploadResponse);
+
+  // GetProductDownloadURL は商品ファイル(file_url)をダウンロードするための
+  // 署名付きURL(有効期限付き、対象のBlob1つだけに限定したSAS)を発行する。
+  // 注意: orcan-apiは購入(決済)状況を持たないため、呼び出し元(pingu-api)が
+  // 「このユーザーはこの商品を取得済みか(所有者本人 or 購入済み)」を事前に検証した上で
+  // 呼び出すこと。orcan-api側では権限チェックを行わない。
+  rpc GetProductDownloadURL(GetProductDownloadURLRequest) returns (GetProductDownloadURLResponse);
 }
 
 message ListProductsRequest {
@@ -56,6 +98,7 @@ message CreateProductRequest {
   string image_url = 5;
   int64 price = 6;
   string status = 7;
+  string file_url = 8;
 }
 
 message CreateProductResponse {
@@ -71,6 +114,7 @@ message UpdateProductRequest {
   string image_url = 6;
   int64 price = 7;
   string status = 8;
+  string file_url = 9;
 }
 
 message UpdateProductResponse {
@@ -82,3 +126,95 @@ message DeleteProductRequest {
 }
 
 message DeleteProductResponse {}
+
+message GetProductImageUploadURLRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+}
+
+message GetProductImageUploadURLResponse {
+  // blob_endpoint + "/" + container + "/" + (main_image_prefix または sub_images_prefix) +
+  // <任意のファイル名> + "?" + sas_token という形でアップロード先URLを組み立てる(PUTでアップロード)。
+  // コンテナ全体に書き込めるSASのため、上記2つのプレフィックス配下にしか置かないことは
+  // クライアント側の実装による取り決めである点に注意。
+  // アップロード完了後は、同じパス(blob_endpoint+"/"+container+"/"+blob名、SASクエリ無し)が
+  // そのまま公開URL(署名不要)として使える。
+  string blob_endpoint = 1;
+  string container = 2;
+  string main_image_prefix = 3;
+  string sub_images_prefix = 4;
+  string sas_token = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message ConfirmProductImageUploadRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+  string file_url = 3;
+  // 以下はfile_urlがsub_images/配下の場合のみ使う(main_image/の場合は無視する)。
+  string description = 4;
+  int32 sort_order = 5;
+}
+
+message ConfirmProductImageUploadResponse {
+  Product product = 1;
+  // file_urlがsub_images/配下だった場合のみ設定される(作成されたproduct_detailの情報)。
+  uint32 detail_id = 2;
+  string detail_image_url = 3;
+  string detail_description = 4;
+  int32 detail_sort_order = 5;
+}
+
+message DeleteProductImageUploadRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+  string file_url = 3;
+}
+
+message DeleteProductImageUploadResponse {
+  Product product = 1;
+}
+
+message GetProductFileUploadURLRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+}
+
+message GetProductFileUploadURLResponse {
+  // blob_endpoint + "/" + container + "/" + path_prefix + <任意のファイル名> + "?" + sas_token
+  // という形でアップロード先URLを組み立てる(PUTでアップロード)。このコンテナは非公開。
+  string blob_endpoint = 1;
+  string container = 2;
+  string path_prefix = 3;
+  string sas_token = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message ConfirmProductFileUploadRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+  string file_url = 3;
+}
+
+message ConfirmProductFileUploadResponse {
+  Product product = 1;
+}
+
+message DeleteProductFileUploadRequest {
+  uint32 user_id = 1;
+  uint32 product_id = 2;
+  string file_url = 3;
+}
+
+message DeleteProductFileUploadResponse {
+  Product product = 1;
+}
+
+message GetProductDownloadURLRequest {
+  uint32 product_id = 1;
+}
+
+message GetProductDownloadURLResponse {
+  string download_url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
