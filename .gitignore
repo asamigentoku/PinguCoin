@@ -66,8 +66,15 @@ infrastructure/terraform/**/*.tfstate
 infrastructure/terraform/**/*.tfstate.*
 infrastructure/terraform/**/*.tfvars
 !infrastructure/terraform/**/*.tfvars.example
-infrastructure/terraform/**/.terraform.lock.hcl
+infrastructure/terraform/**/*.tfplan
 infrastructure/terraform/**/crash.log
+infrastructure/terraform/**/crash.*.log
+infrastructure/terraform/**/override.tf
+infrastructure/terraform/**/override.tf.json
+infrastructure/terraform/**/*_override.tf
+infrastructure/terraform/**/*_override.tf.json
+.terraformrc
+terraform.rc
 
 # === Docker ===
 infrastructure/docker/**/*.env

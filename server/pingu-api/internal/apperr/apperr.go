@@ -22,6 +22,7 @@ const (
 	ReasonInvalidArgument    Reason = "INVALID_ARGUMENT"
 	ReasonAlreadyExists      Reason = "ALREADY_EXISTS"
 	ReasonUnauthenticated    Reason = "UNAUTHENTICATED"
+	ReasonPermissionDenied   Reason = "PERMISSION_DENIED"
 	ReasonFailedPrecondition Reason = "FAILED_PRECONDITION"
 	ReasonInternal           Reason = "INTERNAL"
 )
@@ -59,6 +60,10 @@ func AlreadyExists(resource string) *AppError {
 
 func Unauthenticated(message string) *AppError {
 	return &AppError{HTTPStatus: http.StatusUnauthorized, Reason: ReasonUnauthenticated, Message: message}
+}
+
+func PermissionDenied(message string) *AppError {
+	return &AppError{HTTPStatus: http.StatusForbidden, Reason: ReasonPermissionDenied, Message: message}
 }
 
 func FailedPrecondition(message string) *AppError {
@@ -105,6 +110,8 @@ func FromGRPC(err error) *AppError {
 		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: grpcStatus.Message()}
 	case codes.Unauthenticated:
 		return &AppError{HTTPStatus: http.StatusUnauthorized, Reason: reason, Message: grpcStatus.Message()}
+	case codes.PermissionDenied:
+		return &AppError{HTTPStatus: http.StatusForbidden, Reason: reason, Message: grpcStatus.Message()}
 	case codes.FailedPrecondition:
 		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: grpcStatus.Message()}
 	default:
