@@ -21,6 +21,8 @@ type Product {
   status: String!
   createdAt: String!
   updatedAt: String!
+  # version は更新のたびに1ずつ増える値。クライアント側のキャッシュ無効化判定に使う。
+  version: Int!
 }
 
 # 商品画像(main_image/sub_images)を置くための署名付きアップロード先。

@@ -2,6 +2,8 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -94,6 +96,35 @@ func (server *ProductInventoryServer) DeleteProductInventory(ctx context.Context
 	return &pb.DeleteProductInventoryResponse{}, nil
 }
 
+// AdjustProductInventory は在庫数(quantity)をamountだけ増減させる(負=消費、正=戻し)。
+// idempotency_keyで冪等性を担保する(同じキーの再送は二重に増減させない)。
+func (server *ProductInventoryServer) AdjustProductInventory(ctx context.Context, request *pb.AdjustProductInventoryRequest) (*pb.AdjustProductInventoryResponse, error) {
+	if request.GetProductId() == 0 {
+		return nil, apperr.InvalidArgument("product_id is required")
+	}
+	if request.GetAmount() == 0 {
+		return nil, apperr.InvalidArgument("amount must not be zero")
+	}
+	idempotencyKey := strings.TrimSpace(request.GetIdempotencyKey())
+	if idempotencyKey == "" {
+		return nil, apperr.InvalidArgument("idempotency_key is required")
+	}
+
+	_, _, err := server.repo.AdjustAtomic(uint(request.GetProductId()), int(request.GetAmount()), request.GetReason(), idempotencyKey)
+	if err != nil {
+		if errors.Is(err, repository.ErrInsufficientStock) {
+			return nil, apperr.FailedPrecondition("insufficient stock")
+		}
+		return nil, apperr.Internal(err)
+	}
+
+	inventory, err := server.repo.FindByProductID(uint(request.GetProductId()))
+	if err != nil {
+		return nil, apperr.Internal(err)
+	}
+	return &pb.AdjustProductInventoryResponse{Inventory: toProtoInventory(inventory)}, nil
+}
+
 // toProtoInventory はDBのmodel.ProductInventoryをレスポンス用のpb.ProductInventoryに変換する。
 func toProtoInventory(inventory *model.ProductInventory) *pb.ProductInventory {
 	return &pb.ProductInventory{
@@ -103,5 +134,6 @@ func toProtoInventory(inventory *model.ProductInventory) *pb.ProductInventory {
 		Reserved:  int32(inventory.Reserved),
 		CreatedAt: timestamppb.New(inventory.CreatedAt),
 		UpdatedAt: timestamppb.New(inventory.UpdatedAt),
+		Version:   uint32(inventory.Version),
 	}
 }

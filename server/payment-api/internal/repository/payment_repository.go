@@ -43,6 +43,15 @@ func (repo *PaymentRepository) FindByID(id uint) (*model.Payment, error) {
 	return &payment, nil
 }
 
+// FindByIdempotencyKey はidempotency_keyに一致する決済を返す(無ければgorm.ErrRecordNotFound)。
+func (repo *PaymentRepository) FindByIdempotencyKey(idempotencyKey string) (*model.Payment, error) {
+	var payment model.Payment
+	if err := repo.db.Where("idempotency_key = ?", idempotencyKey).First(&payment).Error; err != nil {
+		return nil, err
+	}
+	return &payment, nil
+}
+
 func (repo *PaymentRepository) Update(payment *model.Payment) error {
 	return repo.db.Save(payment).Error
 }

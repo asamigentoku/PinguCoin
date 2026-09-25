@@ -32,6 +32,7 @@ type Product struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
+	Version     int32  `json:"version"`
 }
 
 type ProductDetail struct {

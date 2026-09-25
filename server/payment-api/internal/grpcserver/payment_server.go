@@ -51,14 +51,27 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 	if strings.TrimSpace(request.GetPaymentMethod()) == "" {
 		return nil, apperr.InvalidArgument("payment_method is required")
 	}
+	idempotencyKey := strings.TrimSpace(request.GetIdempotencyKey())
+	if idempotencyKey == "" {
+		return nil, apperr.InvalidArgument("idempotency_key is required")
+	}
+
+	// 同じidempotency_keyの決済が既にあれば、新たに決済(ポイント消費含む)を作らず
+	// そのまま返す(リトライ・二重送信で二重決済にならないようにするため)。
+	if existing, err := server.payments.FindByIdempotencyKey(idempotencyKey); err == nil {
+		return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, apperr.Internal(err)
+	}
 
 	payment := &model.Payment{
-		UserID:        uint(request.GetUserId()),
-		ProductID:     uint(request.GetProductId()),
-		Amount:        request.GetAmount(),
-		Currency:      request.GetCurrency(),
-		PaymentMethod: request.GetPaymentMethod(),
-		Status:        model.PaymentStatusSucceeded,
+		UserID:         uint(request.GetUserId()),
+		ProductID:      uint(request.GetProductId()),
+		Amount:         request.GetAmount(),
+		Currency:       request.GetCurrency(),
+		PaymentMethod:  request.GetPaymentMethod(),
+		Status:         model.PaymentStatusSucceeded,
+		IdempotencyKey: idempotencyKey,
 	}
 
 	// point払いの場合は「決済の作成」と「ポイント残高の消費」を1トランザクションにまとめる。
@@ -76,15 +89,34 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 			if errors.Is(err, repository.ErrInsufficientPoints) {
 				return nil, apperr.FailedPrecondition("insufficient points")
 			}
+			if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+				return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
+			}
 			return nil, apperr.Internal(err)
 		}
 		return &pb.CreatePaymentResponse{Payment: toProtoPayment(payment)}, nil
 	}
 
 	if err := server.payments.Create(payment); err != nil {
+		if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+			return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
+		}
 		return nil, apperr.Internal(err)
 	}
 	return &pb.CreatePaymentResponse{Payment: toProtoPayment(payment)}, nil
+}
+
+// recoverDuplicatePayment は、同時に同じidempotency_keyでリクエストが来た場合の競合に備え、
+// ユニーク制約違反(gorm.ErrDuplicatedKey)を「先に成功した方の結果を返す」形で救済する。
+func (server *PaymentServer) recoverDuplicatePayment(err error, idempotencyKey string) (*model.Payment, bool) {
+	if !errors.Is(err, gorm.ErrDuplicatedKey) {
+		return nil, false
+	}
+	existing, findErr := server.payments.FindByIdempotencyKey(idempotencyKey)
+	if findErr != nil {
+		return nil, false
+	}
+	return existing, true
 }
 
 // GetPayment は決済を1件取得する。

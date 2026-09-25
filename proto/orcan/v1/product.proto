@@ -21,6 +21,9 @@ message Product {
   // 非公開コンテナに置かれるため、これ自体では閲覧・ダウンロードできず、
   // GetProductDownloadURLで発行した署名付きURLが別途必要。
   string file_url = 11;
+  // version は更新のたびに1ずつ増える値。呼び出し側(pingu-api等)のキャッシュキー/
+  // 無効化判定に使う(このレコードが前回取得時から変わったかどうかを安価に比較できる)。
+  uint32 version = 12;
 }
 
 service ProductService {

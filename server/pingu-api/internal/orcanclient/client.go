@@ -18,9 +18,10 @@ const internalTokenMetadataKey = "x-internal-token"
 
 // Client はorcan-apiの各サービスへのgRPCクライアントをまとめて持つ。
 type Client struct {
-	conn    *grpc.ClientConn
-	Product pb.ProductServiceClient
-	User    pb.UserServiceClient
+	conn      *grpc.ClientConn
+	Product   pb.ProductServiceClient
+	Inventory pb.ProductInventoryServiceClient
+	User      pb.UserServiceClient
 }
 
 // New はorcan-apiへのgRPCコネクションを1本張り、各サービスのクライアントを作る。
@@ -36,9 +37,10 @@ func New(addr, internalToken string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:    conn,
-		Product: pb.NewProductServiceClient(conn),
-		User:    pb.NewUserServiceClient(conn),
+		conn:      conn,
+		Product:   pb.NewProductServiceClient(conn),
+		Inventory: pb.NewProductInventoryServiceClient(conn),
+		User:      pb.NewUserServiceClient(conn),
 	}, nil
 }
 

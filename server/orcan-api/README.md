@@ -7,10 +7,11 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 
 | テーブル | 説明 |
 | --- | --- |
-| `products` | 商品(`user_id`=出品者, `image_url`=メイン画像のblob URL, `file_url`=販売対象のデジタルコンテンツのblob URL) |
+| `products` | 商品(`user_id`=出品者, `image_url`=メイン画像のblob URL, `file_url`=販売対象のデジタルコンテンツのblob URL, `version`=更新のたびに増える値。呼び出し側のキャッシュ無効化判定に使う) |
 | `product_categories` | 商品カテゴリ |
 | `product_detail` | 商品画像・詳細 |
-| `product_inventory` | 在庫 |
+| `product_inventory` | 在庫(`version`は`products`と同じ目的) |
+| `product_inventory_transactions` | 在庫増減履歴(`idempotency_key`で冪等性を担保する台帳。`point_transactions`と同じ考え方) |
 | `product_listings` | 出品情報 |
 | `users` | ユーザーのアプリ内プロフィール(`clerk_user_id`でClerkのユーザーと1:1対応。パスワード等の認証情報は一切保持しない) |
 
@@ -29,7 +30,10 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
     orcan-apiは購入状況を持たないため、呼び出し元(pingu-api)が権限確認済みであることを前提とする。
 - `orcan.v1.ProductCategoryService`: `ListProductCategories`, `GetProductCategory`, `CreateProductCategory`, `UpdateProductCategory`, `DeleteProductCategory`
 - `orcan.v1.ProductDetailService`: `ListProductDetails`(`product_id`で絞り込み可), `GetProductDetail`, `CreateProductDetail`, `UpdateProductDetail`, `DeleteProductDetail`
-- `orcan.v1.ProductInventoryService`: `ListProductInventories`, `GetProductInventory`, `CreateProductInventory`, `UpdateProductInventory`, `DeleteProductInventory`
+- `orcan.v1.ProductInventoryService`: `ListProductInventories`, `GetProductInventory`, `CreateProductInventory`, `UpdateProductInventory`, `DeleteProductInventory`。
+  加えて`AdjustProductInventory`(在庫数を差分で増減。負=消費/正=戻し)を提供する。`idempotency_key`必須で、
+  同じキーの再送は二重に増減しない(`product_inventory_transactions`テーブルに履歴を保持)。
+  在庫不足時は`FAILED_PRECONDITION`を返す。
 - `orcan.v1.ProductListingService`: `ListProductListings`(`product_id`で絞り込み可), `GetProductListing`, `CreateProductListing`, `UpdateProductListing`, `DeleteProductListing`
 - `orcan.v1.UserService`: `ListUsers`, `GetUser`, `GetUserByClerkID`, `EnsureUser`(clerk_user_idで取得、無ければ作成。存在確認/新規作成のJITプロビジョニング用),
   `UpdateUser`(氏名のみ), `DeleteUser`

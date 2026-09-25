@@ -257,29 +257,48 @@ orcan-apiの大半のRPCは同一パターン。個別の分岐は上表・各pr
 
 ### 処理フロー: `POST /orders`(商品購入)
 
-3サービスにまたがる最も複雑な処理。**要ログイン**。
+3サービスにまたがる最も複雑な処理。**要ログイン、`Idempotency-Key`ヘッダ必須**。
 
 ```
-クライアント ──POST /orders {product_id, quantity, payment_method}──▶ OrderHandler.CreateOrder
+クライアント ──POST /orders (Idempotency-Key: <key>)
+              {product_id, quantity, payment_method}──▶ OrderHandler.CreateOrder
 
 1. reqcontext.UserFromContext でログイン確認 → 未ログインなら Unauthenticated
-2. リクエストボディをデコード。product_id必須、quantity未指定は1、
+2. Idempotency-Keyヘッダを取得(必須。無ければInvalidArgument)。
+   このキーに一致する注文が既にDBにあれば、以降の処理は一切行わずその注文を
+   200 OKでそのまま返す(二重注文防止。フロントのリトライ/二重クリック対策)。
+3. リクエストボディをデコード。product_id必須、quantity未指定は1、
    payment_method未指定は"point"をデフォルトに補完
-3. orcan-api.ProductService.GetProduct(product_id) を呼び、商品の現在価格を取得(gRPC)
+4. orcan-api.ProductService.GetProduct(product_id) を呼び、商品の現在価格を取得(gRPC)
    → 見つからなければ orcan-api由来のNotFoundがそのまま返る
-4. totalAmount = product.price * quantity を算出
-5. payment-api.PaymentService.CreatePayment(user_id, product_id, totalAmount,
-   currency="JPY", payment_method) を呼ぶ(gRPC)
+5. totalAmount = product.price * quantity を算出
+6. orcan-api.ProductInventoryService.AdjustProductInventory(product_id, -quantity,
+   idempotency_key=key) を呼び、在庫を消費(gRPC)。決済より先に行うことで、
+   在庫不足の商品に課金してしまうことを防ぐ。
+   → 在庫不足なら FailedPrecondition("insufficient stock") がそのまま返る
+   → 同じidempotency_keyの再送は二重に減算しない(orcan-api側で冪等性を担保)
+7. payment-api.PaymentService.CreatePayment(user_id, product_id, totalAmount,
+   currency="JPY", payment_method, idempotency_key=key) を呼ぶ(gRPC)
    → payment-api側で決済作成(payment_method="point"ならポイント残高も同時に消費。
      残高不足なら FailedPrecondition("insufficient points") がそのまま返る)
-6. 決済結果(payment.status)から注文ステータスを導出:
+   → 同じidempotency_keyの再送は二重決済しない(payment-api側で冪等性を担保)
+   → 決済が失敗した場合、6.で消費した在庫をベストエフォートで戻す
+     (`idempotency_key + ":release"` という別キーで在庫を補償的に加算。
+     これ自体が失敗してもログに残すだけで、クライアントには元の決済エラーを返す)
+8. 決済結果(payment.status)から注文ステータスを導出:
      "succeeded" → "paid" / "pending" → "pending" / それ以外 → "failed"
-7. model.Order{user_id, product_id, quantity, unit_price, total_amount,
-   payment_id, status} を組み立て、pingu-api自身のDBに保存 (INSERT INTO orders)
-8. 201 Created で注文情報をJSONで返す
+9. model.Order{user_id, product_id, quantity, unit_price, total_amount,
+   payment_id, status, idempotency_key} を組み立て、pingu-api自身のDBに保存
+   (INSERT INTO orders。idempotency_keyにユニーク制約があり、同時リクエストの
+   競合時は先に成功した方の注文をそのまま返す)
+10. 201 Created で注文情報をJSONで返す
 ```
 
-呼び出し順序上の注意: 3→4→5→7 のいずれかで失敗しても、**それより前のステップで確定した副作用(決済の作成等)は取り消されない**(payment-api内の決済作成とポイント消費は原子的だが、「決済は成功したのに注文がDBに保存されない」ケースはあり得る)。
+冪等性キーは3.〜9.の全ステップで同じ値(`key`)をそのまま下流に渡す。各サービス
+(pingu-api/orcan-api/payment-api)がそれぞれ自分の担当するテーブルで
+「このキーは処理済みか」を確認してから副作用を起こすため、pingu-apiの2.のチェックだけに
+頼らず、どのステップで通信が途切れてリトライされても二重の在庫消費・二重決済・
+二重注文のいずれも起きない。
 
 ### 処理フロー: `GET /orders` / `GET /orders/{id}`
 

@@ -26,6 +26,7 @@ func productFromPB(product *orcanpb.Product) *model.Product {
 		Status:      product.GetStatus(),
 		CreatedAt:   formatTimestamp(product.GetCreatedAt().AsTime()),
 		UpdatedAt:   formatTimestamp(product.GetUpdatedAt().AsTime()),
+		Version:     int32(product.GetVersion()),
 	}
 }
 

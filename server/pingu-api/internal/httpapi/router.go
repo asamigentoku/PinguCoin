@@ -49,7 +49,7 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", APIVersionPrefix+"/graphql"))
 	mux.Handle(APIVersionPrefix+"/graphql", graphqlServer)
 
-	orderHandler := NewOrderHandler(orcan, payment, orderRepo)
+	orderHandler := NewOrderHandler(logger, orcan, payment, orderRepo)
 	mux.HandleFunc("POST "+APIVersionPrefix+"/orders", orderHandler.CreateOrder)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders", orderHandler.ListOrders)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", orderHandler.GetOrder)

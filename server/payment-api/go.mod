@@ -3,7 +3,7 @@ module github.com/asamigentoku/PinguCoin/server/payment-api
 go 1.27.1
 
 require (
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260918162117-cecb64721679
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3

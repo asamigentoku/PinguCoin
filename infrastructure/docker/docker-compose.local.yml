@@ -5,15 +5,17 @@ services:
     image: postgres:16-alpine
     container_name: pingucoin-postgres
     restart: unless-stopped
-    env_file:
-      - ./postgres/.env.local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orcan
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       # $$ はCompose自身に解決させず、コンテナ内のシェルにそのまま渡して
-      # postgres/.env の値(env_file)で展開させるためのエスケープ。
+      # environmentの値で展開させるためのエスケープ。
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
@@ -25,8 +27,8 @@ services:
     image: redis:7-alpine
     container_name: pingucoin-redis
     restart: unless-stopped
-    env_file:
-      - ./redis/.env.local
+    environment:
+      REDIS_PASSWORD: redis
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
     ports:
       - "6379:6379"
@@ -45,8 +47,22 @@ services:
     container_name: pingucoin-kafka
     hostname: kafka
     restart: unless-stopped
-    env_file:
-      - ./kafka/.env.local
+    environment:
+      # KRaftモード(Zookeeperなし)の単一ブローカー構成。
+      # KAFKA_* はコンテナのエントリーポイントがそのまま server.properties に変換する。
+      CLUSTER_ID: pinguCoinKafkaCluster1
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:19092,CONTROLLER://kafka:19093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:19092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:19093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
       - "9092:9092"
     volumes:
@@ -64,8 +80,10 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     container_name: pingucoin-azurite
     restart: unless-stopped
-    env_file:
-      - ./azurite/.env.local
+    # 未設定ならAzurite標準の開発用アカウント(devstoreaccount1)が使われる。
+    # 追加のアカウントが必要な場合のみ指定する: name1:base64key1;name2:base64key2
+    # environment:
+    #   AZURITE_ACCOUNTS: ""
     # --skipApiVersionCheck: Azure SDKが送るx-ms-versionがAzuriteの対応バージョンより新しい場合に
     # 拒否されてしまう問題を回避する(ローカル開発用エミュレーターのみの設定、本番のAzureには影響しない)。
     command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--location", "/data", "--debug", "/data/debug.log", "--skipApiVersionCheck"]

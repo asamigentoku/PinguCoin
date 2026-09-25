@@ -24,6 +24,7 @@ const (
 	ProductInventoryService_CreateProductInventory_FullMethodName = "/orcan.v1.ProductInventoryService/CreateProductInventory"
 	ProductInventoryService_UpdateProductInventory_FullMethodName = "/orcan.v1.ProductInventoryService/UpdateProductInventory"
 	ProductInventoryService_DeleteProductInventory_FullMethodName = "/orcan.v1.ProductInventoryService/DeleteProductInventory"
+	ProductInventoryService_AdjustProductInventory_FullMethodName = "/orcan.v1.ProductInventoryService/AdjustProductInventory"
 )
 
 // ProductInventoryServiceClient is the client API for ProductInventoryService service.
@@ -35,6 +36,10 @@ type ProductInventoryServiceClient interface {
 	CreateProductInventory(ctx context.Context, in *CreateProductInventoryRequest, opts ...grpc.CallOption) (*CreateProductInventoryResponse, error)
 	UpdateProductInventory(ctx context.Context, in *UpdateProductInventoryRequest, opts ...grpc.CallOption) (*UpdateProductInventoryResponse, error)
 	DeleteProductInventory(ctx context.Context, in *DeleteProductInventoryRequest, opts ...grpc.CallOption) (*DeleteProductInventoryResponse, error)
+	// AdjustProductInventory は在庫数(quantity)をamountだけ増減させる(負=消費、正=戻し)。
+	// idempotency_keyが同じリクエストを再送しても在庫が二重に増減することはない
+	// (最初に処理した結果をそのまま返す)。在庫が不足する場合はFAILED_PRECONDITIONを返す。
+	AdjustProductInventory(ctx context.Context, in *AdjustProductInventoryRequest, opts ...grpc.CallOption) (*AdjustProductInventoryResponse, error)
 }
 
 type productInventoryServiceClient struct {
@@ -95,6 +100,16 @@ func (c *productInventoryServiceClient) DeleteProductInventory(ctx context.Conte
 	return out, nil
 }
 
+func (c *productInventoryServiceClient) AdjustProductInventory(ctx context.Context, in *AdjustProductInventoryRequest, opts ...grpc.CallOption) (*AdjustProductInventoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdjustProductInventoryResponse)
+	err := c.cc.Invoke(ctx, ProductInventoryService_AdjustProductInventory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProductInventoryServiceServer is the server API for ProductInventoryService service.
 // All implementations must embed UnimplementedProductInventoryServiceServer
 // for forward compatibility.
@@ -104,6 +119,10 @@ type ProductInventoryServiceServer interface {
 	CreateProductInventory(context.Context, *CreateProductInventoryRequest) (*CreateProductInventoryResponse, error)
 	UpdateProductInventory(context.Context, *UpdateProductInventoryRequest) (*UpdateProductInventoryResponse, error)
 	DeleteProductInventory(context.Context, *DeleteProductInventoryRequest) (*DeleteProductInventoryResponse, error)
+	// AdjustProductInventory は在庫数(quantity)をamountだけ増減させる(負=消費、正=戻し)。
+	// idempotency_keyが同じリクエストを再送しても在庫が二重に増減することはない
+	// (最初に処理した結果をそのまま返す)。在庫が不足する場合はFAILED_PRECONDITIONを返す。
+	AdjustProductInventory(context.Context, *AdjustProductInventoryRequest) (*AdjustProductInventoryResponse, error)
 	mustEmbedUnimplementedProductInventoryServiceServer()
 }
 
@@ -128,6 +147,9 @@ func (UnimplementedProductInventoryServiceServer) UpdateProductInventory(context
 }
 func (UnimplementedProductInventoryServiceServer) DeleteProductInventory(context.Context, *DeleteProductInventoryRequest) (*DeleteProductInventoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteProductInventory not implemented")
+}
+func (UnimplementedProductInventoryServiceServer) AdjustProductInventory(context.Context, *AdjustProductInventoryRequest) (*AdjustProductInventoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdjustProductInventory not implemented")
 }
 func (UnimplementedProductInventoryServiceServer) mustEmbedUnimplementedProductInventoryServiceServer() {
 }
@@ -241,6 +263,24 @@ func _ProductInventoryService_DeleteProductInventory_Handler(srv interface{}, ct
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProductInventoryService_AdjustProductInventory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdjustProductInventoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProductInventoryServiceServer).AdjustProductInventory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProductInventoryService_AdjustProductInventory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProductInventoryServiceServer).AdjustProductInventory(ctx, req.(*AdjustProductInventoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProductInventoryService_ServiceDesc is the grpc.ServiceDesc for ProductInventoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -267,6 +307,10 @@ var ProductInventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteProductInventory",
 			Handler:    _ProductInventoryService_DeleteProductInventory_Handler,
+		},
+		{
+			MethodName: "AdjustProductInventory",
+			Handler:    _ProductInventoryService_AdjustProductInventory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -233,8 +233,11 @@ type CreatePaymentRequest struct {
 	Amount        int64                  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	PaymentMethod string                 `protobuf:"bytes,5,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
+	// 作られない(最初に処理した結果をそのまま返す)。呼び出し元(pingu-api)は必ず指定すること。
+	IdempotencyKey string `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreatePaymentRequest) Reset() {
@@ -298,6 +301,13 @@ func (x *CreatePaymentRequest) GetCurrency() string {
 func (x *CreatePaymentRequest) GetPaymentMethod() string {
 	if x != nil {
 		return x.PaymentMethod
+	}
+	return ""
+}
+
+func (x *CreatePaymentRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -851,14 +861,15 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xa9\x01\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd2\x01\n" +
 	"\x14CreatePaymentRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x02 \x01(\rR\tproductId\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\x03R\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12%\n" +
-	"\x0epayment_method\x18\x05 \x01(\tR\rpaymentMethod\"F\n" +
+	"\x0epayment_method\x18\x05 \x01(\tR\rpaymentMethod\x12'\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"F\n" +
 	"\x15CreatePaymentResponse\x12-\n" +
 	"\apayment\x18\x01 \x01(\v2\x13.payment.v1.PaymentR\apayment\"#\n" +
 	"\x11GetPaymentRequest\x12\x0e\n" +

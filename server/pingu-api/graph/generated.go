@@ -68,6 +68,7 @@ type ComplexityRoot struct {
 		Status      func(childComplexity int) int
 		UpdatedAt   func(childComplexity int) int
 		UserID      func(childComplexity int) int
+		Version     func(childComplexity int) int
 	}
 
 	ProductDetail struct {
@@ -361,6 +362,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.UserID(childComplexity), true
+	case "Product.version":
+		if e.ComplexityRoot.Product.Version == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.Version(childComplexity), true
 
 	case "ProductDetail.description":
 		if e.ComplexityRoot.ProductDetail.Description == nil {
@@ -690,6 +697,8 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_createdAt(ctx, field)
 	case "updatedAt":
 		return ec.fieldContext_Product_updatedAt(ctx, field)
+	case "version":
+		return ec.fieldContext_Product_version(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
 }
@@ -2019,6 +2028,29 @@ func (ec *executionContext) _Product_updatedAt(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_Product_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Product_version(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Product_version(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Version, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Product_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _ProductDetail_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
@@ -4288,6 +4320,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Product_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "version":
+			out.Values[i] = ec._Product_version(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

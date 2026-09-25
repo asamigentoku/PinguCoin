@@ -398,5 +398,6 @@ func toProtoProduct(product *model.Product) *pb.Product {
 		Status:      product.Status,
 		CreatedAt:   timestamppb.New(product.CreatedAt),
 		UpdatedAt:   timestamppb.New(product.UpdatedAt),
+		Version:     uint32(product.Version),
 	}
 }

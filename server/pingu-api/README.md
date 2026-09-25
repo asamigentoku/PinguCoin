@@ -10,7 +10,7 @@ GraphQL/RESTFulとして統合して外部へ公開する。
 | --- | --- | --- |
 | 商品登録、閲覧、編集、削除 | GraphQL(`/graphql`) | → orcan-api(`ProductService`, DB反映) |
 | 一般ログイン、ログアウト | フロントエンド(Clerk)で完結 | フロントがClerkでログイン/ログアウトし、以降のリクエストにClerkのセッショントークンを添える |
-| 商品購入(注文API) | RESTful(`POST /orders`, `GET /orders`, `GET /orders/{id}`) | → orcan-api(商品確認) → payment-api(決済) → pingu-api自身のDBに注文(Order)として記録 |
+| 商品購入(注文API) | RESTful(`POST /orders`, `GET /orders`, `GET /orders/{id}`)。`POST /orders`は`Idempotency-Key`ヘッダ必須 | → orcan-api(商品確認・在庫消費) → payment-api(決済) → pingu-api自身のDBに注文(Order)として記録 |
 | ユーザー情報、登録、編集 | GraphQL(`/graphql`) | → orcan-api(`UserService`, DB反映)。登録はClerk側で行われ、初回アクセス時にpingu-apiが自動でプロフィールを作成する |
 
 `orcan-api`/`payment-api`は内部向けの薄いCRUD/決済APIで、複数サービスをまたぐ

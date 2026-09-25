@@ -18,11 +18,21 @@ type Product struct {
 	FileURL     string          `gorm:"size:512" json:"file_url"`
 	Price       int64           `gorm:"not null" json:"price"`
 	Status      string          `gorm:"size:20;not null;default:'draft'" json:"status"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"-"`
+	// Version は更新のたびに1ずつ増える値。キャッシュのキー/無効化判定(このレコードが
+	// 変わったかどうか)に使う。更新処理自体は楽観ロックせず、BeforeUpdateフックで
+	// 無条件にインクリメントするだけ(同時更新の競合検出目的ではない)。
+	Version   uint           `gorm:"not null;default:1" json:"version"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (Product) TableName() string {
 	return "products"
+}
+
+// BeforeUpdate はレコード更新のたびにVersionを1つ進める。
+func (product *Product) BeforeUpdate(tx *gorm.DB) error {
+	tx.Statement.SetColumn("version", product.Version+1)
+	return nil
 }

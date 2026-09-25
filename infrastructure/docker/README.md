@@ -6,21 +6,13 @@ Docker Composeで起動する。
 Azuriteは[Azure Blob Storage](https://learn.microsoft.com/azure/storage/blobs/)のローカルエミュレーターで、
 Queue/Tableは使わずBlobのみ起動している(`azurite-blob`コマンド)。
 
-## サービスごとの`.env`
+## サービスごとの設定
 
-各サービスの設定は `<service>/.env.local.example` に分けて置いてある。
-使う前に`.example`を外したファイルを作る。
-
-```bash
-cd infrastructure/docker
-cp postgres/.env.local.example postgres/.env.local
-cp redis/.env.local.example redis/.env.local
-cp kafka/.env.local.example kafka/.env.local
-cp azurite/.env.local.example azurite/.env.local
-```
-
-`docker-compose.local.yml` は `env_file` でこれらを読み込む。
-Postgresの認証情報やKafkaのブローカー設定はここで調整する。
+各サービスの環境変数は別ファイルに切り出さず、`docker-compose.local.yml`の
+各サービスの`environment`に直接書く。ローカル開発用の値のみ(パスワード等も
+秘密情報ではない固定値)なので、`.env`ファイルに分ける必要が無いため。
+Postgresの認証情報やKafkaのブローカー設定を変えたい場合は、この
+`docker-compose.local.yml`を直接編集する。
 
 ## 起動・停止
 

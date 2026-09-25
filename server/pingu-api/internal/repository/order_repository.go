@@ -26,6 +26,15 @@ func (repo *OrderRepository) FindByID(id uint) (*model.Order, error) {
 	return &order, nil
 }
 
+// FindByIdempotencyKey はidempotency_keyに一致する注文を返す(無ければgorm.ErrRecordNotFound)。
+func (repo *OrderRepository) FindByIdempotencyKey(idempotencyKey string) (*model.Order, error) {
+	var order model.Order
+	if err := repo.db.Where("idempotency_key = ?", idempotencyKey).First(&order).Error; err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
 // FindByUser はuserIDが購入した注文の一覧を新しい順に返す。
 func (repo *OrderRepository) FindByUser(userID uint) ([]model.Order, error) {
 	var orders []model.Order

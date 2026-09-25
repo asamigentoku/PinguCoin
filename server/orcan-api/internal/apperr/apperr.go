@@ -18,10 +18,11 @@ import (
 type Reason string
 
 const (
-	ReasonNotFound         Reason = "NOT_FOUND"
-	ReasonInvalidArgument  Reason = "INVALID_ARGUMENT"
-	ReasonPermissionDenied Reason = "PERMISSION_DENIED"
-	ReasonInternal         Reason = "INTERNAL"
+	ReasonNotFound           Reason = "NOT_FOUND"
+	ReasonInvalidArgument    Reason = "INVALID_ARGUMENT"
+	ReasonPermissionDenied   Reason = "PERMISSION_DENIED"
+	ReasonFailedPrecondition Reason = "FAILED_PRECONDITION"
+	ReasonInternal           Reason = "INTERNAL"
 )
 
 const domain = "orcan-api"
@@ -86,6 +87,16 @@ func PermissionDenied(message string) *AppError {
 	return &AppError{
 		GRPCCode: codes.PermissionDenied,
 		Reason:   ReasonPermissionDenied,
+		Message:  message,
+	}
+}
+
+// FailedPrecondition はリソースの現在の状態的に処理を続行できないことを表す
+// (例: 在庫不足)。
+func FailedPrecondition(message string) *AppError {
+	return &AppError{
+		GRPCCode: codes.FailedPrecondition,
+		Reason:   ReasonFailedPrecondition,
 		Message:  message,
 	}
 }

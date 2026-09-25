@@ -50,6 +50,9 @@ message CreatePaymentRequest {
   int64 amount = 3;
   string currency = 4;
   string payment_method = 5;
+  // idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
+  // 作られない(最初に処理した結果をそのまま返す)。呼び出し元(pingu-api)は必ず指定すること。
+  string idempotency_key = 6;
 }
 
 message CreatePaymentResponse {

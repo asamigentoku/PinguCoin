@@ -37,7 +37,10 @@ type Product struct {
 	// file_url は販売対象のデジタルコンテンツ(購入者がダウンロードする実体ファイル)のBlob URL。
 	// 非公開コンテナに置かれるため、これ自体では閲覧・ダウンロードできず、
 	// GetProductDownloadURLで発行した署名付きURLが別途必要。
-	FileUrl       string `protobuf:"bytes,11,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	FileUrl string `protobuf:"bytes,11,opt,name=file_url,json=fileUrl,proto3" json:"file_url,omitempty"`
+	// version は更新のたびに1ずつ増える値。呼び出し側(pingu-api等)のキャッシュキー/
+	// 無効化判定に使う(このレコードが前回取得時から変わったかどうかを安価に比較できる)。
+	Version       uint32 `protobuf:"varint,12,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -147,6 +150,13 @@ func (x *Product) GetFileUrl() string {
 		return x.FileUrl
 	}
 	return ""
+}
+
+func (x *Product) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type ListProductsRequest struct {
@@ -1544,7 +1554,7 @@ var File_orcan_v1_product_proto protoreflect.FileDescriptor
 
 const file_orcan_v1_product_proto_rawDesc = "" +
 	"\n" +
-	"\x16orcan/v1/product.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x02\n" +
+	"\x16orcan/v1/product.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xff\x02\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\rR\x06userId\x12\x1f\n" +
@@ -1560,7 +1570,8 @@ const file_orcan_v1_product_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x19\n" +
-	"\bfile_url\x18\v \x01(\tR\afileUrl\"?\n" +
+	"\bfile_url\x18\v \x01(\tR\afileUrl\x12\x18\n" +
+	"\aversion\x18\f \x01(\rR\aversion\"?\n" +
 	"\x13ListProductsRequest\x12\x1c\n" +
 	"\auser_id\x18\x01 \x01(\rH\x00R\x06userId\x88\x01\x01B\n" +
 	"\n" +

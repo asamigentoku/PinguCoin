@@ -23,13 +23,15 @@ const (
 )
 
 type ProductInventory struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	Quantity      int32                  `protobuf:"varint,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
-	Reserved      int32                  `protobuf:"varint,4,opt,name=reserved,proto3" json:"reserved,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ProductId uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Quantity  int32                  `protobuf:"varint,3,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	Reserved  int32                  `protobuf:"varint,4,opt,name=reserved,proto3" json:"reserved,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// version は更新のたびに1ずつ増える値。呼び出し側のキャッシュキー/無効化判定に使う。
+	Version       uint32 `protobuf:"varint,7,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -104,6 +106,13 @@ func (x *ProductInventory) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *ProductInventory) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type ListProductInventoriesRequest struct {
@@ -570,11 +579,123 @@ func (*DeleteProductInventoryResponse) Descriptor() ([]byte, []int) {
 	return file_orcan_v1_product_inventory_proto_rawDescGZIP(), []int{10}
 }
 
+type AdjustProductInventoryRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProductId      uint32                 `protobuf:"varint,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Amount         int32                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"` // 負=消費(注文等), 正=戻し(注文失敗時の補償・返品等)
+	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AdjustProductInventoryRequest) Reset() {
+	*x = AdjustProductInventoryRequest{}
+	mi := &file_orcan_v1_product_inventory_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdjustProductInventoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdjustProductInventoryRequest) ProtoMessage() {}
+
+func (x *AdjustProductInventoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_inventory_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdjustProductInventoryRequest.ProtoReflect.Descriptor instead.
+func (*AdjustProductInventoryRequest) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_inventory_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AdjustProductInventoryRequest) GetProductId() uint32 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *AdjustProductInventoryRequest) GetAmount() int32 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *AdjustProductInventoryRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AdjustProductInventoryRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type AdjustProductInventoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Inventory     *ProductInventory      `protobuf:"bytes,1,opt,name=inventory,proto3" json:"inventory,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdjustProductInventoryResponse) Reset() {
+	*x = AdjustProductInventoryResponse{}
+	mi := &file_orcan_v1_product_inventory_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdjustProductInventoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdjustProductInventoryResponse) ProtoMessage() {}
+
+func (x *AdjustProductInventoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orcan_v1_product_inventory_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdjustProductInventoryResponse.ProtoReflect.Descriptor instead.
+func (*AdjustProductInventoryResponse) Descriptor() ([]byte, []int) {
+	return file_orcan_v1_product_inventory_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AdjustProductInventoryResponse) GetInventory() *ProductInventory {
+	if x != nil {
+		return x.Inventory
+	}
+	return nil
+}
+
 var File_orcan_v1_product_inventory_proto protoreflect.FileDescriptor
 
 const file_orcan_v1_product_inventory_proto_rawDesc = "" +
 	"\n" +
-	" orcan/v1/product_inventory.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xef\x01\n" +
+	" orcan/v1/product_inventory.proto\x12\borcan.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x89\x02\n" +
 	"\x10ProductInventory\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x1d\n" +
 	"\n" +
@@ -584,7 +705,8 @@ const file_orcan_v1_product_inventory_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x1f\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x18\n" +
+	"\aversion\x18\a \x01(\rR\aversion\"\x1f\n" +
 	"\x1dListProductInventoriesRequest\"^\n" +
 	"\x1eListProductInventoriesResponse\x12<\n" +
 	"\vinventories\x18\x01 \x03(\v2\x1a.orcan.v1.ProductInventoryR\vinventories\",\n" +
@@ -609,13 +731,22 @@ const file_orcan_v1_product_inventory_proto_rawDesc = "" +
 	"\tinventory\x18\x01 \x01(\v2\x1a.orcan.v1.ProductInventoryR\tinventory\"/\n" +
 	"\x1dDeleteProductInventoryRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\" \n" +
-	"\x1eDeleteProductInventoryResponse2\xb1\x04\n" +
+	"\x1eDeleteProductInventoryResponse\"\x97\x01\n" +
+	"\x1dAdjustProductInventoryRequest\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\rR\tproductId\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x05R\x06amount\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"Z\n" +
+	"\x1eAdjustProductInventoryResponse\x128\n" +
+	"\tinventory\x18\x01 \x01(\v2\x1a.orcan.v1.ProductInventoryR\tinventory2\x9e\x05\n" +
 	"\x17ProductInventoryService\x12k\n" +
 	"\x16ListProductInventories\x12'.orcan.v1.ListProductInventoriesRequest\x1a(.orcan.v1.ListProductInventoriesResponse\x12b\n" +
 	"\x13GetProductInventory\x12$.orcan.v1.GetProductInventoryRequest\x1a%.orcan.v1.GetProductInventoryResponse\x12k\n" +
 	"\x16CreateProductInventory\x12'.orcan.v1.CreateProductInventoryRequest\x1a(.orcan.v1.CreateProductInventoryResponse\x12k\n" +
 	"\x16UpdateProductInventory\x12'.orcan.v1.UpdateProductInventoryRequest\x1a(.orcan.v1.UpdateProductInventoryResponse\x12k\n" +
-	"\x16DeleteProductInventory\x12'.orcan.v1.DeleteProductInventoryRequest\x1a(.orcan.v1.DeleteProductInventoryResponseBQZOgithub.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1b\x06proto3"
+	"\x16DeleteProductInventory\x12'.orcan.v1.DeleteProductInventoryRequest\x1a(.orcan.v1.DeleteProductInventoryResponse\x12k\n" +
+	"\x16AdjustProductInventory\x12'.orcan.v1.AdjustProductInventoryRequest\x1a(.orcan.v1.AdjustProductInventoryResponseBQZOgithub.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1;orcanv1b\x06proto3"
 
 var (
 	file_orcan_v1_product_inventory_proto_rawDescOnce sync.Once
@@ -629,7 +760,7 @@ func file_orcan_v1_product_inventory_proto_rawDescGZIP() []byte {
 	return file_orcan_v1_product_inventory_proto_rawDescData
 }
 
-var file_orcan_v1_product_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_orcan_v1_product_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_orcan_v1_product_inventory_proto_goTypes = []any{
 	(*ProductInventory)(nil),               // 0: orcan.v1.ProductInventory
 	(*ListProductInventoriesRequest)(nil),  // 1: orcan.v1.ListProductInventoriesRequest
@@ -642,30 +773,35 @@ var file_orcan_v1_product_inventory_proto_goTypes = []any{
 	(*UpdateProductInventoryResponse)(nil), // 8: orcan.v1.UpdateProductInventoryResponse
 	(*DeleteProductInventoryRequest)(nil),  // 9: orcan.v1.DeleteProductInventoryRequest
 	(*DeleteProductInventoryResponse)(nil), // 10: orcan.v1.DeleteProductInventoryResponse
-	(*timestamppb.Timestamp)(nil),          // 11: google.protobuf.Timestamp
+	(*AdjustProductInventoryRequest)(nil),  // 11: orcan.v1.AdjustProductInventoryRequest
+	(*AdjustProductInventoryResponse)(nil), // 12: orcan.v1.AdjustProductInventoryResponse
+	(*timestamppb.Timestamp)(nil),          // 13: google.protobuf.Timestamp
 }
 var file_orcan_v1_product_inventory_proto_depIdxs = []int32{
-	11, // 0: orcan.v1.ProductInventory.created_at:type_name -> google.protobuf.Timestamp
-	11, // 1: orcan.v1.ProductInventory.updated_at:type_name -> google.protobuf.Timestamp
+	13, // 0: orcan.v1.ProductInventory.created_at:type_name -> google.protobuf.Timestamp
+	13, // 1: orcan.v1.ProductInventory.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: orcan.v1.ListProductInventoriesResponse.inventories:type_name -> orcan.v1.ProductInventory
 	0,  // 3: orcan.v1.GetProductInventoryResponse.inventory:type_name -> orcan.v1.ProductInventory
 	0,  // 4: orcan.v1.CreateProductInventoryResponse.inventory:type_name -> orcan.v1.ProductInventory
 	0,  // 5: orcan.v1.UpdateProductInventoryResponse.inventory:type_name -> orcan.v1.ProductInventory
-	1,  // 6: orcan.v1.ProductInventoryService.ListProductInventories:input_type -> orcan.v1.ListProductInventoriesRequest
-	3,  // 7: orcan.v1.ProductInventoryService.GetProductInventory:input_type -> orcan.v1.GetProductInventoryRequest
-	5,  // 8: orcan.v1.ProductInventoryService.CreateProductInventory:input_type -> orcan.v1.CreateProductInventoryRequest
-	7,  // 9: orcan.v1.ProductInventoryService.UpdateProductInventory:input_type -> orcan.v1.UpdateProductInventoryRequest
-	9,  // 10: orcan.v1.ProductInventoryService.DeleteProductInventory:input_type -> orcan.v1.DeleteProductInventoryRequest
-	2,  // 11: orcan.v1.ProductInventoryService.ListProductInventories:output_type -> orcan.v1.ListProductInventoriesResponse
-	4,  // 12: orcan.v1.ProductInventoryService.GetProductInventory:output_type -> orcan.v1.GetProductInventoryResponse
-	6,  // 13: orcan.v1.ProductInventoryService.CreateProductInventory:output_type -> orcan.v1.CreateProductInventoryResponse
-	8,  // 14: orcan.v1.ProductInventoryService.UpdateProductInventory:output_type -> orcan.v1.UpdateProductInventoryResponse
-	10, // 15: orcan.v1.ProductInventoryService.DeleteProductInventory:output_type -> orcan.v1.DeleteProductInventoryResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0,  // 6: orcan.v1.AdjustProductInventoryResponse.inventory:type_name -> orcan.v1.ProductInventory
+	1,  // 7: orcan.v1.ProductInventoryService.ListProductInventories:input_type -> orcan.v1.ListProductInventoriesRequest
+	3,  // 8: orcan.v1.ProductInventoryService.GetProductInventory:input_type -> orcan.v1.GetProductInventoryRequest
+	5,  // 9: orcan.v1.ProductInventoryService.CreateProductInventory:input_type -> orcan.v1.CreateProductInventoryRequest
+	7,  // 10: orcan.v1.ProductInventoryService.UpdateProductInventory:input_type -> orcan.v1.UpdateProductInventoryRequest
+	9,  // 11: orcan.v1.ProductInventoryService.DeleteProductInventory:input_type -> orcan.v1.DeleteProductInventoryRequest
+	11, // 12: orcan.v1.ProductInventoryService.AdjustProductInventory:input_type -> orcan.v1.AdjustProductInventoryRequest
+	2,  // 13: orcan.v1.ProductInventoryService.ListProductInventories:output_type -> orcan.v1.ListProductInventoriesResponse
+	4,  // 14: orcan.v1.ProductInventoryService.GetProductInventory:output_type -> orcan.v1.GetProductInventoryResponse
+	6,  // 15: orcan.v1.ProductInventoryService.CreateProductInventory:output_type -> orcan.v1.CreateProductInventoryResponse
+	8,  // 16: orcan.v1.ProductInventoryService.UpdateProductInventory:output_type -> orcan.v1.UpdateProductInventoryResponse
+	10, // 17: orcan.v1.ProductInventoryService.DeleteProductInventory:output_type -> orcan.v1.DeleteProductInventoryResponse
+	12, // 18: orcan.v1.ProductInventoryService.AdjustProductInventory:output_type -> orcan.v1.AdjustProductInventoryResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_orcan_v1_product_inventory_proto_init() }
@@ -679,7 +815,7 @@ func file_orcan_v1_product_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orcan_v1_product_inventory_proto_rawDesc), len(file_orcan_v1_product_inventory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
