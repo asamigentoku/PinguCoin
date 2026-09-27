@@ -8,6 +8,8 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
 | テーブル | 説明 |
 | --- | --- |
 | `products` | 商品(`user_id`=出品者, `image_url`=メイン画像のblob URL, `file_url`=販売対象のデジタルコンテンツのblob URL, `version`=更新のたびに増える値。呼び出し側のキャッシュ無効化判定に使う) |
+| `product_asset_purposes` | 保存用途マスタ。1=商品イメージ、2=商品詳細イメージ、3=販売商品ファイル。行追加で将来用途を拡張可能 |
+| `product_assets` | 商品に紐づく共通保存データ。用途を問わず商品1件に対して複数件。画像を含むレスポンスでは削除用の`id`も返す |
 | `product_categories` | 商品カテゴリ |
 | `product_detail` | 商品画像・詳細 |
 | `product_inventory` | 在庫(`version`は`products`と同じ目的) |
@@ -28,6 +30,9 @@ proto定義は[buf](https://buf.build/)で管理し、リポジトリルート�
     販売対象のデジタルコンテンツ(`products.file_url`)用。非公開コンテナに保存し、ダウンロードのたびに
     `GetProductDownloadURL`で発行する署名付きURL(Blob単位、有効期限付き)が必要。
     orcan-apiは購入状況を持たないため、呼び出し元(pingu-api)が権限確認済みであることを前提とする。
+- `orcan.v1.ProductAssetService`: 共通保存API。`purpose_id`をDBに保存し、商品イメージ・商品詳細イメージ・販売商品ファイルをすべて1対多で扱う。
+  `ListProductAssets`と`ConfirmProductAssetUpload`は各データの`id`を返し、削除はURLではなく`DeleteProductAsset(asset_id)`で行う。
+  既存の`products.image_url`、`product_detail`、`products.file_url`は起動時に共通テーブルへ冪等に移行される。
 - `orcan.v1.ProductCategoryService`: `ListProductCategories`, `GetProductCategory`, `CreateProductCategory`, `UpdateProductCategory`, `DeleteProductCategory`
 - `orcan.v1.ProductDetailService`: `ListProductDetails`(`product_id`で絞り込み可), `GetProductDetail`, `CreateProductDetail`, `UpdateProductDetail`, `DeleteProductDetail`
 - `orcan.v1.ProductInventoryService`: `ListProductInventories`, `GetProductInventory`, `CreateProductInventory`, `UpdateProductInventory`, `DeleteProductInventory`。

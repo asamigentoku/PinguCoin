@@ -2,6 +2,16 @@
 
 package model
 
+type ConfirmProductAssetInput struct {
+	OriginalFilename *string `json:"originalFilename,omitempty"`
+	ContentType      *string `json:"contentType,omitempty"`
+	FileSize         *int32  `json:"fileSize,omitempty"`
+	Description      *string `json:"description,omitempty"`
+	SortOrder        *int32  `json:"sortOrder,omitempty"`
+	IsPrimary        *bool   `json:"isPrimary,omitempty"`
+	Metadata         *string `json:"metadata,omitempty"`
+}
+
 type ConfirmProductImageUploadResult struct {
 	Product *Product       `json:"product"`
 	Detail  *ProductDetail `json:"detail,omitempty"`
@@ -33,6 +43,37 @@ type Product struct {
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
 	Version     int32  `json:"version"`
+}
+
+type ProductAsset struct {
+	ID               int32                `json:"id"`
+	ProductID        int32                `json:"productId"`
+	PurposeID        int32                `json:"purposeId"`
+	Purpose          *ProductAssetPurpose `json:"purpose"`
+	StorageURL       string               `json:"storageUrl"`
+	OriginalFilename string               `json:"originalFilename"`
+	ContentType      string               `json:"contentType"`
+	FileSize         int32                `json:"fileSize"`
+	Description      string               `json:"description"`
+	SortOrder        int32                `json:"sortOrder"`
+	IsPrimary        bool                 `json:"isPrimary"`
+	Metadata         string               `json:"metadata"`
+	CreatedAt        string               `json:"createdAt"`
+	UpdatedAt        string               `json:"updatedAt"`
+}
+
+type ProductAssetPurpose struct {
+	ID       int32  `json:"id"`
+	Name     string `json:"name"`
+	IsPublic bool   `json:"isPublic"`
+}
+
+type ProductAssetUploadTarget struct {
+	BlobEndpoint string `json:"blobEndpoint"`
+	Container    string `json:"container"`
+	PathPrefix   string `json:"pathPrefix"`
+	SasToken     string `json:"sasToken"`
+	ExpiresAt    string `json:"expiresAt"`
 }
 
 type ProductDetail struct {

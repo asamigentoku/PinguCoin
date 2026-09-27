@@ -1,2 +1,13 @@
 organization_id   = "<your-org-id>"
 database_password = "<your-password>"
+
+azure_subscription_id      = "<your-subscription-id>"
+azure_storage_account_name = "pingucoinstg<unique>"
+
+# Replace these with the stable staging domains shown by Vercel.
+# Origins must not have a trailing slash.
+storage_cors_allowed_origins = [
+  "http://localhost:3000",
+  "https://staging.pingucoin.example",
+  "https://admin-staging.pingucoin.example",
+]

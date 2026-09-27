@@ -43,17 +43,21 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		ConfirmProductFileUpload  func(childComplexity int, productID int32, fileURL string) int
-		ConfirmProductImageUpload func(childComplexity int, productID int32, fileURL string, description *string, sortOrder *int32) int
-		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
-		DeleteProduct             func(childComplexity int, id int32) int
-		DeleteProductFileUpload   func(childComplexity int, productID int32, fileURL string) int
-		DeleteProductImageUpload  func(childComplexity int, productID int32, fileURL string) int
-		GetProductDownloadURL     func(childComplexity int, productID int32) int
-		GetProductFileUploadURL   func(childComplexity int, productID int32) int
-		GetProductImageUploadURL  func(childComplexity int, productID int32) int
-		UpdateProduct             func(childComplexity int, id int32, input model.UpdateProductInput) int
-		UpdateUser                func(childComplexity int, id int32, input model.UpdateUserInput) int
+		ConfirmProductAssetUpload  func(childComplexity int, productID int32, purposeID int32, fileURL string, input *model.ConfirmProductAssetInput) int
+		ConfirmProductFileUpload   func(childComplexity int, productID int32, fileURL string) int
+		ConfirmProductImageUpload  func(childComplexity int, productID int32, fileURL string, description *string, sortOrder *int32) int
+		CreateProduct              func(childComplexity int, input model.CreateProductInput) int
+		DeleteProduct              func(childComplexity int, id int32) int
+		DeleteProductAsset         func(childComplexity int, assetID int32) int
+		DeleteProductFileUpload    func(childComplexity int, productID int32, fileURL string) int
+		DeleteProductImageUpload   func(childComplexity int, productID int32, fileURL string) int
+		GetProductAssetDownloadURL func(childComplexity int, assetID int32) int
+		GetProductAssetUploadURL   func(childComplexity int, productID int32, purposeID int32) int
+		GetProductDownloadURL      func(childComplexity int, productID int32) int
+		GetProductFileUploadURL    func(childComplexity int, productID int32) int
+		GetProductImageUploadURL   func(childComplexity int, productID int32) int
+		UpdateProduct              func(childComplexity int, id int32, input model.UpdateProductInput) int
+		UpdateUser                 func(childComplexity int, id int32, input model.UpdateUserInput) int
 	}
 
 	Product struct {
@@ -69,6 +73,37 @@ type ComplexityRoot struct {
 		UpdatedAt   func(childComplexity int) int
 		UserID      func(childComplexity int) int
 		Version     func(childComplexity int) int
+	}
+
+	ProductAsset struct {
+		ContentType      func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		Description      func(childComplexity int) int
+		FileSize         func(childComplexity int) int
+		ID               func(childComplexity int) int
+		IsPrimary        func(childComplexity int) int
+		Metadata         func(childComplexity int) int
+		OriginalFilename func(childComplexity int) int
+		ProductID        func(childComplexity int) int
+		Purpose          func(childComplexity int) int
+		PurposeID        func(childComplexity int) int
+		SortOrder        func(childComplexity int) int
+		StorageURL       func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
+	}
+
+	ProductAssetPurpose struct {
+		ID       func(childComplexity int) int
+		IsPublic func(childComplexity int) int
+		Name     func(childComplexity int) int
+	}
+
+	ProductAssetUploadTarget struct {
+		BlobEndpoint func(childComplexity int) int
+		Container    func(childComplexity int) int
+		ExpiresAt    func(childComplexity int) int
+		PathPrefix   func(childComplexity int) int
+		SasToken     func(childComplexity int) int
 	}
 
 	ProductDetail struct {
@@ -102,11 +137,12 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Me       func(childComplexity int) int
-		Product  func(childComplexity int, id int32) int
-		Products func(childComplexity int, userID *int32) int
-		User     func(childComplexity int, id int32) int
-		Users    func(childComplexity int) int
+		Me            func(childComplexity int) int
+		Product       func(childComplexity int, id int32) int
+		ProductAssets func(childComplexity int, productID int32, purposeID *int32) int
+		Products      func(childComplexity int, userID *int32) int
+		User          func(childComplexity int, id int32) int
+		Users         func(childComplexity int) int
 	}
 
 	User struct {
@@ -134,10 +170,15 @@ type MutationResolver interface {
 	ConfirmProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error)
 	DeleteProductFileUpload(ctx context.Context, productID int32, fileURL string) (*model.Product, error)
 	GetProductDownloadURL(ctx context.Context, productID int32) (*model.ProductDownloadTarget, error)
+	GetProductAssetUploadURL(ctx context.Context, productID int32, purposeID int32) (*model.ProductAssetUploadTarget, error)
+	ConfirmProductAssetUpload(ctx context.Context, productID int32, purposeID int32, fileURL string, input *model.ConfirmProductAssetInput) (*model.ProductAsset, error)
+	DeleteProductAsset(ctx context.Context, assetID int32) (bool, error)
+	GetProductAssetDownloadURL(ctx context.Context, assetID int32) (*model.ProductDownloadTarget, error)
 }
 type QueryResolver interface {
 	Products(ctx context.Context, userID *int32) ([]*model.Product, error)
 	Product(ctx context.Context, id int32) (*model.Product, error)
+	ProductAssets(ctx context.Context, productID int32, purposeID *int32) ([]*model.ProductAsset, error)
 	Users(ctx context.Context) ([]*model.User, error)
 	User(ctx context.Context, id int32) (*model.User, error)
 	Me(ctx context.Context) (*model.User, error)
@@ -174,6 +215,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ConfirmProductImageUploadResult.Product(childComplexity), true
 
+	case "Mutation.confirmProductAssetUpload":
+		if e.ComplexityRoot.Mutation.ConfirmProductAssetUpload == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_confirmProductAssetUpload_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ConfirmProductAssetUpload(childComplexity, args["productId"].(int32), args["purposeId"].(int32), args["fileUrl"].(string), args["input"].(*model.ConfirmProductAssetInput)), true
 	case "Mutation.confirmProductFileUpload":
 		if e.ComplexityRoot.Mutation.ConfirmProductFileUpload == nil {
 			break
@@ -218,6 +270,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProduct(childComplexity, args["id"].(int32)), true
+	case "Mutation.deleteProductAsset":
+		if e.ComplexityRoot.Mutation.DeleteProductAsset == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteProductAsset_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteProductAsset(childComplexity, args["assetId"].(int32)), true
 	case "Mutation.deleteProductFileUpload":
 		if e.ComplexityRoot.Mutation.DeleteProductFileUpload == nil {
 			break
@@ -240,6 +303,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProductImageUpload(childComplexity, args["productId"].(int32), args["fileUrl"].(string)), true
+	case "Mutation.getProductAssetDownloadUrl":
+		if e.ComplexityRoot.Mutation.GetProductAssetDownloadURL == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getProductAssetDownloadUrl_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.GetProductAssetDownloadURL(childComplexity, args["assetId"].(int32)), true
+	case "Mutation.getProductAssetUploadUrl":
+		if e.ComplexityRoot.Mutation.GetProductAssetUploadURL == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_getProductAssetUploadUrl_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.GetProductAssetUploadURL(childComplexity, args["productId"].(int32), args["purposeId"].(int32)), true
 	case "Mutation.getProductDownloadUrl":
 		if e.ComplexityRoot.Mutation.GetProductDownloadURL == nil {
 			break
@@ -368,6 +453,141 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.Version(childComplexity), true
+
+	case "ProductAsset.contentType":
+		if e.ComplexityRoot.ProductAsset.ContentType == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.ContentType(childComplexity), true
+	case "ProductAsset.createdAt":
+		if e.ComplexityRoot.ProductAsset.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.CreatedAt(childComplexity), true
+	case "ProductAsset.description":
+		if e.ComplexityRoot.ProductAsset.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.Description(childComplexity), true
+	case "ProductAsset.fileSize":
+		if e.ComplexityRoot.ProductAsset.FileSize == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.FileSize(childComplexity), true
+	case "ProductAsset.id":
+		if e.ComplexityRoot.ProductAsset.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.ID(childComplexity), true
+	case "ProductAsset.isPrimary":
+		if e.ComplexityRoot.ProductAsset.IsPrimary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.IsPrimary(childComplexity), true
+	case "ProductAsset.metadata":
+		if e.ComplexityRoot.ProductAsset.Metadata == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.Metadata(childComplexity), true
+	case "ProductAsset.originalFilename":
+		if e.ComplexityRoot.ProductAsset.OriginalFilename == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.OriginalFilename(childComplexity), true
+	case "ProductAsset.productId":
+		if e.ComplexityRoot.ProductAsset.ProductID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.ProductID(childComplexity), true
+	case "ProductAsset.purpose":
+		if e.ComplexityRoot.ProductAsset.Purpose == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.Purpose(childComplexity), true
+	case "ProductAsset.purposeId":
+		if e.ComplexityRoot.ProductAsset.PurposeID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.PurposeID(childComplexity), true
+	case "ProductAsset.sortOrder":
+		if e.ComplexityRoot.ProductAsset.SortOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.SortOrder(childComplexity), true
+	case "ProductAsset.storageUrl":
+		if e.ComplexityRoot.ProductAsset.StorageURL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.StorageURL(childComplexity), true
+	case "ProductAsset.updatedAt":
+		if e.ComplexityRoot.ProductAsset.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAsset.UpdatedAt(childComplexity), true
+
+	case "ProductAssetPurpose.id":
+		if e.ComplexityRoot.ProductAssetPurpose.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetPurpose.ID(childComplexity), true
+	case "ProductAssetPurpose.isPublic":
+		if e.ComplexityRoot.ProductAssetPurpose.IsPublic == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetPurpose.IsPublic(childComplexity), true
+	case "ProductAssetPurpose.name":
+		if e.ComplexityRoot.ProductAssetPurpose.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetPurpose.Name(childComplexity), true
+
+	case "ProductAssetUploadTarget.blobEndpoint":
+		if e.ComplexityRoot.ProductAssetUploadTarget.BlobEndpoint == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetUploadTarget.BlobEndpoint(childComplexity), true
+	case "ProductAssetUploadTarget.container":
+		if e.ComplexityRoot.ProductAssetUploadTarget.Container == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetUploadTarget.Container(childComplexity), true
+	case "ProductAssetUploadTarget.expiresAt":
+		if e.ComplexityRoot.ProductAssetUploadTarget.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetUploadTarget.ExpiresAt(childComplexity), true
+	case "ProductAssetUploadTarget.pathPrefix":
+		if e.ComplexityRoot.ProductAssetUploadTarget.PathPrefix == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetUploadTarget.PathPrefix(childComplexity), true
+	case "ProductAssetUploadTarget.sasToken":
+		if e.ComplexityRoot.ProductAssetUploadTarget.SasToken == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductAssetUploadTarget.SasToken(childComplexity), true
 
 	case "ProductDetail.description":
 		if e.ComplexityRoot.ProductDetail.Description == nil {
@@ -498,6 +718,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Product(childComplexity, args["id"].(int32)), true
+	case "Query.productAssets":
+		if e.ComplexityRoot.Query.ProductAssets == nil {
+			break
+		}
+
+		args, err := ec.field_Query_productAssets_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ProductAssets(childComplexity, args["productId"].(int32), args["purposeId"].(*int32)), true
 	case "Query.products":
 		if e.ComplexityRoot.Query.Products == nil {
 			break
@@ -566,6 +797,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputConfirmProductAssetInput,
 		ec.unmarshalInputCreateProductInput,
 		ec.unmarshalInputUpdateProductInput,
 		ec.unmarshalInputUpdateUserInput,
@@ -701,6 +933,68 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_version(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductAsset(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ProductAsset_id(ctx, field)
+	case "productId":
+		return ec.fieldContext_ProductAsset_productId(ctx, field)
+	case "purposeId":
+		return ec.fieldContext_ProductAsset_purposeId(ctx, field)
+	case "purpose":
+		return ec.fieldContext_ProductAsset_purpose(ctx, field)
+	case "storageUrl":
+		return ec.fieldContext_ProductAsset_storageUrl(ctx, field)
+	case "originalFilename":
+		return ec.fieldContext_ProductAsset_originalFilename(ctx, field)
+	case "contentType":
+		return ec.fieldContext_ProductAsset_contentType(ctx, field)
+	case "fileSize":
+		return ec.fieldContext_ProductAsset_fileSize(ctx, field)
+	case "description":
+		return ec.fieldContext_ProductAsset_description(ctx, field)
+	case "sortOrder":
+		return ec.fieldContext_ProductAsset_sortOrder(ctx, field)
+	case "isPrimary":
+		return ec.fieldContext_ProductAsset_isPrimary(ctx, field)
+	case "metadata":
+		return ec.fieldContext_ProductAsset_metadata(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_ProductAsset_createdAt(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_ProductAsset_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductAsset", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductAssetPurpose(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ProductAssetPurpose_id(ctx, field)
+	case "name":
+		return ec.fieldContext_ProductAssetPurpose_name(ctx, field)
+	case "isPublic":
+		return ec.fieldContext_ProductAssetPurpose_isPublic(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductAssetPurpose", field.Name)
+}
+
+func (ec *executionContext) childFields_ProductAssetUploadTarget(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "blobEndpoint":
+		return ec.fieldContext_ProductAssetUploadTarget_blobEndpoint(ctx, field)
+	case "container":
+		return ec.fieldContext_ProductAssetUploadTarget_container(ctx, field)
+	case "pathPrefix":
+		return ec.fieldContext_ProductAssetUploadTarget_pathPrefix(ctx, field)
+	case "sasToken":
+		return ec.fieldContext_ProductAssetUploadTarget_sasToken(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_ProductAssetUploadTarget_expiresAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductAssetUploadTarget", field.Name)
 }
 
 func (ec *executionContext) childFields_ProductDetail(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -895,6 +1189,44 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_confirmProductAssetUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "purposeId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["purposeId"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "fileUrl",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["fileUrl"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (*model.ConfirmProductAssetInput, error) {
+			return ec.unmarshalOConfirmProductAssetInput2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐConfirmProductAssetInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_confirmProductFileUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -969,6 +1301,20 @@ func (ec *executionContext) field_Mutation_createProduct_args(ctx context.Contex
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteProductAsset_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "assetId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["assetId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_deleteProductFileUpload_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1024,6 +1370,42 @@ func (ec *executionContext) field_Mutation_deleteProduct_args(ctx context.Contex
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getProductAssetDownloadUrl_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "assetId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["assetId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_getProductAssetUploadUrl_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "purposeId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["purposeId"] = arg1
 	return args, nil
 }
 
@@ -1124,6 +1506,28 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_productAssets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "productId",
+		func(ctx context.Context, v any) (int32, error) {
+			return ec.unmarshalNInt2int32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["productId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "purposeId",
+		func(ctx context.Context, v any) (*int32, error) {
+			return ec.unmarshalOInt2ᚖint32(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["purposeId"] = arg1
 	return args, nil
 }
 
@@ -1777,6 +2181,182 @@ func (ec *executionContext) fieldContext_Mutation_getProductDownloadUrl(ctx cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_getProductAssetUploadUrl(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_getProductAssetUploadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().GetProductAssetUploadURL(ctx, fc.Args["productId"].(int32), fc.Args["purposeId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductAssetUploadTarget) graphql.Marshaler {
+			return ec.marshalNProductAssetUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetUploadTarget(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_getProductAssetUploadUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductAssetUploadTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_getProductAssetUploadUrl_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_confirmProductAssetUpload(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_confirmProductAssetUpload(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ConfirmProductAssetUpload(ctx, fc.Args["productId"].(int32), fc.Args["purposeId"].(int32), fc.Args["fileUrl"].(string), fc.Args["input"].(*model.ConfirmProductAssetInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductAsset) graphql.Marshaler {
+			return ec.marshalNProductAsset2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAsset(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_confirmProductAssetUpload(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductAsset(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_confirmProductAssetUpload_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteProductAsset(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_deleteProductAsset(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteProductAsset(ctx, fc.Args["assetId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_deleteProductAsset(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteProductAsset_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_getProductAssetDownloadUrl(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_getProductAssetDownloadUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().GetProductAssetDownloadURL(ctx, fc.Args["assetId"].(int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductDownloadTarget) graphql.Marshaler {
+			return ec.marshalNProductDownloadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDownloadTarget(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_getProductAssetDownloadUrl(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductDownloadTarget(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_getProductAssetDownloadUrl_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2051,6 +2631,521 @@ func (ec *executionContext) _Product_version(ctx context.Context, field graphql.
 }
 func (ec *executionContext) fieldContext_Product_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Product", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_productId(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_productId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProductID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_purposeId(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_purposeId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PurposeID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_purposeId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_purpose(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_purpose(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Purpose, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductAssetPurpose) graphql.Marshaler {
+			return ec.marshalNProductAssetPurpose2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetPurpose(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_purpose(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductAsset",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductAssetPurpose(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductAsset_storageUrl(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_storageUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.StorageURL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_storageUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_originalFilename(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_originalFilename(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OriginalFilename, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_originalFilename(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_contentType(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_contentType(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ContentType, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_contentType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_fileSize(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_fileSize(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FileSize, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_fileSize(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_description(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_description(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_sortOrder(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_sortOrder(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SortOrder, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_sortOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_isPrimary(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_isPrimary(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IsPrimary, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_isPrimary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_metadata(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_metadata(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Metadata, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_metadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAsset_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductAsset) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAsset_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAsset_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAsset", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetPurpose_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetPurpose) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetPurpose_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int32) graphql.Marshaler {
+			return ec.marshalNInt2int32(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetPurpose_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetPurpose", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetPurpose_name(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetPurpose) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetPurpose_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetPurpose_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetPurpose", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetPurpose_isPublic(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetPurpose) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetPurpose_isPublic(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IsPublic, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetPurpose_isPublic(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetPurpose", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetUploadTarget_blobEndpoint(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetUploadTarget_blobEndpoint(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BlobEndpoint, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetUploadTarget_blobEndpoint(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetUploadTarget_container(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetUploadTarget_container(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Container, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetUploadTarget_container(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetUploadTarget_pathPrefix(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetUploadTarget_pathPrefix(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PathPrefix, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetUploadTarget_pathPrefix(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetUploadTarget_sasToken(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetUploadTarget_sasToken(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SasToken, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetUploadTarget_sasToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ProductAssetUploadTarget_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ProductAssetUploadTarget) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductAssetUploadTarget_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductAssetUploadTarget_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductAssetUploadTarget", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _ProductDetail_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductDetail) (ret graphql.Marshaler) {
@@ -2549,6 +3644,50 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_product_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_productAssets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_productAssets(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ProductAssets(ctx, fc.Args["productId"].(int32), fc.Args["purposeId"].(*int32))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ProductAsset) graphql.Marshaler {
+			return ec.marshalNProductAsset2ᚕᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_productAssets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductAsset(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_productAssets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3913,6 +5052,78 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputConfirmProductAssetInput(ctx context.Context, obj any) (model.ConfirmProductAssetInput, error) {
+	var it model.ConfirmProductAssetInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"originalFilename", "contentType", "fileSize", "description", "sortOrder", "isPrimary", "metadata"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "originalFilename":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("originalFilename"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OriginalFilename = data
+		case "contentType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contentType"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ContentType = data
+		case "fileSize":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("fileSize"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FileSize = data
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
+		case "sortOrder":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sortOrder"))
+			data, err := ec.unmarshalOInt2ᚖint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SortOrder = data
+		case "isPrimary":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isPrimary"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsPrimary = data
+		case "metadata":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("metadata"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Metadata = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context, obj any) (model.CreateProductInput, error) {
 	var it model.CreateProductInput
 	if obj == nil {
@@ -4235,6 +5446,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "getProductAssetUploadUrl":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getProductAssetUploadUrl(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "confirmProductAssetUpload":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_confirmProductAssetUpload(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteProductAsset":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteProductAsset(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "getProductAssetDownloadUrl":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_getProductAssetDownloadUrl(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4325,6 +5564,215 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "version":
 			out.Values[i] = ec._Product_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productAssetImplementors = []string{"ProductAsset"}
+
+func (ec *executionContext) _ProductAsset(ctx context.Context, sel ast.SelectionSet, obj *model.ProductAsset) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productAssetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductAsset")
+		case "id":
+			out.Values[i] = ec._ProductAsset_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "productId":
+			out.Values[i] = ec._ProductAsset_productId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "purposeId":
+			out.Values[i] = ec._ProductAsset_purposeId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "purpose":
+			out.Values[i] = ec._ProductAsset_purpose(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "storageUrl":
+			out.Values[i] = ec._ProductAsset_storageUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "originalFilename":
+			out.Values[i] = ec._ProductAsset_originalFilename(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "contentType":
+			out.Values[i] = ec._ProductAsset_contentType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fileSize":
+			out.Values[i] = ec._ProductAsset_fileSize(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._ProductAsset_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sortOrder":
+			out.Values[i] = ec._ProductAsset_sortOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isPrimary":
+			out.Values[i] = ec._ProductAsset_isPrimary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "metadata":
+			out.Values[i] = ec._ProductAsset_metadata(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ProductAsset_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._ProductAsset_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productAssetPurposeImplementors = []string{"ProductAssetPurpose"}
+
+func (ec *executionContext) _ProductAssetPurpose(ctx context.Context, sel ast.SelectionSet, obj *model.ProductAssetPurpose) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productAssetPurposeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductAssetPurpose")
+		case "id":
+			out.Values[i] = ec._ProductAssetPurpose_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._ProductAssetPurpose_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isPublic":
+			out.Values[i] = ec._ProductAssetPurpose_isPublic(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var productAssetUploadTargetImplementors = []string{"ProductAssetUploadTarget"}
+
+func (ec *executionContext) _ProductAssetUploadTarget(ctx context.Context, sel ast.SelectionSet, obj *model.ProductAssetUploadTarget) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productAssetUploadTargetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductAssetUploadTarget")
+		case "blobEndpoint":
+			out.Values[i] = ec._ProductAssetUploadTarget_blobEndpoint(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "container":
+			out.Values[i] = ec._ProductAssetUploadTarget_container(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pathPrefix":
+			out.Values[i] = ec._ProductAssetUploadTarget_pathPrefix(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sasToken":
+			out.Values[i] = ec._ProductAssetUploadTarget_sasToken(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._ProductAssetUploadTarget_expiresAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4624,6 +6072,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_product(ctx, field)
 				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "productAssets":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_productAssets(ctx, field)
+				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
@@ -5259,6 +6729,52 @@ func (ec *executionContext) marshalNProduct2ᚖgithubᚗcomᚋasamigentokuᚋPin
 	return ec._Product(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNProductAsset2ᚕᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductAsset) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProductAsset2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAsset(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProductAsset2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAsset(ctx context.Context, sel ast.SelectionSet, v *model.ProductAsset) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductAsset(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductAssetPurpose2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetPurpose(ctx context.Context, sel ast.SelectionSet, v *model.ProductAssetPurpose) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductAssetPurpose(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductAssetUploadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductAssetUploadTarget(ctx context.Context, sel ast.SelectionSet, v *model.ProductAssetUploadTarget) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductAssetUploadTarget(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNProductDownloadTarget2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐProductDownloadTarget(ctx context.Context, sel ast.SelectionSet, v *model.ProductDownloadTarget) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -5509,6 +7025,14 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOConfirmProductAssetInput2ᚖgithubᚗcomᚋasamigentokuᚋPinguCoinᚋserverᚋpinguᚑapiᚋgraphᚋmodelᚐConfirmProductAssetInput(ctx context.Context, v any) (*model.ConfirmProductAssetInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputConfirmProductAssetInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint32(ctx context.Context, v any) (*int32, error) {

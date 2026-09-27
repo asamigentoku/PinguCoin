@@ -4,13 +4,14 @@ import "os"
 
 // Config はアプリケーションの設定値を保持する。
 type Config struct {
-	Port       string
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
+	DatabaseURL string
+	Port        string
+	DBHost      string
+	DBPort      string
+	DBUser      string
+	DBPassword  string
+	DBName      string
+	DBSSLMode   string
 
 	// InternalAPIToken はpingu-apiからのgRPC呼び出しを検証するための共有シークレット。
 	// pingu-api/orcan-api/payment-apiで同じ値を設定する。
@@ -20,13 +21,14 @@ type Config struct {
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
 func Load() Config {
 	return Config{
-		Port:       getEnv("PORT", "8081"),
-		DBHost:     getEnv("DB_HOST", "localhost"),
-		DBPort:     getEnv("DB_PORT", "5432"),
-		DBUser:     getEnv("DB_USER", "postgres"),
-		DBPassword: getEnv("DB_PASSWORD", "postgres"),
-		DBName:     getEnv("DB_NAME", "payment"),
-		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
+		DatabaseURL: getEnv("DATABASE_URL", ""),
+		Port:        getEnv("PORT", "8081"),
+		DBHost:      getEnv("DB_HOST", "localhost"),
+		DBPort:      getEnv("DB_PORT", "5432"),
+		DBUser:      getEnv("DB_USER", "postgres"),
+		DBPassword:  getEnv("DB_PASSWORD", "postgres"),
+		DBName:      getEnv("DB_NAME", "payment"),
+		DBSSLMode:   getEnv("DB_SSLMODE", "disable"),
 
 		InternalAPIToken: getEnv("INTERNAL_API_TOKEN", ""),
 	}

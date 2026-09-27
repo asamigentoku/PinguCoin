@@ -121,6 +121,12 @@ func (storage *BlobStorage) ProductFilePrefix(userID, productID uint32) string {
 	return storage.ProductPathPrefix(userID, productID) + productFileSubdir + "/"
 }
 
+// ProductAssetPrefix returns the common path used by the extensible asset API.
+// purposeID is part of the path so newly registered purposes remain isolated.
+func (storage *BlobStorage) ProductAssetPrefix(userID, productID uint32, purposeID uint16) string {
+	return fmt.Sprintf("%sassets/%d/", storage.ProductPathPrefix(userID, productID), purposeID)
+}
+
 // UploadURL はコンテナ・パスプレフィックス・署名(SAS)付きアップロード先の情報をまとめて持つ。
 type UploadURL struct {
 	BlobEndpoint string
@@ -172,6 +178,13 @@ func (storage *BlobStorage) IssueImageUploadURL(ctx context.Context) (*UploadURL
 // IssueFileUploadURL は商品ファイル(非公開コンテナ)へアップロードするための署名付きURLを発行する。
 func (storage *BlobStorage) IssueFileUploadURL(ctx context.Context) (*UploadURL, error) {
 	return storage.issueContainerUploadURL(ctx, storage.privateContainer)
+}
+
+func (storage *BlobStorage) IssueAssetUploadURL(ctx context.Context, isPublic bool) (*UploadURL, error) {
+	if isPublic {
+		return storage.IssueImageUploadURL(ctx)
+	}
+	return storage.IssueFileUploadURL(ctx)
 }
 
 // IssueDownloadURL は非公開コンテナ内の指定したBlob1つだけに限定した、読み取り専用の
@@ -228,6 +241,33 @@ func (storage *BlobStorage) FileBlobNameFromURL(fileURL string, userID, productI
 	return storage.blobNameFromURL(fileURL, storage.privateContainer, userID, productID)
 }
 
+func (storage *BlobStorage) AssetBlobNameFromURL(fileURL string, userID, productID uint32, purposeID uint16, isPublic bool) (string, error) {
+	containerName := storage.privateContainer
+	if isPublic {
+		containerName = storage.publicContainer
+	}
+	blobName, err := storage.blobNameFromURL(fileURL, containerName, userID, productID)
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(blobName, storage.ProductAssetPrefix(userID, productID, purposeID)) {
+		// Records migrated from the legacy columns keep their existing Blob path.
+		legacyPrefix := ""
+		switch purposeID {
+		case 1:
+			legacyPrefix = storage.MainImagePrefix(userID, productID)
+		case 2:
+			legacyPrefix = storage.SubImagesPrefix(userID, productID)
+		case 3:
+			legacyPrefix = storage.ProductFilePrefix(userID, productID)
+		}
+		if legacyPrefix == "" || !strings.HasPrefix(blobName, legacyPrefix) {
+			return "", ErrBlobNotInProductPath
+		}
+	}
+	return blobName, nil
+}
+
 // ClassifyImageBlobName は(ImageBlobNameFromURLで取り出した)Blob名がmain_image/配下か
 // sub_images/配下かを判定する。どちらでもない場合は ImageKindUnknown を返す。
 func (storage *BlobStorage) ClassifyImageBlobName(blobName string, userID, productID uint32) ImageKind {
@@ -250,6 +290,13 @@ func (storage *BlobStorage) DeleteImageBlob(ctx context.Context, blobName string
 // DeleteFileBlob は非公開コンテナ内の指定Blobを削除する。既に存在しない場合はエラーにしない(冪等)。
 func (storage *BlobStorage) DeleteFileBlob(ctx context.Context, blobName string) error {
 	return storage.deleteBlob(ctx, storage.privateContainer, blobName)
+}
+
+func (storage *BlobStorage) DeleteAssetBlob(ctx context.Context, blobName string, isPublic bool) error {
+	if isPublic {
+		return storage.DeleteImageBlob(ctx, blobName)
+	}
+	return storage.DeleteFileBlob(ctx, blobName)
 }
 
 func (storage *BlobStorage) deleteBlob(ctx context.Context, containerName, blobName string) error {

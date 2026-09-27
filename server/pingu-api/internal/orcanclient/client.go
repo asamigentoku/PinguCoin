@@ -7,9 +7,9 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
+	sharedgrpc "github.com/asamigentoku/PinguCoin/server/pingu-api/internal/grpcclient"
 	pb "github.com/asamigentoku/PinguCoin/server/pingu-api/internal/pb/orcan/v1"
 )
 
@@ -20,6 +20,7 @@ const internalTokenMetadataKey = "x-internal-token"
 type Client struct {
 	conn      *grpc.ClientConn
 	Product   pb.ProductServiceClient
+	Asset     pb.ProductAssetServiceClient
 	Inventory pb.ProductInventoryServiceClient
 	User      pb.UserServiceClient
 }
@@ -28,8 +29,13 @@ type Client struct {
 // internalToken は全リクエストにサービス間認証用のメタデータとして付与する
 // (orcan-api側でこの値を検証し、pingu-api以外からの直接呼び出しを拒否する)。
 func New(addr, internalToken string) (*Client, error) {
-	conn, err := grpc.NewClient(addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	target, transportCredentials, err := sharedgrpc.Transport(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := grpc.NewClient(target,
+		grpc.WithTransportCredentials(transportCredentials),
 		grpc.WithUnaryInterceptor(internalTokenInterceptor(internalToken)),
 	)
 	if err != nil {
@@ -39,6 +45,7 @@ func New(addr, internalToken string) (*Client, error) {
 	return &Client{
 		conn:      conn,
 		Product:   pb.NewProductServiceClient(conn),
+		Asset:     pb.NewProductAssetServiceClient(conn),
 		Inventory: pb.NewProductInventoryServiceClient(conn),
 		User:      pb.NewUserServiceClient(conn),
 	}, nil

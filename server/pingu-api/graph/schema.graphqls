@@ -71,6 +71,49 @@ type ProductDownloadTarget {
   expiresAt: String!
 }
 
+# 商品に紐づく保存データ。purposeIdはDB管理のため、将来値を追加しても
+# GraphQLスキーマの変更は不要。
+type ProductAssetPurpose {
+  id: Int!
+  name: String!
+  isPublic: Boolean!
+}
+
+type ProductAsset {
+  id: Int!
+  productId: Int!
+  purposeId: Int!
+  purpose: ProductAssetPurpose!
+  storageUrl: String!
+  originalFilename: String!
+  contentType: String!
+  fileSize: Int!
+  description: String!
+  sortOrder: Int!
+  isPrimary: Boolean!
+  metadata: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type ProductAssetUploadTarget {
+  blobEndpoint: String!
+  container: String!
+  pathPrefix: String!
+  sasToken: String!
+  expiresAt: String!
+}
+
+input ConfirmProductAssetInput {
+  originalFilename: String
+  contentType: String
+  fileSize: Int
+  description: String
+  sortOrder: Int
+  isPrimary: Boolean
+  metadata: String
+}
+
 type User {
   id: Int!
   email: String!
@@ -82,6 +125,9 @@ type User {
 type Query {
   products(userId: Int): [Product!]!
   product(id: Int!): Product
+
+  # 各要素に削除操作で使うidを含む。
+  productAssets(productId: Int!, purposeId: Int): [ProductAsset!]!
 
   users: [User!]!
   user(id: Int!): User
@@ -133,4 +179,10 @@ type Mutation {
   # 商品ファイルのダウンロードURL発行。商品の所有者本人、またはその商品を購入済み(paid)の
   # ユーザーのみ実行できる。
   getProductDownloadUrl(productId: Int!): ProductDownloadTarget!
+
+  # 共通商品アセット。削除はURLではなく、返却されたassetIdで行う。
+  getProductAssetUploadUrl(productId: Int!, purposeId: Int!): ProductAssetUploadTarget!
+  confirmProductAssetUpload(productId: Int!, purposeId: Int!, fileUrl: String!, input: ConfirmProductAssetInput): ProductAsset!
+  deleteProductAsset(assetId: Int!): Boolean!
+  getProductAssetDownloadUrl(assetId: Int!): ProductDownloadTarget!
 }

@@ -11,7 +11,7 @@
 
 ## orcan-api
 
-商品・ユーザーを管理する。DB: PostgreSQL(`AutoMigrate` 対象: `ProductCategory`, `Product`, `ProductDetail`, `ProductInventory`, `ProductListing`, `User`)
+商品・ユーザーを管理する。DB: PostgreSQL(`AutoMigrate` 対象には共通保存データの`ProductAssetPurpose`、`ProductAsset`も含む)
 
 ### users
 
@@ -57,7 +57,7 @@
 
 ### product_detail
 
-商品の画像・詳細情報(1商品に対して複数件)
+旧商品詳細画像。新規アップロードは`product_assets`の`purpose_id=2`を使用する。
 
 | カラム | 型 | 制約 |
 |---|---|---|
@@ -66,6 +66,38 @@
 | image_url | string(512) | |
 | description | text | |
 | sort_order | int | NOT NULL, DEFAULT 0 |
+| created_at | time.Time | |
+| updated_at | time.Time | |
+
+### product_asset_purposes
+
+保存データの用途マスタ。用途追加はスキーマ変更ではなく、このテーブルへの行追加で行う。
+
+| カラム | 型 | 制約 |
+|---|---|---|
+| id | uint16 | PK, 自動採番なし。1=商品イメージ、2=商品詳細イメージ、3=販売商品ファイル |
+| name | string(64) | NOT NULL, UNIQUE INDEX |
+| is_public | bool | NOT NULL。公開・非公開Blobコンテナの選択に使用 |
+| created_at | time.Time | |
+| updated_at | time.Time | |
+
+### product_assets
+
+商品に紐づく画像・PDF等の共通保存データ。すべての商品との関係は1対多。削除APIではこのテーブルの`id`を指定する。
+
+| カラム | 型 | 制約 |
+|---|---|---|
+| id | uint | PK |
+| product_id | uint | NOT NULL, FK: products.id, INDEX |
+| purpose_id | uint16 | NOT NULL, FK: product_asset_purposes.id, INDEX |
+| storage_url | string(1024) | NOT NULL, UNIQUE INDEX |
+| original_filename | string(255) | |
+| content_type | string(255) | |
+| file_size | int64 | NOT NULL, DEFAULT 0 |
+| description | text | |
+| sort_order | int | NOT NULL, DEFAULT 0, INDEX |
+| is_primary | bool | NOT NULL, DEFAULT false |
+| metadata | jsonb | NOT NULL, DEFAULT `{}` |
 | created_at | time.Time | |
 | updated_at | time.Time | |
 

@@ -39,6 +39,9 @@ func TestProductPathPrefix(t *testing.T) {
 	if got, want := s.ProductFilePrefix(5, 12), "develop/products/5/12/product_file/"; got != want {
 		t.Errorf("ProductFilePrefix() = %q, want %q", got, want)
 	}
+	if got, want := s.ProductAssetPrefix(5, 12, 3), "develop/products/5/12/assets/3/"; got != want {
+		t.Errorf("ProductAssetPrefix() = %q, want %q", got, want)
+	}
 }
 
 func TestImageBlobNameFromURL_Valid(t *testing.T) {
@@ -113,6 +116,25 @@ func TestFileBlobNameFromURL(t *testing.T) {
 	publicURL := endpoint + "/" + testPublicContainer + "/" + s.ProductFilePrefix(5, 12) + "ebook.pdf"
 	if _, err := s.FileBlobNameFromURL(publicURL, 5, 12); err == nil {
 		t.Errorf("FileBlobNameFromURL(%q) expected error, got nil", publicURL)
+	}
+}
+
+func TestAssetBlobNameFromURLValidatesPurposeAndVisibility(t *testing.T) {
+	s := newTestStorage(t)
+	endpoint := strings.TrimSuffix(s.BlobEndpoint(), "/")
+	validURL := endpoint + "/" + testPublicContainer + "/" + s.ProductAssetPrefix(5, 12, 2) + "detail.png"
+	got, err := s.AssetBlobNameFromURL(validURL, 5, 12, 2, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if want := "develop/products/5/12/assets/2/detail.png"; got != want {
+		t.Errorf("AssetBlobNameFromURL() = %q, want %q", got, want)
+	}
+	if _, err := s.AssetBlobNameFromURL(validURL, 5, 12, 1, true); err == nil {
+		t.Error("different purpose_id should be rejected")
+	}
+	if _, err := s.AssetBlobNameFromURL(validURL, 5, 12, 2, false); err == nil {
+		t.Error("wrong container visibility should be rejected")
 	}
 }
 

@@ -69,8 +69,10 @@ func main() {
 	// 「このgRPCサーバーに、このRPCが来たらこの実装(grpcserver.NewXxxServer)を呼ぶ」
 	// というルーティングをserverの内部に登録する処理。
 	// 各実装(grpcserver.NewXxxServer)はDBアクセス用のrepositoryを注入されて動く。
+	productRepo := repository.NewProductRepository(db)
 	detailRepo := repository.NewProductDetailRepository(db)
-	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(repository.NewProductRepository(db), detailRepo, blobStorage))
+	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(productRepo, detailRepo, blobStorage))
+	pb.RegisterProductAssetServiceServer(server, grpcserver.NewProductAssetServer(repository.NewProductAssetRepository(db), productRepo, blobStorage))
 	pb.RegisterProductCategoryServiceServer(server, grpcserver.NewProductCategoryServer(repository.NewProductCategoryRepository(db)))
 	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(detailRepo))
 	pb.RegisterProductInventoryServiceServer(server, grpcserver.NewProductInventoryServer(repository.NewProductInventoryRepository(db)))

@@ -30,6 +30,24 @@ func productFromPB(product *orcanpb.Product) *model.Product {
 	}
 }
 
+func productAssetFromPB(asset *orcanpb.ProductAsset) *model.ProductAsset {
+	if asset == nil {
+		return nil
+	}
+	purpose := asset.GetPurpose()
+	result := &model.ProductAsset{
+		ID: int32(asset.GetId()), ProductID: int32(asset.GetProductId()), PurposeID: int32(asset.GetPurposeId()),
+		StorageURL: asset.GetStorageUrl(), OriginalFilename: asset.GetOriginalFilename(), ContentType: asset.GetContentType(),
+		FileSize: int32(asset.GetFileSize()), Description: asset.GetDescription(), SortOrder: asset.GetSortOrder(),
+		IsPrimary: asset.GetIsPrimary(), Metadata: asset.GetMetadata(),
+		CreatedAt: formatTimestamp(asset.GetCreatedAt().AsTime()), UpdatedAt: formatTimestamp(asset.GetUpdatedAt().AsTime()),
+	}
+	if purpose != nil {
+		result.Purpose = &model.ProductAssetPurpose{ID: int32(purpose.GetId()), Name: purpose.GetName(), IsPublic: purpose.GetIsPublic()}
+	}
+	return result
+}
+
 func userFromPB(user *orcanpb.User) *model.User {
 	if user == nil {
 		return nil
