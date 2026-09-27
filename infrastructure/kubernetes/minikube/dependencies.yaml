@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pingucoin-secrets
+type: Opaque
+stringData:
+  # Local development values only.
+  postgres-password: postgres
+  internal-api-token: minikube-development-token
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  01-create-databases.sql: |
+    CREATE DATABASE orcan;
+    CREATE DATABASE payment;
+    CREATE DATABASE pingu;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pingucoin-config
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  DB_SSLMODE: disable
+  ORCAN_API_ADDR: orcan-api:8080
+  PAYMENT_API_ADDR: payment-api:8081
+  APP_ENV: minikube
+  AZURE_STORAGE_PUBLIC_CONTAINER: pingue-public
+  AZURE_STORAGE_PRIVATE_CONTAINER: pingue
+  AZURE_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: postgres
+          volumeMounts:
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azurite
+spec:
+  selector:
+    app: azurite
+  ports:
+    - port: 10000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azurite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+        - name: azurite
+          image: mcr.microsoft.com/azure-storage/azurite:latest
+          args:
+            - azurite-blob
+            - --blobHost
+            - 0.0.0.0
+            - --blobPort
+            - "10000"
+            - --skipApiVersionCheck
+          ports:
+            - containerPort: 10000

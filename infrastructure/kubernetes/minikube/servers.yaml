@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: orcan-api
+spec:
+  selector:
+    app: orcan-api
+  ports:
+    - port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orcan-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orcan-api
+  template:
+    metadata:
+      labels:
+        app: orcan-api
+    spec:
+      containers:
+        - name: orcan-api
+          image: pingucoin/orcan-api:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: pingucoin-config
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DB_NAME
+              value: orcan
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: postgres-password
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: internal-api-token
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+spec:
+  selector:
+    app: payment-api
+  ports:
+    - port: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      containers:
+        - name: payment-api
+          image: pingucoin/payment-api:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: pingucoin-config
+          env:
+            - name: PORT
+              value: "8081"
+            - name: DB_NAME
+              value: payment
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: postgres-password
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: internal-api-token
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pingu-api
+spec:
+  selector:
+    app: pingu-api
+  ports:
+    - port: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pingu-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pingu-api
+  template:
+    metadata:
+      labels:
+        app: pingu-api
+    spec:
+      containers:
+        - name: pingu-api
+          image: pingucoin/pingu-api:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: pingucoin-config
+          env:
+            - name: PORT
+              value: "8082"
+            - name: DB_NAME
+              value: pingu
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: postgres-password
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: pingucoin-secrets
+                  key: internal-api-token
