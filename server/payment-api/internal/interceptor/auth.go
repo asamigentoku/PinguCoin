@@ -18,6 +18,9 @@ const internalTokenMetadataKey = "x-internal-token"
 // payment-apiはユーザーを識別しない。ここで検証するのは「呼び出し元がpingu-apiであること」のみ。
 func Auth(token string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if isHealthCheck(info.FullMethod) {
+			return handler(ctx, request)
+		}
 		if !hasValidToken(ctx, token) {
 			return nil, status.Error(codes.Unauthenticated, "missing or invalid internal token")
 		}

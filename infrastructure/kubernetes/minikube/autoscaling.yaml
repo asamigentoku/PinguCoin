@@ -1,0 +1,117 @@
+# 自動スケール(HPA)と、同時に落とせる数の制限(PDB)。
+#
+# HPAはPodのCPU使用率を見て、replicasを minReplicas〜maxReplicas の間で増減させる。
+# 使用率は servers.yaml の resources.requests.cpu に対する割合。
+# メトリクスを取るために metrics-server が必要(minikube: minikube addons enable metrics-server。
+# start.sh が有効にする)。無いと HPA の TARGETS が <unknown> のままで、スケールしない。
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: orcan-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: orcan-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    # 増やすのは素早く、減らすのはゆっくり(5分間落ち着いてから)。負荷が波打っても増減を繰り返さない。
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+# 自発的な中断(ノードのdrain、クラスターのアップグレードなど)の間も、最低1つは動かし続ける。
+# (Podが落ちる障害には効かない。それを防ぐのは replicas と topologySpreadConstraints)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orcan-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: orcan-api
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    # 増やすのは素早く、減らすのはゆっくり(5分間落ち着いてから)。負荷が波打っても増減を繰り返さない。
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+# 自発的な中断(ノードのdrain、クラスターのアップグレードなど)の間も、最低1つは動かし続ける。
+# (Podが落ちる障害には効かない。それを防ぐのは replicas と topologySpreadConstraints)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payment-api
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pingu-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pingu-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    # 増やすのは素早く、減らすのはゆっくり(5分間落ち着いてから)。負荷が波打っても増減を繰り返さない。
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 300
+---
+# 自発的な中断(ノードのdrain、クラスターのアップグレードなど)の間も、最低1つは動かし続ける。
+# (Podが落ちる障害には効かない。それを防ぐのは replicas と topologySpreadConstraints)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pingu-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pingu-api

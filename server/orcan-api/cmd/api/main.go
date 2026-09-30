@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -11,6 +14,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/grpcserver"
+	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/health"
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/interceptor"
 	pb "github.com/asamigentoku/PinguCoin/server/orcan-api/internal/pb/orcan/v1"
 	"github.com/asamigentoku/PinguCoin/server/orcan-api/internal/repository"
@@ -83,6 +87,17 @@ func main() {
 	// reflectionを有効にすると、.protoファイルを配らなくても
 	// grpcurl等のツールがサーバーに直接問い合わせてスキーマ(サービス一覧・メッセージ構造)を取得できる。
 	reflection.Register(server)
+
+	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
+	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stopSignals()
+	health.Register(shutdownCtx, server, db, logger)
+	go func() {
+		<-shutdownCtx.Done()
+		logger.Info("shutting down: draining in-flight requests")
+		// 処理中のRPCが終わるのを待ってから止める(新しいRPCは受け付けない)。
+		server.GracefulStop()
+	}()
 
 	logger.Info("orcan-api (gRPC) listening", slog.String("port", cfg.Port))
 	// listenしているTCPソケット(listener)に対してリクエストの受付・処理ループを開始する。

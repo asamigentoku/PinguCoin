@@ -1,0 +1,66 @@
+# 通信の制限(NetworkPolicy)。
+#
+# 1. まず、namespace内のPodへの入ってくる通信を、すべて拒否する。
+# 2. そのうえで、必要な通信だけ許可する。
+#      orcan-api / payment-api ... pingu-api からだけ受け付ける(ほかのPodやクラスター外からは届かない)
+#      pingu-api               ... 同じクラスター内のどこからでも受け付ける
+#                                  (port-forward はkubelet経由なので、このポリシーの影響を受けない)
+# NetworkPolicyを実際に効かせるには、それに対応したCNIが必要(minikubeの既定のkindnetは対応している)。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pingu-api-to-orcan-api
+spec:
+  podSelector:
+    matchLabels:
+      app: orcan-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pingu-api
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-pingu-api-to-payment-api
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: pingu-api
+      ports:
+        - port: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-pingu-api
+spec:
+  podSelector:
+    matchLabels:
+      app: pingu-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8082

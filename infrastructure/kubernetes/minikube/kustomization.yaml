@@ -3,6 +3,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: pingucoin
 resources:
-  - namespace.yaml # 専用のnamespace「pingucoin」
-  - config.yaml    # 共通の設定(ConfigMapとSecret)
-  - servers.yaml   # 3つのAPIのDeploymentとService
+  - namespace.yaml      # 専用のnamespace「pingucoin」
+  - config.yaml         # 共通の設定(ConfigMap)
+  - servers.yaml        # 3つのAPIのDeploymentとService(リソース・probe・ローリングアップデートなど)
+  - autoscaling.yaml    # 自動スケール(HPA)と、同時に落とせる数の制限(PDB)
+  - network-policy.yaml # 通信の制限(NetworkPolicy)

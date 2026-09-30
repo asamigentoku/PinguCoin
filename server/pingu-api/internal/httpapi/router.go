@@ -15,6 +15,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/asamigentoku/PinguCoin/server/pingu-api/graph"
+	"github.com/asamigentoku/PinguCoin/server/pingu-api/graph/resolvers"
 	"github.com/asamigentoku/PinguCoin/server/pingu-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/server/pingu-api/internal/orcanclient"
 	"github.com/asamigentoku/PinguCoin/server/pingu-api/internal/paymentclient"
@@ -34,11 +35,12 @@ const APIVersionPrefix = "/api/v1"
 //   - GET  /api/v1/orders       : 自分の注文一覧
 //   - GET  /api/v1/orders/{id}  : 注文詳細
 //   - GET  /api/v1/points       : 自分のポイント残高と履歴
-func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository) http.Handler {
+//   - GET  /healthz, /readyz    : Kubernetesのprobe用(liveness / readiness)
+func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository, ping func(context.Context) error) http.Handler {
 	//muxはapp_router
 	mux := http.NewServeMux()
 
-	graphqlServer := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{Orcan: orcan, Orders: orderRepo}}))
+	graphqlServer := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &resolvers.Resolver{Orcan: orcan, Orders: orderRepo}}))
 	graphqlServer.AddTransport(transport.Options{})
 	graphqlServer.AddTransport(transport.GET{})
 	graphqlServer.AddTransport(transport.POST{})
@@ -49,6 +51,10 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 
 	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", APIVersionPrefix+"/graphql"))
 	mux.Handle(APIVersionPrefix+"/graphql", graphqlServer)
+
+	healthHandler := NewHealthHandler(ping)
+	mux.HandleFunc("GET /healthz", healthHandler.Live)
+	mux.HandleFunc("GET /readyz", healthHandler.Ready)
 
 	orderHandler := NewOrderHandler(logger, orcan, payment, orderRepo)
 	mux.HandleFunc("POST "+APIVersionPrefix+"/orders", orderHandler.CreateOrder)

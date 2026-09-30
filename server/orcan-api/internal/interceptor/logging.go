@@ -20,6 +20,9 @@ import (
 // ここ一箇所でリクエスト単位のログを一元的に出す。
 func Logging(logger *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if isHealthCheck(info.FullMethod) {
+			return handler(ctx, request)
+		}
 		start := time.Now()
 		response, err := handler(ctx, request)
 		duration := time.Since(start)

@@ -43,22 +43,22 @@ model:
 
 # Where should the resolver implementations go?
 resolver:
-  package: graph
-  layout: follow-schema # Only other option is "single-file."
+  package: resolvers
+  layout: single-file # Implementations are split by domain in graph/resolvers.
 
   # Only for single-file layout:
-  # filename: graph/resolver.go
+  filename: graph/resolvers/resolver.go
 
   # Only for follow-schema layout:
-  dir: graph
-  filename_template: "{name}.resolvers.go"
+  # dir: graph/resolvers
+  # filename_template: "{name}.resolvers.go"
 
   # Optional: turn on to not generate template comments above resolvers
   # omit_template_comment: false
   # Optional: Pass in a path to a new gotpl template to use for generating resolvers
   # resolver_template: [your/path/resolver.gotpl]
   # Optional: turn on to avoid rewriting existing resolver(s) when generating
-  # preserve_resolver: false
+  preserve_resolver: true
   # Optional: turn on to hold the root resolver in a named "r" field instead of embedding it.
   # Speeds up compilation on large schemas. Turning this on is source-breaking for existing
   # resolver bodies: dependencies are reached as r.r.myService instead of r.myService.

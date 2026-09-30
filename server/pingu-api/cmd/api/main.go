@@ -53,7 +53,12 @@ func main() {
 
 	orderRepo := repository.NewOrderRepository(db)
 
-	router := httpapi.NewRouter(logger, orcan, payment, orderRepo)
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Error("failed to get sql.DB", slog.Any("error", err))
+		os.Exit(1)
+	}
+	router := httpapi.NewRouter(logger, orcan, payment, orderRepo, sqlDB.PingContext)
 
 	logger.Info("pingu-api (GraphQL/REST) listening",
 		slog.String("port", cfg.Port),

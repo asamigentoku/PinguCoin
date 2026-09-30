@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -11,6 +14,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/grpcserver"
+	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/health"
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/interceptor"
 	pb "github.com/asamigentoku/PinguCoin/server/payment-api/internal/pb/payment/v1"
 	"github.com/asamigentoku/PinguCoin/server/payment-api/internal/repository"
@@ -62,6 +66,17 @@ func main() {
 	pb.RegisterPointServiceServer(server, grpcserver.NewPointServer(pointRepo))
 
 	reflection.Register(server)
+
+	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
+	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stopSignals()
+	health.Register(shutdownCtx, server, db, logger)
+	go func() {
+		<-shutdownCtx.Done()
+		logger.Info("shutting down: draining in-flight requests")
+		// 処理中のRPCが終わるのを待ってから止める(新しいRPCは受け付けない)。
+		server.GracefulStop()
+	}()
 
 	logger.Info("payment-api (gRPC) listening", slog.String("port", cfg.Port))
 	if err := server.Serve(listener); err != nil {

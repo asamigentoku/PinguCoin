@@ -1,12 +1,17 @@
 # 3つのAPIのDeployment(Podの定義)とService(クラスター内の宛先)。
 #
 # DBとAzureはクラスター内に立てず、stagingを使う。接続情報は各APIの
-# server/<api>/.env に書き、start.ps1 がSecret(orcan-api-env など)にして渡す。
+# server/<api>/.env に書き、start.sh がSecret(orcan-api-env など)にして渡す。
 #
 # 環境変数の優先順位(後のものが勝つ):
 #   1. envFrom の1つ目 ... <api>-env Secret(.env の中身がそのまま入る)
 #   2. envFrom の2つ目 ... pingucoin-cluster-config(クラスター内の宛先で上書き)
 #   3. env            ... PORT(Serviceのポートと必ず合わせるため固定)
+#
+# 運用向けの設定(スケール・障害対策)は各Deploymentに書いてある。
+# 自動スケール(HPA)と、同時に落とせる数の制限(PDB)は autoscaling.yaml、
+# 通信の制限は network-policy.yaml。
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -16,13 +21,24 @@ spec:
     app: orcan-api
   ports:
     - port: 8080
+      targetPort: api
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: orcan-api
 spec:
-  replicas: 1
+  # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
+  replicas: 2
+  # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
+  # デプロイ中もリクエストを受け付け続けられる。
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # 過去のReplicaSetを残す数(ロールバック用: kubectl rollout undo)。
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
       app: orcan-api
@@ -31,13 +47,32 @@ spec:
       labels:
         app: orcan-api
     spec:
+      # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
+      automountServiceAccountToken: false
+      # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
+      terminationGracePeriodSeconds: 30
+      # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
+      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: orcan-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: orcan-api
           image: pingucoin/orcan-api:dev
-          # minikubeでビルドしたイメージを使う(レジストリからは取得しない)。
+          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
-            - containerPort: 8080
+            # probeとServiceからは、番号ではなくこの名前で参照する。
+            - name: api
+              containerPort: 8080
           envFrom:
             - secretRef:
                 name: orcan-api-env
@@ -46,6 +81,53 @@ spec:
           env:
             - name: PORT
               value: "8080"
+          # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
+          # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # ヘルスチェック(probe)。
+          #   startupProbe   ... 起動が終わるまで待つ。終わるまで他のprobeは動かない(最大 5秒 x 30回)
+          #   readinessProbe ... 失敗するとServiceの宛先から外し、リクエストを送らない(再起動はしない)
+          #   livenessProbe  ... 失敗が続くとコンテナを再起動する(固まったプロセスの自動復旧)
+          # gRPC標準のヘルスチェック(grpc.health.v1)を使う。server/orcan-api/internal/health を参照。
+          #   service を省略 ... readiness。DBに接続できる間だけ SERVING
+          #   liveness       ... プロセスが生きている間は常に SERVING(DBの障害では再起動しない)
+          # (grpcのprobeは、名前付きポートではなく番号で指定する)
+          startupProbe:
+            grpc:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            grpc:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            grpc:
+              port: 8080
+              service: liveness
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # 終了時: 先にServiceの宛先から外れるのを待ってから止める。
+          # 外れる前に止めると、まだ届いているリクエストが失敗する。
+          # (distrolessイメージにはシェルがないので、execのsleepではなくsleepアクションを使う)
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          # コンテナの権限を最小にする。
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
 ---
 apiVersion: v1
 kind: Service
@@ -56,13 +138,24 @@ spec:
     app: payment-api
   ports:
     - port: 8081
+      targetPort: api
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: payment-api
 spec:
-  replicas: 1
+  # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
+  replicas: 2
+  # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
+  # デプロイ中もリクエストを受け付け続けられる。
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # 過去のReplicaSetを残す数(ロールバック用: kubectl rollout undo)。
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
       app: payment-api
@@ -71,12 +164,32 @@ spec:
       labels:
         app: payment-api
     spec:
+      # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
+      automountServiceAccountToken: false
+      # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
+      terminationGracePeriodSeconds: 30
+      # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
+      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: payment-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: payment-api
           image: pingucoin/payment-api:dev
+          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
-            - containerPort: 8081
+            # probeとServiceからは、番号ではなくこの名前で参照する。
+            - name: api
+              containerPort: 8081
           envFrom:
             - secretRef:
                 name: payment-api-env
@@ -85,6 +198,53 @@ spec:
           env:
             - name: PORT
               value: "8081"
+          # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
+          # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # ヘルスチェック(probe)。
+          #   startupProbe   ... 起動が終わるまで待つ。終わるまで他のprobeは動かない(最大 5秒 x 30回)
+          #   readinessProbe ... 失敗するとServiceの宛先から外し、リクエストを送らない(再起動はしない)
+          #   livenessProbe  ... 失敗が続くとコンテナを再起動する(固まったプロセスの自動復旧)
+          # gRPC標準のヘルスチェック(grpc.health.v1)を使う。server/payment-api/internal/health を参照。
+          #   service を省略 ... readiness。DBに接続できる間だけ SERVING
+          #   liveness       ... プロセスが生きている間は常に SERVING(DBの障害では再起動しない)
+          # (grpcのprobeは、名前付きポートではなく番号で指定する)
+          startupProbe:
+            grpc:
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            grpc:
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            grpc:
+              port: 8081
+              service: liveness
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # 終了時: 先にServiceの宛先から外れるのを待ってから止める。
+          # 外れる前に止めると、まだ届いているリクエストが失敗する。
+          # (distrolessイメージにはシェルがないので、execのsleepではなくsleepアクションを使う)
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          # コンテナの権限を最小にする。
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
 ---
 apiVersion: v1
 kind: Service
@@ -95,13 +255,24 @@ spec:
     app: pingu-api
   ports:
     - port: 8082
+      targetPort: api
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pingu-api
 spec:
-  replicas: 1
+  # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
+  replicas: 2
+  # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
+  # デプロイ中もリクエストを受け付け続けられる。
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # 過去のReplicaSetを残す数(ロールバック用: kubectl rollout undo)。
+  revisionHistoryLimit: 5
   selector:
     matchLabels:
       app: pingu-api
@@ -110,12 +281,32 @@ spec:
       labels:
         app: pingu-api
     spec:
+      # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
+      automountServiceAccountToken: false
+      # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
+      terminationGracePeriodSeconds: 30
+      # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
+      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: pingu-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: pingu-api
           image: pingucoin/pingu-api:dev
+          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
-            - containerPort: 8082
+            # probeとServiceからは、番号ではなくこの名前で参照する。
+            - name: api
+              containerPort: 8082
           envFrom:
             - secretRef:
                 name: pingu-api-env
@@ -124,3 +315,51 @@ spec:
           env:
             - name: PORT
               value: "8082"
+          # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
+          # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # ヘルスチェック(probe)。
+          #   startupProbe   ... 起動が終わるまで待つ。終わるまで他のprobeは動かない(最大 5秒 x 30回)
+          #   readinessProbe ... 失敗するとServiceの宛先から外し、リクエストを送らない(再起動はしない)
+          #   livenessProbe  ... 失敗が続くとコンテナを再起動する(固まったプロセスの自動復旧)
+          # HTTPのヘルスチェック。server/pingu-api/internal/httpapi/health_handler.go を参照。
+          #   /readyz  ... DBに接続できる間だけ200(できなければ503)
+          #   /healthz ... プロセスが応答できれば常に200(DBの障害では再起動しない)
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: api
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: api
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: api
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # 終了時: 先にServiceの宛先から外れるのを待ってから止める。
+          # 外れる前に止めると、まだ届いているリクエストが失敗する。
+          # (distrolessイメージにはシェルがないので、execのsleepではなくsleepアクションを使う)
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          # コンテナの権限を最小にする。s
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
