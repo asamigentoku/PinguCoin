@@ -1,0 +1,55 @@
+.home-section { margin-top: 88px; }
+
+/* Hero: the coin is the one memorable element */
+.hero { display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: center; gap: 40px; padding-block: 64px 24px; }
+.hero h1 { margin: 0 0 24px; font-size: clamp(44px, 7vw, 92px); font-weight: 900; letter-spacing: -0.05em; line-height: 1.08; }
+.hero-copy > p { max-width: 30em; margin: 0; color: var(--muted); font-size: 17px; line-height: 1.9; }
+.hero-actions { display: flex; align-items: center; gap: 28px; margin-top: 36px; }
+
+.hero-art { position: relative; display: grid; place-items: center; min-height: 440px; }
+.hero-coin { position: relative; display: grid; place-items: center; width: min(100%, 420px); aspect-ratio: 1; border-radius: 50%; background: var(--coin); box-shadow: inset 0 0 0 18px rgba(255, 255, 255, 0.4), inset 0 0 0 20px rgba(12, 32, 56, 0.12), 0 30px 60px -20px rgba(12, 32, 56, 0.35); animation: coin-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes coin-in { from { transform: rotateY(90deg) scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.penguin { position: relative; width: 44%; aspect-ratio: 3 / 4; border-radius: 48% 48% 44% 44%; background: var(--ink); }
+.penguin::before { content: ""; position: absolute; inset: 26% 18% 4%; border-radius: 48% 48% 44% 44%; background: var(--snow); }
+.penguin::after { content: ""; position: absolute; left: 28%; right: 28%; bottom: -5%; height: 9%; border-radius: 50%; background: var(--coral); }
+.eye { position: absolute; top: 24%; width: 7%; aspect-ratio: 3 / 4; border-radius: 50%; background: #fff; z-index: 1; }
+.eye-left { left: 32%; } .eye-right { right: 32%; }
+.beak { position: absolute; left: 40%; top: 33%; width: 20%; height: 9%; background: var(--coral); clip-path: polygon(0 20%, 100% 0, 55% 100%); z-index: 1; }
+.float-coin { position: absolute; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--snow); font-size: 26px; font-weight: 900; box-shadow: 0 10px 24px -8px rgba(12, 32, 56, 0.3); }
+.float-one { left: 4%; top: 12%; } .float-two { right: 6%; bottom: 14%; background: var(--sea); color: #fff; }
+.float-tag { position: absolute; right: 2%; top: 16%; padding: 10px 16px; border-radius: 14px 14px 14px 2px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 800; line-height: 1.4; }
+
+/* Categories */
+.category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.category-card { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; min-height: 150px; padding: 22px; border-radius: 22px 22px 22px 6px; transition: transform 0.15s; }
+.category-card:hover { transform: translateY(-4px); }
+.category-card strong { font-size: 19px; font-weight: 800; }
+.category-card span { font-size: 13px; color: rgba(12, 32, 56, 0.72); }
+.tone-coral { background: var(--coral); } .tone-sea { background: var(--glacier); } .tone-violet { background: var(--violet); } .tone-coin { background: var(--coin); }
+
+/* Benefits */
+.benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; padding-block: 8px; border-top: 2px solid var(--ink); }
+.benefits > div { padding-top: 24px; }
+.benefits strong { font-size: 19px; font-weight: 800; }
+.benefits p { margin: 8px 0 0; max-width: 24em; color: var(--muted); font-size: 14px; }
+
+/* Newsletter */
+.newsletter { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; padding: 56px; border-radius: 32px; background: var(--ink); color: #fff; }
+.newsletter h2 { margin: 0; font-size: clamp(26px, 3.4vw, 40px); font-weight: 900; letter-spacing: -0.03em; line-height: 1.3; }
+.newsletter p { margin: 12px 0 0; color: #b7c9da; font-size: 14px; }
+.newsletter-form label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.newsletter-form > div { display: flex; gap: 8px; padding: 6px; border-radius: 999px; background: #fff; }
+.newsletter-form input { flex: 1; min-width: 0; padding: 0 16px; border: 0; outline: 0; background: transparent; color: var(--ink); }
+.newsletter-form button { padding: 12px 22px; border: 0; border-radius: 999px; background: var(--coin); color: var(--ink); font-weight: 800; cursor: pointer; }
+.newsletter-form button:disabled { opacity: 0.7; cursor: default; }
+.newsletter-form small { display: block; margin-top: 12px; color: #a9bdd0; font-size: 12px; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; padding-top: 40px; }
+  .hero-art { min-height: 340px; order: -1; }
+  .hero-coin { width: min(80%, 320px); }
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+  .benefits { grid-template-columns: 1fr; gap: 0; }
+  .newsletter { grid-template-columns: 1fr; padding: 36px 24px; gap: 28px; }
+}
+@media (max-width: 600px) { .home-section { margin-top: 64px; } .hero-actions { flex-wrap: wrap; } }

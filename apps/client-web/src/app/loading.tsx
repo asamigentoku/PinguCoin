@@ -1,1 +1,3 @@
-export default function Loading() { return <div className="page-loading" role="status"><span /><p>LOADING MARKET</p></div>; }
+export default function Loading() {
+  return <div className="page-loading" role="status"><span /><p>読み込み中</p></div>;
+}
