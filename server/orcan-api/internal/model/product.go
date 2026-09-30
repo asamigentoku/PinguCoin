@@ -36,3 +36,13 @@ func (product *Product) BeforeUpdate(tx *gorm.DB) error {
 	tx.Statement.SetColumn("version", product.Version+1)
 	return nil
 }
+
+// DefaultDigitalStock はデジタル商品の初期在庫数。デジタルコンテンツは実質的に売り切れが無いため、
+// 購入(在庫消費)が必ず通るよう十分大きな値を入れておく。
+const DefaultDigitalStock = 1_000_000
+
+// AfterCreate は商品の作成と同じトランザクションで、在庫の行を作る。
+// 購入(注文API)は在庫の行が無いとエラーになるため、行の作り忘れを防ぐ。
+func (product *Product) AfterCreate(tx *gorm.DB) error {
+	return tx.Create(&ProductInventory{ProductID: product.ID, Quantity: DefaultDigitalStock}).Error
+}

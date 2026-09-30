@@ -60,6 +60,28 @@ func AutoMigrate(db *gorm.DB) error {
 	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&defaultPurposes).Error; err != nil {
 		return err
 	}
+	// client-web の lib/categories.ts と同じID・名前。商品はcategory_idの外部キーを持つため、
+	// 行が無いと出品(商品の作成)が制約違反で失敗する。既にある行は変更しない。
+	defaultCategories := []model.ProductCategory{
+		{ID: 1, Name: "アート・イラスト"},
+		{ID: 2, Name: "テンプレート"},
+		{ID: 3, Name: "音楽・サウンド"},
+		{ID: 4, Name: "便利ツール"},
+	}
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&defaultCategories).Error; err != nil {
+		return err
+	}
+	// IDを明示して入れるとシーケンスが進まないため、以降にCreateProductCategoryで
+	// 採番するIDと衝突しないよう、シーケンスを最大IDまで進める。
+	if err := db.Exec(`SELECT setval(pg_get_serial_sequence('product_categories', 'id'), (SELECT COALESCE(MAX(id), 1) FROM product_categories))`).Error; err != nil {
+		return err
+	}
+	// 在庫の行が無い既存の商品にも、購入できるよう初期在庫を入れる。
+	if err := db.Exec(`INSERT INTO product_inventory (product_id, quantity, reserved, version, created_at, updated_at)
+		SELECT id, ?, 0, 1, NOW(), NOW() FROM products WHERE deleted_at IS NULL
+		ON CONFLICT (product_id) DO NOTHING`, model.DefaultDigitalStock).Error; err != nil {
+		return err
+	}
 	if err := migrateLegacyProductAssets(db); err != nil {
 		return err
 	}

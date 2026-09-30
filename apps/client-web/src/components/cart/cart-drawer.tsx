@@ -2,6 +2,7 @@
 
 import { formatPrice } from "@/lib/format";
 import { CloseIcon, MinusIcon, PlusIcon } from "../ui/icons";
+import { CheckoutButton } from "../shop/checkout-button";
 import { useCart } from "./cart-provider";
 
 export function CartDrawer() {
@@ -35,8 +36,8 @@ export function CartDrawer() {
               ))}
             </ul>
             <div className="cart-total"><span>合計</span><strong>{formatPrice(total)}</strong></div>
-            <button className="button button-primary checkout-button" disabled>購入手続きは準備中です</button>
-            <p className="cart-caption">ログインと注文機能の公開後にご利用いただけます。</p>
+            <CheckoutButton />
+            <p className="cart-caption">保有ポイントでお支払いします。購入後すぐにダウンロードできます。</p>
           </div>
         )}
       </aside>

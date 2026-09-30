@@ -1,3 +1,12 @@
+# 3つのAPIのDeployment(Podの定義)とService(クラスター内の宛先)。
+#
+# DBとAzureはクラスター内に立てず、stagingを使う。接続情報は各APIの
+# server/<api>/.env に書き、start.ps1 がSecret(orcan-api-env など)にして渡す。
+#
+# 環境変数の優先順位(後のものが勝つ):
+#   1. envFrom の1つ目 ... <api>-env Secret(.env の中身がそのまま入る)
+#   2. envFrom の2つ目 ... pingucoin-cluster-config(クラスター内の宛先で上書き)
+#   3. env            ... PORT(Serviceのポートと必ず合わせるため固定)
 apiVersion: v1
 kind: Service
 metadata:
@@ -25,27 +34,18 @@ spec:
       containers:
         - name: orcan-api
           image: pingucoin/orcan-api:dev
+          # minikubeでビルドしたイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
           envFrom:
+            - secretRef:
+                name: orcan-api-env
             - configMapRef:
-                name: pingucoin-config
+                name: pingucoin-cluster-config
           env:
             - name: PORT
               value: "8080"
-            - name: DB_NAME
-              value: orcan
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: postgres-password
-            - name: INTERNAL_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: internal-api-token
 ---
 apiVersion: v1
 kind: Service
@@ -78,23 +78,13 @@ spec:
           ports:
             - containerPort: 8081
           envFrom:
+            - secretRef:
+                name: payment-api-env
             - configMapRef:
-                name: pingucoin-config
+                name: pingucoin-cluster-config
           env:
             - name: PORT
               value: "8081"
-            - name: DB_NAME
-              value: payment
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: postgres-password
-            - name: INTERNAL_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: internal-api-token
 ---
 apiVersion: v1
 kind: Service
@@ -127,20 +117,10 @@ spec:
           ports:
             - containerPort: 8082
           envFrom:
+            - secretRef:
+                name: pingu-api-env
             - configMapRef:
-                name: pingucoin-config
+                name: pingucoin-cluster-config
           env:
             - name: PORT
               value: "8082"
-            - name: DB_NAME
-              value: pingu
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: postgres-password
-            - name: INTERNAL_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: pingucoin-secrets
-                  key: internal-api-token

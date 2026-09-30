@@ -146,7 +146,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		UserId:         uint32(claims.UserID),
 		ProductId:      request.ProductID,
 		Amount:         totalAmount,
-		Currency:       "JPY",
+		Currency:       "POINT",
 		PaymentMethod:  request.PaymentMethod,
 		IdempotencyKey: idempotencyKey,
 	})

@@ -5,6 +5,7 @@ export type Product = {
   name: string;
   description: string;
   imageUrl: string;
+  fileUrl?: string;
   price: number;
   status: string;
   createdAt: string;

@@ -18,6 +18,7 @@ const internalTokenMetadataKey = "x-internal-token"
 type Client struct {
 	conn    *grpc.ClientConn
 	Payment pb.PaymentServiceClient
+	Point   pb.PointServiceClient
 }
 
 // New はpayment-apiへのgRPCコネクションを1本張る。
@@ -40,6 +41,7 @@ func New(addr, internalToken string) (*Client, error) {
 	return &Client{
 		conn:    conn,
 		Payment: pb.NewPaymentServiceClient(conn),
+		Point:   pb.NewPointServiceClient(conn),
 	}, nil
 }
 

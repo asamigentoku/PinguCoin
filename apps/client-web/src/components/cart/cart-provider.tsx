@@ -11,6 +11,7 @@ type CartContextValue = {
   isOpen: boolean;
   addItem: (product: Product) => void;
   changeQuantity: (id: number, amount: number) => void;
+  removeItems: (ids: number[]) => void;
   openCart: () => void;
   closeCart: () => void;
 };
@@ -33,6 +34,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     },
     changeQuantity: (id, amount) => setItems((current) => current.flatMap((item) =>
       item.id !== id ? [item] : item.quantity + amount > 0 ? [{ ...item, quantity: item.quantity + amount }] : [])),
+    removeItems: (ids) => setItems((current) => current.filter((item) => !ids.includes(item.id))),
     openCart: () => setIsOpen(true),
     closeCart: () => setIsOpen(false),
   }), [items, isOpen]);

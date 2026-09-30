@@ -37,7 +37,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
         <div className="detail-copy">
           <p className="detail-category">{categoryName(product.categoryId)}</p>
           <h1>{product.name}</h1>
-          <p className="detail-price">{formatPrice(product.price)}<small>税込</small></p>
+          <p className="detail-price">{formatPrice(product.price)}</p>
           <p className="detail-description">{product.description || "つくり手のこだわりが詰まったデジタルプロダクトです。"}</p>
           <AddToCartButton product={product} />
           <dl className="detail-facts">

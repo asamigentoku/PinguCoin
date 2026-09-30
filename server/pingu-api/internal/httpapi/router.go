@@ -33,6 +33,7 @@ const APIVersionPrefix = "/api/v1"
 //   - POST /api/v1/orders       : 商品購入(注文API)
 //   - GET  /api/v1/orders       : 自分の注文一覧
 //   - GET  /api/v1/orders/{id}  : 注文詳細
+//   - GET  /api/v1/points       : 自分のポイント残高と履歴
 func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository) http.Handler {
 	//muxはapp_router
 	mux := http.NewServeMux()
@@ -53,6 +54,7 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("POST "+APIVersionPrefix+"/orders", orderHandler.CreateOrder)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders", orderHandler.ListOrders)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", orderHandler.GetOrder)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/points", NewPointHandler(payment).GetPoints)
 
 	return WithLogging(logger)(WithOptionalAuth(orcan)(mux))
 }

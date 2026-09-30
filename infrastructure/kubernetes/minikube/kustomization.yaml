@@ -1,7 +1,8 @@
+# `kubectl apply -k` で、下のファイルをまとめて適用する。
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: pingucoin
 resources:
-  - namespace.yaml
-  - dependencies.yaml
-  - servers.yaml
+  - namespace.yaml # 専用のnamespace「pingucoin」
+  - config.yaml    # 共通の設定(ConfigMapとSecret)
+  - servers.yaml   # 3つのAPIのDeploymentとService

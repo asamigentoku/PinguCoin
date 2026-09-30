@@ -15,9 +15,14 @@ import (
 )
 
 // CreateProduct is the resolver for the createProduct field.
+// 出品者は常にログイン中のユーザー。input.userId は無視する(なりすまし防止)。
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
 	response, err := r.Orcan.Product.CreateProduct(ctx, &orcanpb.CreateProductRequest{
-		UserId: uint32(input.UserID), CategoryId: uint32(input.CategoryID), Name: input.Name,
+		UserId: uint32(claims.UserID), CategoryId: uint32(input.CategoryID), Name: input.Name,
 		Description: strOrEmpty(input.Description), ImageUrl: strOrEmpty(input.ImageURL),
 		Price: int64(input.Price), Status: strOrEmpty(input.Status),
 	})
@@ -27,11 +32,32 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	return productFromPB(response.GetProduct()), nil
 }
 
+// ownedProduct はログイン中のユーザーが所有する商品を取得する。
+func (r *mutationResolver) ownedProduct(ctx context.Context, id int32) (*orcanpb.Product, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return nil, apperr.Unauthenticated("login is required")
+	}
+	response, err := r.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: uint32(id)})
+	if err != nil {
+		return nil, apperr.FromGRPC(err)
+	}
+	if uint(response.GetProduct().GetUserId()) != claims.UserID {
+		return nil, apperr.Unauthenticated("cannot modify another user's product")
+	}
+	return response.GetProduct(), nil
+}
+
 // UpdateProduct is the resolver for the updateProduct field.
+// orcan-apiのUpdateProductはfile_urlも上書きするため、現在の値をそのまま引き継ぐ。
 func (r *mutationResolver) UpdateProduct(ctx context.Context, id int32, input model.UpdateProductInput) (*model.Product, error) {
+	current, err := r.ownedProduct(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	response, err := r.Orcan.Product.UpdateProduct(ctx, &orcanpb.UpdateProductRequest{
-		Id: uint32(id), UserId: uint32(input.UserID), CategoryId: uint32(input.CategoryID), Name: input.Name,
-		Description: strOrEmpty(input.Description), ImageUrl: strOrEmpty(input.ImageURL),
+		Id: uint32(id), UserId: current.GetUserId(), CategoryId: uint32(input.CategoryID), Name: input.Name,
+		Description: strOrEmpty(input.Description), ImageUrl: current.GetImageUrl(), FileUrl: current.GetFileUrl(),
 		Price: int64(input.Price), Status: strOrEmpty(input.Status),
 	})
 	if err != nil {
@@ -42,6 +68,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id int32, input mo
 
 // DeleteProduct is the resolver for the deleteProduct field.
 func (r *mutationResolver) DeleteProduct(ctx context.Context, id int32) (bool, error) {
+	if _, err := r.ownedProduct(ctx, id); err != nil {
+		return false, err
+	}
 	if _, err := r.Orcan.Product.DeleteProduct(ctx, &orcanpb.DeleteProductRequest{Id: uint32(id)}); err != nil {
 		return false, apperr.FromGRPC(err)
 	}
@@ -302,11 +331,39 @@ func (r *queryResolver) ProductAssets(ctx context.Context, productID int32, purp
 	if err != nil {
 		return nil, apperr.FromGRPC(err)
 	}
+	// 非公開のアセット(販売するファイル等)は、その商品の出品者本人と購入済みのユーザーにだけ見せる。
+	canSeePrivate, err := r.canSeePrivateAssets(ctx, uint32(productID))
+	if err != nil {
+		return nil, err
+	}
 	assets := make([]*model.ProductAsset, 0, len(response.GetAssets()))
 	for _, asset := range response.GetAssets() {
+		if !asset.GetPurpose().GetIsPublic() && !canSeePrivate {
+			continue
+		}
 		assets = append(assets, productAssetFromPB(asset))
 	}
 	return assets, nil
+}
+
+// canSeePrivateAssets はログイン中のユーザーが、商品の出品者本人か購入済みかを返す。
+func (r *queryResolver) canSeePrivateAssets(ctx context.Context, productID uint32) (bool, error) {
+	claims, ok := reqcontext.UserFromContext(ctx)
+	if !ok {
+		return false, nil
+	}
+	productResponse, err := r.Orcan.Product.GetProduct(ctx, &orcanpb.GetProductRequest{Id: productID})
+	if err != nil {
+		return false, apperr.FromGRPC(err)
+	}
+	if productResponse.GetProduct().GetUserId() == uint32(claims.UserID) {
+		return true, nil
+	}
+	purchased, err := r.Orders.HasPaidOrder(claims.UserID, uint(productID))
+	if err != nil {
+		return false, apperr.Internal(err)
+	}
+	return purchased, nil
 }
 
 // Users is the resolver for the users field.
