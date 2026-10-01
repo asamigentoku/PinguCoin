@@ -13,6 +13,7 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
+	"github.com/asamigentoku/PinguCoin/pkg/migrate"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/grpcserver"
@@ -36,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := database.AutoMigrate(db); err != nil {
+	if err := migrate.WithLock(context.Background(), db, database.AutoMigrate); err != nil {
 		logger.Error("failed to migrate database", slog.Any("error", err))
 		os.Exit(1)
 	}

@@ -1,0 +1,26 @@
+# 本番(AKS)用。GitHub Actions(deploy-production.yml)が、イメージのタグを git の SHA にして適用する。
+#   cd platform/kubernetes/production
+#   kustomize edit set image pingucoin/orcan-api=<acr>.azurecr.io/orcan-api:<sha>   (3つとも)
+#   kubectl apply -k .
+# minikube とは共有しない。このフォルダだけで完結している。
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: pingucoin
+resources:
+  - namespace.yaml      # 専用のnamespace「pingucoin」
+  - config.yaml         # 共通の設定(ConfigMap)
+  - servers.yaml        # 3つのAPIのDeploymentとService(replicas: 1)
+  - network-policy.yaml # 通信の制限(NetworkPolicy)
+  - ingress.yaml        # インターネットからの入口(HTTPS)
+# ACR のイメージ。タグ(newTag)はデプロイのたびに、ワークフローが git の SHA に差し替える。
+# ACR の名前は Terraform の出力(acr_login_server)。ここの newName は、作成後に実際の値へ置き換える。
+images:
+  - name: pingucoin/orcan-api
+    newName: pingucoinprodacr.azurecr.io/orcan-api
+    newTag: latest
+  - name: pingucoin/payment-api
+    newName: pingucoinprodacr.azurecr.io/payment-api
+    newTag: latest
+  - name: pingucoin/pingu-api
+    newName: pingucoinprodacr.azurecr.io/pingu-api
+    newTag: latest

@@ -65,6 +65,7 @@ platform/terraform/**/.terraform/
 platform/terraform/**/*.tfstate
 platform/terraform/**/*.tfstate.*
 platform/terraform/**/*.tfvars
+platform/terraform/**/backend.hcl
 !platform/terraform/**/*.tfvars.example
 platform/terraform/**/*.tfplan
 platform/terraform/**/crash.log

@@ -26,10 +26,12 @@ services/<api>/.env ──> Secret「<api>-env」──(envFrom)──> Pod の�
 
 ## ファイル構成
 
+マニフェストは、環境ごとに完結しています(`../production` とは共有しません)。
+
 | ファイル | 内容 |
 | --- | --- |
-| `start.sh` | 起動スクリプト(minikube 起動、ホストの Docker でイメージをビルドして取り込み、Secret の作成、適用、待機) |
-| `stop.sh` | 停止スクリプト(削除) |
+| `script/start.sh` | 起動スクリプト(minikube 起動、ホストの Docker でイメージをビルドして取り込み、Secret の作成、適用、待機) |
+| `script/stop.sh` | 停止スクリプト(削除) |
 | `namespace.yaml` | 専用の namespace `pingucoin` |
 | `config.yaml` | クラスター内の宛先(ConfigMap) |
 | `servers.yaml` | 3つの API の Deployment(Pod の定義)と Service(クラスター内の宛先)。リソース・ヘルスチェック・ローリングアップデートなどの設定も、ここに書いてあります |

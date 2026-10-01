@@ -19,17 +19,21 @@
 ├── pkg/                      # 複数のサービスで共有するGoのコード
 │   ├── interceptor/          #   gRPCのサービス間認証・リクエストログ
 │   ├── health/               #   gRPCのヘルスチェック(grpc.health.v1)
+│   ├── migrate/              #   起動時のマイグレーションを、複数のPodが同時に実行しても衝突させない(DBのロック)
 │   ├── gormlogger/           #   GORMのログをslog(JSON)に流すロガー
 │   └── testutil/             #   テスト用のDB・偽のDB
 ├── apps/                     # フロントエンド(Next.js)
 │   ├── client-web/           #   購入者・出品者向けのサイト
 │   └── admin-web/            #   管理画面
 ├── platform/                 # 実行基盤(インフラ)の定義
-│   ├── kubernetes/minikube/  #   Kubernetesのマニフェスト(kustomize)
-│   ├── terraform/            #   staging環境(Supabase / Azure Blob)
+│   ├── kubernetes/           #   Kubernetesのマニフェスト(kustomize)。環境ごとに完結していて、共有しない
+│   │   ├── minikube/         #     ローカル用
+│   │   └── production/       #     本番(AKS)用
+│   ├── terraform/envs/       #   staging(Supabase / Azure Blob)と production(AKS / PostgreSQL / Blob / ACR / Key Vault)
 │   └── docker/               #   ローカル用のPostgres / Redisなど(docker compose)
-├── script/                   # 起動・停止などのスクリプト(start.sh / stop.sh)
-├── docs/                     # 設計・API仕様・テストの説明
+├── .github/workflows/        # GitHub Actions(CI、Terraform、本番へのデプロイ)
+├── script/                   # 起動・停止・Azureの初期設定のスクリプト
+├── docs/                     # 設計・API仕様・テスト・デプロイの説明
 ├── buf.yaml                  # protobufのワークスペース(各サービスのproto/を束ねる)
 ├── go.mod / go.sum           # Goのモジュール(ルートに1つ)
 ├── Makefile                  # 開発用コマンド(make help)
@@ -59,6 +63,7 @@ make up         # minikubeに起動(イメージのビルドから)
 make down       # minikubeのAPIを停止
 ```
 
+- 本番(Azure)へのデプロイ: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) / 月額コストの想定: [docs/COST.md](docs/COST.md)
 - テストの詳細: [docs/TESTING.md](docs/TESTING.md)
 - minikubeでの起動: [platform/kubernetes/minikube/README.md](platform/kubernetes/minikube/README.md)
 - API仕様: [docs/API_SPEC.md](docs/API_SPEC.md) / DB: [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)

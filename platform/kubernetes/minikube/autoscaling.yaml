@@ -2,8 +2,8 @@
 #
 # HPAはPodのCPU使用率を見て、replicasを minReplicas〜maxReplicas の間で増減させる。
 # 使用率は servers.yaml の resources.requests.cpu に対する割合。
-# メトリクスを取るために metrics-server が必要(minikube: minikube addons enable metrics-server。
-# start.sh が有効にする)。無いと HPA の TARGETS が <unknown> のままで、スケールしない。
+# メトリクスを取るために metrics-server が必要(script/start.sh が有効にする)。
+# 無いと HPA の TARGETS が <unknown> のままで、スケールしない。
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

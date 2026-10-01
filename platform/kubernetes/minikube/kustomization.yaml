@@ -1,4 +1,4 @@
-# `kubectl apply -k` で、下のファイルをまとめて適用する。
+# `kubectl apply -k platform/kubernetes/minikube` で、下のファイルをまとめて適用する(script/start.sh がやる)。
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: pingucoin

@@ -1,0 +1,141 @@
+# プルリクエストと main への push で、ビルド・テスト・設定の検証をする。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# 同じブランチで続けて push したときは、古い実行を止める。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go (build / vet / test)
+    runs-on: ubuntu-latest
+    # DB を使う統合テスト用の Postgres(テストごとに専用のスキーマを作って、終わったら消す)。
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pingucoin_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pingucoin_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pingucoin_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go.mod / go.sum が整っているか
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l services pkg)"
+          if [ -n "$unformatted" ]; then echo "gofmt が必要なファイル:"; echo "$unformatted"; exit 1; fi
+      - run: go test ./... -count=1
+
+  proto:
+    name: protobuf (lint / 生成コードが最新か)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bufbuild/buf-setup-action@v1
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: protoc-gen-go / protoc-gen-go-grpc
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      - run: buf lint
+      - name: 生成コードがコミット済みのものと同じか
+        run: |
+          buf generate services/orcan-api/proto --template services/orcan-api/proto/buf.gen.yaml
+          buf generate services/payment-api/proto --template services/payment-api/proto/buf.gen.yaml
+          git diff --exit-code -- services/orcan-api/proto services/payment-api/proto
+
+  web:
+    name: Web (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [client-web, admin-web]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+  docker:
+    name: Docker build (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [orcan-api, payment-api, pingu-api]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # push はしない。Dockerfile がビルドできるかだけ確認する(デプロイは deploy-production.yml)。
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  kubernetes:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # kustomize でマニフェストを組み立てられるか(参照しているファイルや、YAML の書き間違いがないか)。
+      - name: kustomize build
+        run: |
+          kubectl kustomize platform/kubernetes/minikube > /dev/null
+          kubectl kustomize platform/kubernetes/production > /dev/null
+
+  terraform:
+    name: Terraform (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [production]
+    defaults:
+      run:
+        working-directory: platform/terraform/envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      # backend には接続せずに、構文と引数だけを検証する(認証は要らない)。
+      - run: terraform init -backend=false
+      - run: terraform validate

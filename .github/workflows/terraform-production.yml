@@ -1,0 +1,121 @@
+# 本番のインフラ(AKS / PostgreSQL / Blob / ACR / Key Vault)を Terraform で管理する。
+#   プルリクエスト ... plan だけ(何が変わるかを確認する。変更は加えない)
+#   main へのマージ ... plan のあと、「production-infra」環境の承認を待って apply する
+#
+# Azure へのログインは OIDC(パスワードなし)。準備は script/bootstrap-azure.sh を参照。
+# 設定する値は docs/DEPLOYMENT.md を参照。
+name: Terraform (production)
+
+on:
+  pull_request:
+    paths:
+      - "platform/terraform/envs/production/**"
+      - ".github/workflows/terraform-production.yml"
+  push:
+    branches: [main]
+    paths:
+      - "platform/terraform/envs/production/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # OIDC で Azure にログインするのに必要
+  contents: read
+
+# state のロックと同じく、同時に1つだけ実行する(apply の途中で止めない)。
+concurrency:
+  group: terraform-production
+  cancel-in-progress: false
+
+env:
+  TF_WORKDIR: platform/terraform/envs/production
+  # azurerm provider が OIDC で認証するための設定。
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=production.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+      - run: terraform validate
+
+      # 入力値(秘密ではない)は、GitHub の Variables「TFVARS」に、terraform.tfvars の中身をそのまま入れておく。
+      - name: terraform.tfvars を作る
+        env:
+          TFVARS: ${{ vars.TFVARS }}
+        run: printf '%s\n' "$TFVARS" > terraform.tfvars
+
+      # plan のファイルは、パスワードなどの秘密を含むので、artifact には保存しない(apply で、もう一度 plan する)。
+      - name: terraform plan
+        run: terraform plan -no-color -lock-timeout=5m | tee plan.txt
+      - name: 結果をジョブの要約に出す
+        if: always()
+        run: |
+          {
+            echo '## terraform plan (production)'
+            echo '```'
+            tail -n 200 plan.txt 2>/dev/null || echo "(plan did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: apply
+    # PR では apply しない。main へのマージ(または手動実行)のときだけ、承認を待って apply する。
+    if: github.event_name != 'pull_request'
+    needs: plan
+    runs-on: ubuntu-latest
+    # この環境(production-infra)に「承認者」を設定すると、承認されるまでここで止まる。
+    environment: production-infra
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
+            -backend-config="key=production.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: terraform.tfvars を作る
+        env:
+          TFVARS: ${{ vars.TFVARS }}
+        run: printf '%s\n' "$TFVARS" > terraform.tfvars
+
+      - name: terraform apply
+        run: terraform apply -auto-approve -no-color -lock-timeout=10m
+
+      - name: デプロイ用の値を要約に出す(GitHub の Environment「production」の Variables に設定する)
+        run: |
+          {
+            echo '## terraform output'
+            echo '```'
+            terraform output -no-color
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

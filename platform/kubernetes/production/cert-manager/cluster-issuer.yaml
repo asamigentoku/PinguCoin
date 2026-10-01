@@ -1,0 +1,16 @@
+# Let's Encrypt から TLS 証明書を取得する設定。cert-manager を入れたあとに、1度だけ適用する(deploy-production.yml がやる)。
+# EMAIL は、証明書の期限切れなどの通知先。ワークフローが LETSENCRYPT_EMAIL に差し替える。
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: EMAIL
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: webapprouting.kubernetes.azure.com

@@ -13,6 +13,7 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
+	"github.com/asamigentoku/PinguCoin/pkg/migrate"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/grpcserver"
@@ -39,7 +40,7 @@ func main() {
 	}
 
 	// 起動時にモデル(internal/model)の定義に合わせてテーブルを作成・更新する。
-	if err := database.AutoMigrate(db); err != nil {
+	if err := migrate.WithLock(context.Background(), db, database.AutoMigrate); err != nil {
 		logger.Error("failed to migrate database", slog.Any("error", err))
 		os.Exit(1)
 	}

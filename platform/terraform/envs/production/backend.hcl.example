@@ -1,0 +1,9 @@
+# Terraform の state を置く Storage の接続先。backend.hcl にコピーして、script/bootstrap-azure.sh が表示した値に置き換える。
+#   terraform init -backend-config=backend.hcl
+resource_group_name  = "pingucoin-tfstate-rg"
+storage_account_name = "pingucoinprodtfstate<unique>"
+container_name       = "tfstate"
+key                  = "production.tfstate"
+
+# アクセスキーではなく、Azure の権限(az login / GitHub Actions の OIDC)で state を読み書きする。
+use_azuread_auth = true

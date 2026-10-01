@@ -1,17 +1,22 @@
-# 3つのAPIのDeployment(Podの定義)とService(クラスター内の宛先)。minikube(ローカル)用。
+# 3つのAPIのDeployment(Podの定義)とService(クラスター内の宛先)。本番(AKS)用。
 #
-# DBとBlob Storageはクラスターの外(staging)にある。接続情報は各APIの
-# services/<api>/.env に書き、script/start.sh がSecret(orcan-api-env など)にして渡す。
+# このフォルダは、本番だけで完結している(minikube とは共有しない)。
+#
+# DBとBlob Storageはクラスターの外にある(Azure Database for PostgreSQL と Azure Blob Storage)。
+# 接続情報は <api>-env Secret で渡す。Secret はこのフォルダでは作らず、デプロイのワークフロー
+# (.github/workflows/deploy-production.yml)が、Key Vault の値から作る。
+# イメージは Azure Container Registry のもの。kustomization.yaml の images が、ACR の名前と、デプロイごとのタグ(git の SHA)を決める。
 #
 # 環境変数の優先順位(後のものが勝つ):
-#   1. envFrom の1つ目 ... <api>-env Secret(.env の中身がそのまま入る)
+#   1. envFrom の1つ目 ... <api>-env Secret
 #   2. envFrom の2つ目 ... pingucoin-cluster-config(クラスター内の宛先で上書き)
 #   3. env            ... PORT(Serviceのポートと必ず合わせるため固定)
 #
-# 運用向けの設定(スケール・障害対策)は各Deploymentに書いてある。
-# 自動スケール(HPA)と、同時に落とせる数の制限(PDB)は autoscaling.yaml、
-# 通信の制限は network-policy.yaml。
-# 本番(AKS)の定義は ../production にある。このフォルダとは共有せず、それぞれで完結している。
+# コストを最小にするため、各サービス1つだけ(replicas: 1)。自動スケール(HPA)と、同時に落とせる数の制限(PDB)は置かない。
+#   - デプロイ中は、新しい Pod が Ready になってから古い Pod を止める(maxUnavailable: 0)ので、止まらない
+#   - Pod やノードが落ちたときは、再作成されるまでの数十秒〜数分、リクエストが失敗する
+# 止まりにくくしたくなったら、replicas を増やして、HPA と PDB を足す(docs/DEPLOYMENT.md を参照)。
+# 通信の制限は network-policy.yaml、インターネットからの入口は ingress.yaml。
 ---
 apiVersion: v1
 kind: Service
@@ -30,7 +35,7 @@ metadata:
   name: orcan-api
 spec:
   # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
-  replicas: 2
+  replicas: 1 # コストを最小にするため。
   # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
   # デプロイ中もリクエストを受け付け続けられる。
   strategy:
@@ -53,7 +58,7 @@ spec:
       # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
       terminationGracePeriodSeconds: 30
       # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
-      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      # Podが複数になったときに、別のノードに分散させる。ノードが1つの間は、置けなくてもエラーにしない(ScheduleAnyway)。
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -67,9 +72,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: orcan-api
-          image: pingucoin/orcan-api:dev
-          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
-          imagePullPolicy: Never
+          # ACR のイメージ(名前とタグは、kustomization.yaml の images が決める)。
+          image: pingucoin/orcan-api
+          imagePullPolicy: IfNotPresent
           ports:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api
@@ -147,7 +152,7 @@ metadata:
   name: payment-api
 spec:
   # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
-  replicas: 2
+  replicas: 1 # コストを最小にするため。
   # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
   # デプロイ中もリクエストを受け付け続けられる。
   strategy:
@@ -170,7 +175,7 @@ spec:
       # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
       terminationGracePeriodSeconds: 30
       # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
-      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      # Podが複数になったときに、別のノードに分散させる。ノードが1つの間は、置けなくてもエラーにしない(ScheduleAnyway)。
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -184,9 +189,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: payment-api
-          image: pingucoin/payment-api:dev
-          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
-          imagePullPolicy: Never
+          # ACR のイメージ(名前とタグは、kustomization.yaml の images が決める)。
+          image: pingucoin/payment-api
+          imagePullPolicy: IfNotPresent
           ports:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api
@@ -264,7 +269,7 @@ metadata:
   name: pingu-api
 spec:
   # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
-  replicas: 2
+  replicas: 1 # コストを最小にするため。
   # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
   # デプロイ中もリクエストを受け付け続けられる。
   strategy:
@@ -287,7 +292,7 @@ spec:
       # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
       terminationGracePeriodSeconds: 30
       # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
-      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      # Podが複数になったときに、別のノードに分散させる。ノードが1つの間は、置けなくてもエラーにしない(ScheduleAnyway)。
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -301,9 +306,9 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pingu-api
-          image: pingucoin/pingu-api:dev
-          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
-          imagePullPolicy: Never
+          # ACR のイメージ(名前とタグは、kustomization.yaml の images が決める)。
+          image: pingucoin/pingu-api
+          imagePullPolicy: IfNotPresent
           ports:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api

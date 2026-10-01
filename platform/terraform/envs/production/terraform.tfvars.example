@@ -1,0 +1,28 @@
+azure_subscription_id = "<your-subscription-id>"
+
+# 世界で一意な名前。実際の値に置き換える。
+storage_account_name = "pingucoinprod<unique>"
+acr_name             = "pingucoinprod<unique>"
+key_vault_name       = "pingucoin-prod-<unique>"
+postgres_server_name = "pingucoin-prod-<unique>"
+
+# ブラウザから Blob に直接アップロードする Web アプリの Origin。末尾に / は付けない。
+storage_cors_allowed_origins = [
+  "https://pingucoin.example",
+  "https://admin.pingucoin.example",
+]
+
+# script/bootstrap-azure.sh が表示する、GitHub Actions 用アプリのオブジェクト ID。
+deployer_principal_ids = ["<github-actions-service-principal-object-id>"]
+
+# kubectl を使う人たち(Microsoft Entra ID のグループのオブジェクト ID)。
+aks_admin_group_object_ids = ["<entra-group-object-id>"]
+
+# 既定値は、コストを最小にした構成(各サービス1つだけ。AKS はノード1つ、DB は最小サイズで高可用性なし)。
+# 利用者が増えて、止まらないようにしたくなったら、必要なものから次のように上げる(docs/DEPLOYMENT.md を参照)。
+# aks_node_count                = 3
+# aks_sku_tier                  = "Standard"
+# postgres_sku_name             = "GP_Standard_D2ds_v5"
+# postgres_high_availability    = "ZoneRedundant"
+# postgres_geo_redundant_backup = true
+# storage_replication_type      = "ZRS"
