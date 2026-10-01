@@ -52,7 +52,7 @@ jobs:
       # 行ごとに、テストで通った所・通っていない所が分かるレポート(coverage.html)を、ダウンロードできるようにする。
       - name: カバレッジのレポートを保存
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: |
