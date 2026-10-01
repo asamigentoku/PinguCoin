@@ -1,0 +1,13 @@
+# クラスター内の宛先だけを決める設定(機密ではない)。
+#
+# 各APIの環境変数は services/<api>/.env から作ったSecret(<api>-env)で渡す。
+# ただし .env の ORCAN_API_ADDR=localhost:8080 のような値は、Pod内では届かない。
+# そこでこのConfigMapを servers.yaml の envFrom の「最後」に置き、
+# .env の値よりも優先させて、クラスター内のService名に向ける。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pingucoin-cluster-config
+data:
+  ORCAN_API_ADDR: orcan-api:8080
+  PAYMENT_API_ADDR: payment-api:8081

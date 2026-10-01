@@ -1,0 +1,11 @@
+# protobuf のワークスペース。各サービスが、自分の .proto を services/<service>/proto/ に持つ。
+version: v2
+modules:
+  - path: services/orcan-api/proto
+  - path: services/payment-api/proto
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

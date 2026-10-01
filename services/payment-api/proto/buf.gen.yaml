@@ -1,0 +1,11 @@
+# payment-api の protobuf から Go のコードを生成する設定。リポジトリのルートから実行する(make proto)。
+#   buf generate services/payment-api/proto --template services/payment-api/proto/buf.gen.yaml
+# 生成したコードは .proto と同じフォルダに置き、payment-api 自身も、呼び出す側(pingu-api)も、同じ生成コードを import する。
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: services/payment-api/proto
+    opt: paths=source_relative
+  - local: protoc-gen-go-grpc
+    out: services/payment-api/proto
+    opt: paths=source_relative

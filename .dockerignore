@@ -1,0 +1,11 @@
+# docker build のコンテキストはリポジトリのルート。ビルドに要らないものは送らない。
+.git
+.idea
+.vscode
+apps
+docs
+platform
+script
+**/node_modules
+**/.env
+**/*_test.go

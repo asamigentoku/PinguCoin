@@ -17,7 +17,7 @@ desktop.ini
 !.env.*.example
 *.pem
 *.key
-!infrastructure/**/*.example.key
+!platform/**/*.example.key
 
 # === Node.js (apps/*, potential JS/TS services) ===
 node_modules/
@@ -34,7 +34,7 @@ out/
 .cache/
 coverage/
 
-# === Java / Kotlin (server/*) ===
+# === Java / Kotlin (services/*) ===
 target/
 *.class
 *.jar
@@ -44,10 +44,10 @@ gradle-app.setting
 !gradlew
 !gradlew.bat
 
-# === Go (server/*) ===
+# === Go (services/*) ===
 /bin/
-server/*/bin/
-server/*/tmp/
+services/*/bin/
+services/*/tmp/
 *.exe
 *.exe~
 *.test
@@ -61,27 +61,27 @@ venv/
 *.egg-info/
 
 # === Terraform ===
-infrastructure/terraform/**/.terraform/
-infrastructure/terraform/**/*.tfstate
-infrastructure/terraform/**/*.tfstate.*
-infrastructure/terraform/**/*.tfvars
-!infrastructure/terraform/**/*.tfvars.example
-infrastructure/terraform/**/*.tfplan
-infrastructure/terraform/**/crash.log
-infrastructure/terraform/**/crash.*.log
-infrastructure/terraform/**/override.tf
-infrastructure/terraform/**/override.tf.json
-infrastructure/terraform/**/*_override.tf
-infrastructure/terraform/**/*_override.tf.json
+platform/terraform/**/.terraform/
+platform/terraform/**/*.tfstate
+platform/terraform/**/*.tfstate.*
+platform/terraform/**/*.tfvars
+!platform/terraform/**/*.tfvars.example
+platform/terraform/**/*.tfplan
+platform/terraform/**/crash.log
+platform/terraform/**/crash.*.log
+platform/terraform/**/override.tf
+platform/terraform/**/override.tf.json
+platform/terraform/**/*_override.tf
+platform/terraform/**/*_override.tf.json
 .terraformrc
 terraform.rc
 
 # === Docker ===
-infrastructure/docker/**/*.env
+platform/docker/**/*.env
 
 # === Kubernetes (avoid committing generated/secret manifests) ===
-infrastructure/kubernetes/**/secrets.yaml
-infrastructure/kubernetes/**/*.secret.yaml
+platform/kubernetes/**/secrets.yaml
+platform/kubernetes/**/*.secret.yaml
 
 # === Logs ===
 *.log
