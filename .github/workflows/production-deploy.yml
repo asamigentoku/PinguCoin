@@ -74,7 +74,7 @@ jobs:
       - name: ACR にログイン
         run: az acr login --name "${{ vars.ACR_NAME }}"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       # イメージのタグは git の SHA。同じタグを上書きしないので、いつでも、その時点のイメージに戻せる。
       - uses: docker/build-push-action@v6
         with:
