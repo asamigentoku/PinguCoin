@@ -74,9 +74,6 @@ func (handler *PointHandler) GetPoints(w http.ResponseWriter, r *http.Request) {
 			BalanceAfter: transaction.GetBalanceAfter(), CreatedAt: transaction.GetCreatedAt().AsTime().Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
-	// 履歴は新しい順に並べ替える。
-	for i, j := 0, len(response.Transactions)-1; i < j; i, j = i+1, j-1 {
-		response.Transactions[i], response.Transactions[j] = response.Transactions[j], response.Transactions[i]
-	}
+	// 履歴は payment-api が新しい順(id降順)で返すので、並べ替えずにそのまま返す。
 	writeJSON(w, http.StatusOK, response)
 }

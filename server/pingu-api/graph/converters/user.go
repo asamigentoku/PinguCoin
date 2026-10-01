@@ -5,6 +5,7 @@ import (
 	orcanpb "github.com/asamigentoku/PinguCoin/server/pingu-api/internal/pb/orcan/v1"
 )
 
+// UserFromPB は gRPC の User を、GraphQL の User に変換する。nil なら nil を返す。
 func UserFromPB(user *orcanpb.User) *model.User {
 	if user == nil {
 		return nil

@@ -5,6 +5,8 @@ import (
 	orcanpb "github.com/asamigentoku/PinguCoin/server/pingu-api/internal/pb/orcan/v1"
 )
 
+// ProductAssetFromPB は gRPC の ProductAsset を、GraphQL の ProductAsset に変換する。nil なら nil を返す。
+// 用途(Purpose)は付いているときだけ変換する。
 func ProductAssetFromPB(asset *orcanpb.ProductAsset) *model.ProductAsset {
 	if asset == nil {
 		return nil

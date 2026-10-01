@@ -5,6 +5,7 @@ import (
 	orcanpb "github.com/asamigentoku/PinguCoin/server/pingu-api/internal/pb/orcan/v1"
 )
 
+// ProductFromPB は gRPC の Product を、GraphQL の Product に変換する。nil なら nil を返す。
 func ProductFromPB(product *orcanpb.Product) *model.Product {
 	if product == nil {
 		return nil

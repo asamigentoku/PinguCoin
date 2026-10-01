@@ -25,9 +25,11 @@ const (
 	// LivenessService はlivenessプローブが指定するサービス名。
 	LivenessService = "liveness"
 
-	checkInterval = 5 * time.Second
-	checkTimeout  = 2 * time.Second
+	checkTimeout = 2 * time.Second
 )
+
+// checkInterval はDBの疎通を確認する間隔。テストで短くできるよう変数にしている。
+var checkInterval = 5 * time.Second
 
 // Register はgRPCサーバーにヘルスチェックのサービスを登録し、DBの疎通を定期的に確認して
 // readiness(サービス名 "")の状態を更新する。ctxがキャンセルされると確認を止める。
