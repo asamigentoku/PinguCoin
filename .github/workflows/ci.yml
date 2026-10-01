@@ -68,7 +68,7 @@ jobs:
         working-directory: apps/${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 24: TypeScript のテスト(node --test)を、そのまま実行できる。
           node-version: 24
