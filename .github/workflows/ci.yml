@@ -89,7 +89,7 @@ jobs:
         service: [orcan-api, payment-api, pingu-api]
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       # push はしない。Dockerfile がビルドできるかだけ確認する(デプロイは production-deploy.yml)。
       - uses: docker/build-push-action@v6
         with:
