@@ -1,4 +1,4 @@
-# Let's Encrypt から TLS 証明書を取得する設定。cert-manager を入れたあとに、1度だけ適用する(deploy-production.yml がやる)。
+# Let's Encrypt から TLS 証明書を取得する設定。cert-manager を入れたあとに、1度だけ適用する(production-deploy.yml がやる)。
 # EMAIL は、証明書の期限切れなどの通知先。ワークフローが LETSENCRYPT_EMAIL に差し替える。
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer

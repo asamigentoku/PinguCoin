@@ -92,4 +92,4 @@ cp .env.example .env
 go run ./cmd/api
 ```
 
-起動時に `internal/database.AutoMigrate` が全テーブルのマイグレーションを実行する。
+起動時に `internal/database.Migrate` が、未適用の SQL マイグレーション(`migrations/`)を番号順に適用する(仕組みは `docs/VERSIONING.md`)。

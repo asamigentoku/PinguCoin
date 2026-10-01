@@ -1,6 +1,6 @@
 # クラスター内の宛先だけを決める設定(機密ではない)。
 #
-# 各APIの環境変数は、Key Vault の値から作った Secret(<api>-env)で渡す(deploy-production.yml)。
+# 各APIの環境変数は、Key Vault の値から作った Secret(<api>-env)で渡す(production-deploy.yml)。
 # このConfigMapを servers.yaml の envFrom の「最後」に置き、Secret の値よりも優先させて、
 # クラスター内のService名に向ける。
 apiVersion: v1
@@ -8,5 +8,7 @@ kind: ConfigMap
 metadata:
   name: pingucoin-cluster-config
 data:
+  # ログの env 属性(Datadog の env)。pkg/logging が読む。全サービスで、同じ値にそろえる。
+  DD_ENV: production
   ORCAN_API_ADDR: orcan-api:8080
   PAYMENT_API_ADDR: payment-api:8081

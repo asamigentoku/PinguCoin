@@ -1,0 +1,18 @@
+name: Roll back (production)
+description: 3つの API の Deployment を、1つ前のリビジョンに戻す。デプロイが失敗したときに使う。事前に connect-aks が必要。
+
+inputs:
+  namespace:
+    description: Deployment がある namespace
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        for api in orcan-api payment-api pingu-api; do
+          kubectl rollout undo -n "$NAMESPACE" "deployment/${api}" || true
+        done

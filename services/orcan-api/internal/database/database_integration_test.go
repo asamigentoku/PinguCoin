@@ -1,19 +1,22 @@
 package database_test
 
 import (
+	"context"
 	"testing"
 
 	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/dbmigrate"
 	"github.com/asamigentoku/PinguCoin/pkg/testutil"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/model"
+	"github.com/asamigentoku/PinguCoin/services/orcan-api/migrations"
 )
 
 // これらは実際のPostgresが必要(TEST_DATABASE_URL)。起動時のマイグレーションが入れる初期データを確かめる。
 
-func TestAutoMigrateSeedsTheCategoriesTheFrontendUses(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+func TestMigrateSeedsTheCategoriesTheFrontendUses(t *testing.T) {
+	db := testutil.NewDB(t, database.Migrate)
 
 	// client-web の lib/categories.ts と同じID・名前。無いと、出品時に外部キー制約違反になる。
 	want := map[uint]string{1: "アート・イラスト", 2: "テンプレート", 3: "音楽・サウンド", 4: "便利ツール"}
@@ -31,13 +34,13 @@ func TestAutoMigrateSeedsTheCategoriesTheFrontendUses(t *testing.T) {
 	}
 }
 
-func TestAutoMigrateIsIdempotentAndKeepsEdits(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+func TestMigrateIsIdempotentAndKeepsEdits(t *testing.T) {
+	db := testutil.NewDB(t, database.Migrate)
 
 	if err := db.Model(&model.ProductCategory{}).Where("id = ?", 1).Update("name", "Renamed").Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := database.AutoMigrate(db); err != nil {
+	if err := database.Migrate(db); err != nil {
 		t.Fatalf("second migration: %v", err)
 	}
 
@@ -57,7 +60,7 @@ func TestAutoMigrateIsIdempotentAndKeepsEdits(t *testing.T) {
 
 // 新しく作るカテゴリーのIDが、初期データ(1〜4)と衝突しない(シーケンスが進んでいる)。
 func TestNewCategoriesDoNotCollideWithTheSeed(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 
 	category := model.ProductCategory{Name: "New category"}
 	if err := db.Create(&category).Error; err != nil {
@@ -68,15 +71,24 @@ func TestNewCategoriesDoNotCollideWithTheSeed(t *testing.T) {
 	}
 }
 
-func TestAutoMigrateBackfillsInventoryForExistingProducts(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+// 既存の DB(データがある)を、最新のスキーマに上げる: 在庫の補完、旧データの移行、旧カラムの削除。
+// 「ベースラインと参照データまでを適用した状態」を作って、そこへ、残りのマイグレーションを適用して確かめる。
+func TestUpgradingAnExistingDatabase(t *testing.T) {
+	db := testutil.NewDB(t, nil)
+	ctx := context.Background()
+	all, err := dbmigrate.Load(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dbmigrate.Run(ctx, db, all[:2], dbmigrate.Options{Table: "orcan_schema_migrations"}); err != nil { // 1: ベースライン、2: 参照データ
+		t.Fatal(err)
+	}
 
-	// フックを使わずに作り、在庫の行が無い「既存の商品」を再現する。
-	withoutInventory := &model.Product{UserID: 1, CategoryID: 1, Name: "Old product", Price: 100}
+	// 在庫の行が無い既存の商品(画像・ファイルの参照つき)、すでに在庫がある商品、旧カラム(password_hash)がある users。
+	withoutInventory := &model.Product{UserID: 1, CategoryID: 1, Name: "Old product", Price: 100, ImageURL: "https://blob/old.png", FileURL: "https://blob/old.zip"}
 	if err := db.Session(&gorm.Session{SkipHooks: true}).Create(withoutInventory).Error; err != nil {
 		t.Fatal(err)
 	}
-	// すでに在庫がある商品は、上書きされてはいけない。
 	withInventory := &model.Product{UserID: 1, CategoryID: 1, Name: "Stocked product", Price: 100}
 	if err := db.Create(withInventory).Error; err != nil {
 		t.Fatal(err)
@@ -84,9 +96,13 @@ func TestAutoMigrateBackfillsInventoryForExistingProducts(t *testing.T) {
 	if err := db.Model(&model.ProductInventory{}).Where("product_id = ?", withInventory.ID).Update("quantity", 5).Error; err != nil {
 		t.Fatal(err)
 	}
-
-	if err := database.AutoMigrate(db); err != nil {
+	if err := db.Exec("ALTER TABLE users ADD COLUMN password_hash text NOT NULL DEFAULT ''").Error; err != nil {
 		t.Fatal(err)
+	}
+
+	applied, err := dbmigrate.Run(ctx, db, all, dbmigrate.Options{Table: "orcan_schema_migrations"})
+	if err != nil || len(applied) != len(all)-2 {
+		t.Fatalf("applied=%v err=%v, want the remaining %d migrations", applied, err, len(all)-2)
 	}
 
 	quantity := func(productID uint) int {
@@ -102,10 +118,23 @@ func TestAutoMigrateBackfillsInventoryForExistingProducts(t *testing.T) {
 	if got := quantity(withInventory.ID); got != 5 {
 		t.Errorf("existing stock was overwritten: %d", got)
 	}
+
+	// 旧カラム(image_url / file_url)の参照が、共通のテーブルにコピーされる(画像は用途1・メイン、ファイルは用途3)。
+	var assets []model.ProductAsset
+	if err := db.Where("product_id = ?", withoutInventory.ID).Order("purpose_id").Find(&assets).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(assets) != 2 || assets[0].PurposeID != 1 || !assets[0].IsPrimary || assets[0].StorageURL != "https://blob/old.png" || assets[1].PurposeID != 3 {
+		t.Errorf("legacy references were not migrated: %+v", assets)
+	}
+
+	if db.Migrator().HasColumn(&model.User{}, "password_hash") {
+		t.Error("users.password_hash should have been dropped")
+	}
 }
 
-func TestAutoMigrateSeedsAssetPurposes(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+func TestMigrateSeedsAssetPurposes(t *testing.T) {
+	db := testutil.NewDB(t, database.Migrate)
 
 	var purposes []model.ProductAssetPurpose
 	if err := db.Order("id").Find(&purposes).Error; err != nil {

@@ -1,4 +1,4 @@
-# GitHub Actions のデプロイ(deploy-production.yml)が使う値。GitHub の Environment「production」の変数に設定する。
+# GitHub Actions のデプロイ(production-deploy.yml)が使う値。GitHub の Environment「production」の変数に設定する。
 
 output "azure_resource_group_name" {
   description = "AZURE_RESOURCE_GROUP"

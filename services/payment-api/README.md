@@ -64,4 +64,4 @@ go run ./cmd/api
 
 `DB_NAME`のデータベース(デフォルト`payment`)は事前に作成しておく必要がある
 (`orcan-api`と同じPostgresインスタンスを使う場合、`orcan`用に自動作成される`orcan`とは別に作成が必要)。
-起動時に `internal/database.AutoMigrate` がテーブル(`payments`, `refunds`, `point_accounts`, `point_transactions`)のマイグレーションを実行する。
+起動時に `internal/database.Migrate` が、未適用の SQL マイグレーション(`migrations/`。テーブルは `payments`, `refunds`, `point_accounts`, `point_transactions`)を番号順に適用する(仕組みは `docs/VERSIONING.md`)。

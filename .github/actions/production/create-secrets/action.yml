@@ -1,0 +1,71 @@
+name: Create Kubernetes secrets (production)
+description: Key Vault の値から、Kubernetes の Secret(<api>-env)を作る。事前に azure/login と connect-aks が必要。
+
+inputs:
+  key-vault-name:
+    description: Key Vault の名前
+    required: true
+  namespace:
+    description: Secret を作る namespace
+    required: true
+  storage-public-container:
+    description: 商品画像のコンテナ名
+    required: true
+  storage-private-container:
+    description: 販売ファイルのコンテナ名
+    required: true
+  clerk-secret-key:
+    description: Clerk のシークレットキー(GitHub の Secret から渡す)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # DB の接続URLなどは、Key Vault から読んで、Kubernetes の Secret(<api>-env)にする。
+    # ログに出ないよう、値は読んだ直後にマスクする。Secret のファイルは作ったらすぐに消す。
+    - name: Secret を作る(Key Vault から)
+      shell: bash
+      env:
+        KEY_VAULT_NAME: ${{ inputs.key-vault-name }}
+        NAMESPACE: ${{ inputs.namespace }}
+        PUBLIC_CONTAINER: ${{ inputs.storage-public-container }}
+        PRIVATE_CONTAINER: ${{ inputs.storage-private-container }}
+        CLERK_SECRET_KEY: ${{ inputs.clerk-secret-key }}
+      run: |
+        set -euo pipefail
+        kubectl apply -f platform/kubernetes/production/namespace.yaml
+
+        kv() {
+          local value
+          value="$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name "$1" --query value -o tsv)"
+          echo "::add-mask::$value"
+          printf '%s' "$value"
+        }
+        apply_secret() {  # $1 = Secret 名。標準入力に KEY=value を渡す
+          local file="$RUNNER_TEMP/$1.env"
+          (umask 077; cat > "$file")
+          kubectl create secret generic "$1" -n "$NAMESPACE" --from-env-file="$file" --dry-run=client -o yaml | kubectl apply -f -
+          rm -f "$file"
+        }
+
+        INTERNAL_API_TOKEN="$(kv internal-api-token)"
+
+        apply_secret orcan-api-env <<EOF
+        DATABASE_URL=$(kv orcan-database-url)
+        INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+        AZURE_STORAGE_CONNECTION_STRING=$(kv storage-connection-string)
+        AZURE_STORAGE_PUBLIC_CONTAINER=${PUBLIC_CONTAINER}
+        AZURE_STORAGE_PRIVATE_CONTAINER=${PRIVATE_CONTAINER}
+        APP_ENV=production
+        EOF
+
+        apply_secret payment-api-env <<EOF
+        DATABASE_URL=$(kv payment-database-url)
+        INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+        EOF
+
+        apply_secret pingu-api-env <<EOF
+        DATABASE_URL=$(kv pingu-database-url)
+        INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN}
+        CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+        EOF

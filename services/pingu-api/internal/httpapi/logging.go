@@ -2,8 +2,13 @@ package httpapi
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/requestid"
 )
 
 // statusRecorder は http.ResponseWriter をラップし、実際に書き込まれたステータスコードを記録する
@@ -18,10 +23,29 @@ func (recorder *statusRecorder) WriteHeader(status int) {
 	recorder.ResponseWriter.WriteHeader(status)
 }
 
+// WithRequestID は、リクエスト ID(ヘッダー X-Request-Id)を、context とレスポンスのヘッダーに持たせる。
+// リクエストに ID があればそれを使い(使えない文字を含む場合は作り直し)、なければ作る。いちばん外側に置くこと。
+// pingu-api が gRPC で呼ぶときも、同じ ID を渡すので(grpcclient)、orcan-api / payment-api のログとも、同じ request_id でつながる。
+func WithRequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := requestid.OrNew(r.Header.Get(requestid.Header))
+		w.Header().Set(requestid.Header, id)
+		next.ServeHTTP(w, r.WithContext(requestid.WithContext(r.Context(), id)))
+	})
+}
+
 // WithLogging は全HTTPリクエスト(GraphQL/RESTの両方)を構造化ログに出すミドルウェア。
-// orcan-api/payment-apiのinternal/interceptor.Logging(gRPC版)と同じ考え方で、
+// orcan-api/payment-apiのpkg/interceptor.Logging(gRPC版)と同じ考え方で、
 // 各ハンドラー側で個別にログを書かなくても、ここ一箇所でリクエスト単位のログを一元的に出す。
 // Internal(5xx)エラーの詳細な原因は、発生箇所(internal/httpapi/response.go)側で別途ログする。
+//
+// ログの属性は、Datadog の標準属性にそろえる(pkg/logging を参照)。
+//
+//	http.method / http.url / http.status_code / http.useragent / http.referer / http.version
+//	network.client.ip,  duration(ナノ秒),  request_id
+//
+// http.url には、パスだけを出す(クエリ文字列は、トークンなどの秘密を含みうるので、出さない)。
+// リクエストの本文(GraphQL のクエリや変数)も、出さない。
 func WithLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,10 +59,17 @@ func WithLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			next.ServeHTTP(recorder, r)
 
 			attrs := []slog.Attr{
-				slog.String("method", r.Method),
-				slog.String("path", r.URL.Path),
-				slog.Int("status", recorder.status),
-				slog.Duration("duration", time.Since(start)),
+				slog.Group("http",
+					slog.String("method", r.Method),
+					slog.String("url", r.URL.Path),
+					slog.Int("status_code", recorder.status),
+					slog.String("useragent", r.UserAgent()),
+					slog.String("referer", r.Referer()),
+					slog.String("version", r.Proto),
+				),
+				slog.Group("network", slog.Group("client", slog.String("ip", clientIP(r)))),
+				logging.Duration(time.Since(start)),
+				logging.RequestID(r.Context()),
 			}
 
 			switch {
@@ -51,4 +82,19 @@ func WithLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+// clientIP は、クライアントの IP。プロキシ(Ingress)の後ろでは、X-Forwarded-For の先頭(元のクライアント)を使う。
+// ヘッダーは偽装できるので、ログ用の参考値であり、認可には使わないこと。
+func clientIP(r *http.Request) string {
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		first, _, _ := strings.Cut(forwarded, ",")
+		if ip := strings.TrimSpace(first); net.ParseIP(ip) != nil {
+			return ip
+		}
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }

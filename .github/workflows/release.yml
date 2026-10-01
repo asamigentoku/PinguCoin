@@ -1,0 +1,70 @@
+# リリース: git のタグ(v1.2.3)を push すると、テストを通したうえで、GitHub Release を作る(変更の一覧つき)。
+# バージョンの決め方・リリースの手順は docs/VERSIONING.md を参照(手順は script/release.sh が、タグ付けまでやる)。
+#
+# ここで作るのは「リリースの記録」だけで、本番へのデプロイはしない。本番へは、production ブランチへの push で出す
+# (production-deploy.yml)。デプロイしたイメージには、直近のタグから求めたバージョンが埋め込まれる(pkg/version)。
+name: Release
+
+on:
+  push:
+    tags:
+      # v1.2.3 と、プレリリース(v1.2.3-rc.1)。それ以外のタグでは動かない。
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: タグの確認
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: タグの形式と、リリースするコミットを確認する
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # セマンティックバージョニング(vMAJOR.MINOR.PATCH、プレリリースは -rc.1 など)。
+          if ! printf '%s' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
+            echo "タグ $TAG は、vMAJOR.MINOR.PATCH(例: v1.2.3、v1.2.3-rc.1)の形式ではありません" >&2
+            exit 1
+          fi
+          # リリースするコミットは、main に入っているものだけ(レビュー・CI を通っていないコミットを、リリースしない)。
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "タグのコミット($GITHUB_SHA)が、main に含まれていません。main からタグを付けてください" >&2
+            exit 1
+          fi
+
+  test:
+    name: test
+    needs: validate
+    uses: ./.github/workflows/_go-test.yml
+
+  release:
+    name: GitHub Release を作る
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Release の作成に必要
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # 前のタグからの、マージされた PR を、ラベル別にまとめた変更の一覧(.github/release.yml の分類)を、自動で作る。
+      # プレリリース(-rc.1 など)は、「プレリリース」として公開する(最新のリリースとして扱わない)。
+      - name: Release を作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          flags=()
+          case "$TAG" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --generate-notes --title "$TAG" "${flags[@]}"

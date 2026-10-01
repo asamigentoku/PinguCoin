@@ -19,6 +19,8 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"gorm.io/gorm"
+
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
 )
 
 const (
@@ -43,7 +45,7 @@ func Register(ctx context.Context, server *grpc.Server, db *gorm.DB, logger *slo
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		logger.Error("health: failed to get sql.DB; readiness will stay NOT_SERVING", slog.Any("error", err))
+		logger.Error("health: failed to get sql.DB; readiness will stay NOT_SERVING", logging.Err(err))
 		healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 		return
 	}
@@ -66,7 +68,7 @@ func Register(ctx context.Context, server *grpc.Server, db *gorm.DB, logger *slo
 
 			// 状態が変わったときだけログに残す(定期実行のたびには出さない)。
 			if err != nil && serving {
-				logger.Warn("health: database is unreachable; marking NOT_SERVING", slog.Any("error", err))
+				logger.Warn("health: database is unreachable; marking NOT_SERVING", logging.Err(err))
 			} else if err == nil && !serving {
 				logger.Info("health: database is reachable again; marking SERVING")
 			}

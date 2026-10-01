@@ -1,0 +1,45 @@
+name: Terraform init (production)
+description: state の保存先(Azure Storage)に接続して terraform init を実行し、入力値(terraform.tfvars)を作る。
+
+inputs:
+  working-directory:
+    description: Terraform の本番環境のフォルダ
+    required: true
+  state-resource-group:
+    description: state を置く Storage の、リソースグループ
+    required: true
+  state-storage-account:
+    description: state を置く Storage Account
+    required: true
+  state-container:
+    description: state を置くコンテナ
+    required: true
+  tfvars:
+    description: terraform.tfvars の中身(秘密を含まない入力値)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: terraform init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        STATE_RG: ${{ inputs.state-resource-group }}
+        STATE_SA: ${{ inputs.state-storage-account }}
+        STATE_CONTAINER: ${{ inputs.state-container }}
+      run: |
+        terraform init \
+          -backend-config="resource_group_name=${STATE_RG}" \
+          -backend-config="storage_account_name=${STATE_SA}" \
+          -backend-config="container_name=${STATE_CONTAINER}" \
+          -backend-config="key=production.tfstate" \
+          -backend-config="use_azuread_auth=true" \
+          -backend-config="use_oidc=true"
+
+    - name: terraform.tfvars を作る
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TFVARS: ${{ inputs.tfvars }}
+      run: printf '%s\n' "$TFVARS" > terraform.tfvars

@@ -73,9 +73,9 @@ func TestFromGRPC(t *testing.T) {
 		{codes.PermissionDenied, http.StatusForbidden},
 		{codes.FailedPrecondition, http.StatusConflict},
 		{codes.Internal, http.StatusInternalServerError},
-		{codes.Unavailable, http.StatusInternalServerError},
+		{codes.Unavailable, http.StatusServiceUnavailable},
 		{codes.Unknown, http.StatusInternalServerError},
-		{codes.DeadlineExceeded, http.StatusInternalServerError},
+		{codes.DeadlineExceeded, http.StatusGatewayTimeout},
 	}
 	for _, tt := range tests {
 		t.Run(tt.code.String(), func(t *testing.T) {
@@ -123,5 +123,20 @@ func TestFromGRPCEdgeCases(t *testing.T) {
 	}
 	if got := FromGRPC(errors.New("not a gRPC error")); got.HTTPStatus != http.StatusInternalServerError {
 		t.Errorf("a non-gRPC error should map to 500, got %d", got.HTTPStatus)
+	}
+}
+
+// 上流につながらないときは 503(一時的な失敗)で返す。上流のメッセージ(ホスト名など)はクライアントに返さない。
+func TestFromGRPCUnavailableIsTemporaryAndHidesTheUpstreamMessage(t *testing.T) {
+	got := FromGRPC(status.Error(codes.Unavailable, "connection error: dial tcp 10.0.0.5:8080: connection refused"))
+
+	if got.HTTPStatus != http.StatusServiceUnavailable {
+		t.Errorf("HTTPStatus = %d, want 503", got.HTTPStatus)
+	}
+	if strings.Contains(got.Message, "10.0.0.5") || got.Message != "service temporarily unavailable" {
+		t.Errorf("the upstream message leaked: %q", got.Message)
+	}
+	if got.Err == nil {
+		t.Error("the original error should be kept for the server log")
 	}
 }

@@ -36,7 +36,7 @@ func quantityOf(t *testing.T, repo *repository.ProductInventoryRepository, produ
 
 // 商品を作ると、購入(在庫の消費)が通るように、在庫の行が同時に作られる。
 func TestCreatingAProductCreatesItsInventory(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	product := newProduct(t, db, 1)
 
 	inventory := repository.NewProductInventoryRepository(db)
@@ -46,7 +46,7 @@ func TestCreatingAProductCreatesItsInventory(t *testing.T) {
 }
 
 func TestAdjustInventory(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	product := newProduct(t, db, 1)
 	repo := repository.NewProductInventoryRepository(db)
 	// 数を分かりやすくするため、在庫を10にしておく。
@@ -117,7 +117,7 @@ func TestAdjustInventory(t *testing.T) {
 
 // 同時に購入されても、在庫より多くは売れない(行ロックが効いている)。
 func TestConcurrentConsumeNeverOversells(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	product := newProduct(t, db, 1)
 	repo := repository.NewProductInventoryRepository(db)
 	inventory, _ := repo.FindByProductID(product.ID)
@@ -154,7 +154,7 @@ func TestConcurrentConsumeNeverOversells(t *testing.T) {
 }
 
 func TestFindAllFiltersBySeller(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	repo := repository.NewProductRepository(db)
 	newProduct(t, db, 1)
 	newProduct(t, db, 1)
@@ -176,7 +176,7 @@ func TestFindAllFiltersBySeller(t *testing.T) {
 }
 
 func TestDeletedProductsAreHidden(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	repo := repository.NewProductRepository(db)
 	product := newProduct(t, db, 1)
 

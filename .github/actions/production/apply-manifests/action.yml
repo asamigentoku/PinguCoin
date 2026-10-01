@@ -1,0 +1,61 @@
+name: Apply manifests (production)
+description: イメージのタグと公開ホスト名を差し替えて、platform/kubernetes/production を適用し、ロールアウトの完了を待つ。事前に connect-aks が必要。
+
+inputs:
+  acr-login-server:
+    description: ACR のログインサーバー(例 pingucoinprodacr.azurecr.io)
+    required: true
+  image-tag:
+    description: デプロイするイメージのタグ(git の SHA)
+    required: true
+  api-host:
+    description: API を公開するホスト名
+    required: true
+  namespace:
+    description: デプロイ先の namespace
+    required: true
+  restart:
+    description: イメージが同じでも、Pod を再起動する(true / false)
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: マニフェストを適用する
+      shell: bash
+      env:
+        ACR_LOGIN_SERVER: ${{ inputs.acr-login-server }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+        API_HOST: ${{ inputs.api-host }}
+      run: |
+        set -euo pipefail
+        # リポジトリの中のファイルは書き換えず、コピーの上でイメージのタグと公開ホスト名を差し替える。
+        cp -r platform/kubernetes/production "$RUNNER_TEMP/k8s"
+        cd "$RUNNER_TEMP/k8s"
+        for api in orcan-api payment-api pingu-api; do
+          kustomize edit set image "pingucoin/${api}=${ACR_LOGIN_SERVER}/${api}:${IMAGE_TAG}"
+        done
+        sed -i "s|api.pingucoin.example|${API_HOST}|g" ingress.yaml
+        kubectl apply -k .
+
+    - name: Pod を再起動する(指定したときだけ)
+      if: ${{ inputs.restart == 'true' }}
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        for api in orcan-api payment-api pingu-api; do
+          kubectl rollout restart -n "$NAMESPACE" "deployment/${api}"
+        done
+
+    # ローリングアップデートが終わる(新しい Pod が Ready になる)まで待つ。間に合わなければ、ここで失敗する。
+    - name: ロールアウトを待つ
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        for api in orcan-api payment-api pingu-api; do
+          kubectl rollout status -n "$NAMESPACE" "deployment/${api}" --timeout=300s
+        done
+        kubectl get pods -n "$NAMESPACE"

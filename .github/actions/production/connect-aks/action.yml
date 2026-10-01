@@ -1,0 +1,31 @@
+name: Connect to AKS (production)
+description: AKS の認証情報を取得し、Microsoft Entra ID(az のログイン)で kubectl を使えるようにする。事前に azure/login が必要。
+
+inputs:
+  resource-group:
+    description: AKS のリソースグループ
+    required: true
+  cluster-name:
+    description: AKS のクラスター名
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: azure/setup-kubectl@v4
+    - uses: azure/use-kubelogin@v1
+      with:
+        kubelogin-version: "v0.1.9"
+    - uses: azure/setup-helm@v4
+    - uses: imranismail/setup-kustomize@v2
+
+    # AKS はローカルの管理者アカウントを無効にしているので、Microsoft Entra ID(az のログイン)で kubectl を使う。
+    - name: AKS につなぐ
+      shell: bash
+      env:
+        RESOURCE_GROUP: ${{ inputs.resource-group }}
+        CLUSTER_NAME: ${{ inputs.cluster-name }}
+      run: |
+        az aks get-credentials --resource-group "$RESOURCE_GROUP" --name "$CLUSTER_NAME" --overwrite-existing
+        kubelogin convert-kubeconfig -l azurecli
+        kubectl get nodes

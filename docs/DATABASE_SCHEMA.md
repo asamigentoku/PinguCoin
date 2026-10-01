@@ -1,8 +1,9 @@
 # データベーステーブル構造
 
 各サーバー(orcan-api / payment-api / pingu-api)が保持するテーブル構造をまとめたもの。
-全サーバーとも PostgreSQL + GORM の `AutoMigrate` によってテーブルを作成しており、
-以下は各 `internal/model/*.go` の定義に基づく実際のスキーマ。
+全サーバーとも PostgreSQL。テーブルは、番号付きの SQL マイグレーション(`services/*/migrations/`)で作成・変更する
+(仕組みとルールは [VERSIONING.md](VERSIONING.md) の「DB スキーマのバージョン」)。
+以下は各 `internal/model/*.go` の定義に基づくスキーマ(マイグレーションと一致することは、`TestMigrationsMatchTheModels` が確かめる)。
 
 - 各サービスは自分が所有するテーブルのみをマイグレーションする(サービスをまたぐ参照は外部キー制約を張らず、IDのみを保持する)。
 - `DeletedAt` があるテーブルは GORM の論理削除(soft delete)対象。
@@ -11,12 +12,12 @@
 
 ## orcan-api
 
-商品・ユーザーを管理する。DB: PostgreSQL(`AutoMigrate` 対象には共通保存データの`ProductAssetPurpose`、`ProductAsset`も含む)
+商品・ユーザーを管理する。DB: PostgreSQL(マイグレーション対象には共通保存データの`ProductAssetPurpose`、`ProductAsset`も含む)
 
 ### users
 
 > **2026-09-21時点で移行中**: 認証をorcan-api独自のJWT(メール/パスワード)からClerk(フロントエンド側で認証)に切り替え済み。`password_hash`は廃止され、Clerkのユーザーと1:1に対応する`clerk_user_id`を持つアプリ内プロフィールのみになった。
-> GORMの`AutoMigrate`はカラムの追加のみを行い削除はしないため、`database.AutoMigrate`内で`password_hash`列の存在を明示的にチェックし`DropColumn`している(残すとNOT NULL制約により`clerk_user_id`のみでのユーザー作成が失敗するため)。
+> 以前のGORMの`AutoMigrate`はカラムの追加のみを行い削除はしなかったため、旧DBに残る`password_hash`列は、マイグレーション`000005_drop_users_password_hash.sql`で削除する(残すとNOT NULL制約により`clerk_user_id`のみでのユーザー作成が失敗するため)。
 
 | カラム | 型 | 制約 |
 |---|---|---|
@@ -133,7 +134,7 @@
 
 ## payment-api
 
-決済・返金・ポイントを管理する。DB: PostgreSQL(`AutoMigrate` 対象: `Payment`, `Refund`, `PointAccount`, `PointTransaction`)
+決済・返金・ポイントを管理する。DB: PostgreSQL(テーブル: `Payment`, `Refund`, `PointAccount`, `PointTransaction`)
 
 ### payments
 
@@ -197,7 +198,7 @@
 ## pingu-api
 
 注文(Order)を管理する。商品・ユーザーはorcan-api、決済はpayment-apiが真実の記録を持つため、
-pingu-apiは`Order`のみをマイグレーションする。DB: PostgreSQL(`AutoMigrate` 対象: `Order`)
+pingu-apiは`Order`のみを持つ。DB: PostgreSQL(テーブル: `Order`)
 
 ### orders
 

@@ -86,11 +86,11 @@ DEPLOY_SP_ID="$(az ad sp show --id "$DEPLOY_APP_ID" --query id -o tsv)"
 
 # GitHub の「どのワークフローから来たか」で、ログインを許可する。リポジトリと環境(Environment)で絞る。
 #   production-infra ... terraform apply(承認が要る環境)
-#   pull_request / main ... terraform plan(何が変わるかの確認)
+#   pull_request / production ブランチ ... terraform plan(何が変わるかの確認)
 ensure_federated_credential "$TERRAFORM_APP_ID" "github-production-infra" "repo:${GITHUB_REPO}:environment:production-infra"
 ensure_federated_credential "$TERRAFORM_APP_ID" "github-pull-request" "repo:${GITHUB_REPO}:pull_request"
-#   main ブランチ ... マージ後の plan(承認の前に、何が変わるかを確認する)
-ensure_federated_credential "$TERRAFORM_APP_ID" "github-main-branch" "repo:${GITHUB_REPO}:ref:refs/heads/main"
+#   production ブランチ ... push 後の plan(承認の前に、何が変わるかを確認する)。main では、本番にログインできない
+ensure_federated_credential "$TERRAFORM_APP_ID" "github-production-branch" "repo:${GITHUB_REPO}:ref:refs/heads/production"
 #   production ... アプリのデプロイ(承認が要る環境)
 ensure_federated_credential "$DEPLOY_APP_ID" "github-production" "repo:${GITHUB_REPO}:environment:production"
 

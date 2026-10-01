@@ -114,6 +114,12 @@ func FromGRPC(err error) *AppError {
 		return &AppError{HTTPStatus: http.StatusForbidden, Reason: reason, Message: grpcStatus.Message()}
 	case codes.FailedPrecondition:
 		return &AppError{HTTPStatus: http.StatusConflict, Reason: reason, Message: grpcStatus.Message()}
+	case codes.Unavailable:
+		// 上流につながらない(再試行しても、つながらなかった)。一時的な失敗なので、503 で返す。
+		// クライアントは、冪等な操作なら、少し待って再試行できる。上流のメッセージは返さず、ログにだけ残す。
+		return &AppError{HTTPStatus: http.StatusServiceUnavailable, Reason: reason, Message: "service temporarily unavailable", Err: err}
+	case codes.DeadlineExceeded:
+		return &AppError{HTTPStatus: http.StatusGatewayTimeout, Reason: reason, Message: "upstream request timed out", Err: err}
 	default:
 		return Internal(err)
 	}

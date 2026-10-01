@@ -64,7 +64,7 @@ go run ./cmd/api
 
 `DB_NAME`のデータベース(デフォルト`pingu`)は事前に作成しておく必要がある
 (`orcan-api`/`payment-api`と同じPostgresインスタンスを使う場合、別途作成が必要)。
-起動時に`internal/database.AutoMigrate`が`orders`テーブルのマイグレーションを実行する。
+起動時に`internal/database.Migrate`が、未適用のSQLマイグレーション(`migrations/`。`orders`テーブル)を番号順に適用する(仕組みは`docs/VERSIONING.md`)。
 
 起動後、`http://localhost:8082/`でGraphQL Playgroundを確認できる。
 `orcan-api`(デフォルト`localhost:8080`)と`payment-api`(デフォルト`localhost:8081`)を

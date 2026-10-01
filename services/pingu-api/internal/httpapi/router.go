@@ -14,6 +14,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/graph"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/graph/resolvers"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
@@ -53,6 +54,7 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	mux.Handle(APIVersionPrefix+"/graphql", graphqlServer)
 
 	healthHandler := NewHealthHandler(ping)
+	mux.HandleFunc("GET /version", healthHandler.Version)
 	mux.HandleFunc("GET /healthz", healthHandler.Live)
 	mux.HandleFunc("GET /readyz", healthHandler.Ready)
 
@@ -62,7 +64,8 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", orderHandler.GetOrder)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/points", NewPointHandler(payment).GetPoints)
 
-	return WithLogging(logger)(WithOptionalAuth(orcan)(mux))
+	// 内側から: 認証 → ログ → API のバージョンのヘッダー → リクエスト ID(いちばん外側。ログにも、レスポンスにも、同じ ID を出す)。
+	return WithRequestID(WithAPIVersion(WithLogging(logger)(WithOptionalAuth(orcan)(mux))))
 }
 
 // newErrorPresenter はresolverが返したエラーをGraphQLのエラーレスポンスに変換する。
@@ -77,9 +80,10 @@ func newErrorPresenter(logger *slog.Logger) graphql.ErrorPresenterFunc {
 		}
 
 		if appErr.Reason == apperr.ReasonInternal && appErr.Err != nil {
-			logger.Error("graphql internal error",
-				slog.Any("path", graphql.GetPath(ctx)),
-				slog.String("error", appErr.Err.Error()),
+			logger.ErrorContext(ctx, "graphql internal error",
+				logging.RequestID(ctx),
+				slog.Any("graphql_path", graphql.GetPath(ctx)),
+				logging.Err(appErr.Err),
 			)
 		}
 

@@ -10,6 +10,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	orcanpb "github.com/asamigentoku/PinguCoin/services/orcan-api/proto/orcan/v1"
 	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
@@ -85,13 +86,13 @@ func toOrderResponse(order *model.Order) orderResponse {
 func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
-		writeError(w, apperr.Unauthenticated("login is required"))
+		writeError(w, r, apperr.Unauthenticated("login is required"))
 		return
 	}
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get(idempotencyKeyHeader))
 	if idempotencyKey == "" {
-		writeError(w, apperr.InvalidArgument(idempotencyKeyHeader+" header is required"))
+		writeError(w, r, apperr.InvalidArgument(idempotencyKeyHeader+" header is required"))
 		return
 	}
 
@@ -100,17 +101,17 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, toOrderResponse(existing))
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		writeError(w, apperr.Internal(err))
+		writeError(w, r, apperr.Internal(err))
 		return
 	}
 
 	var request createOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		writeError(w, apperr.InvalidArgument("invalid request body"))
+		writeError(w, r, apperr.InvalidArgument("invalid request body"))
 		return
 	}
 	if request.ProductID == 0 {
-		writeError(w, apperr.InvalidArgument("product_id is required"))
+		writeError(w, r, apperr.InvalidArgument("product_id is required"))
 		return
 	}
 	if request.Quantity <= 0 {
@@ -122,7 +123,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 
 	productResponse, err := handler.orcan.Product.GetProduct(r.Context(), &orcanpb.GetProductRequest{Id: request.ProductID})
 	if err != nil {
-		writeError(w, apperr.FromGRPC(err))
+		writeError(w, r, apperr.FromGRPC(err))
 		return
 	}
 	product := productResponse.GetProduct()
@@ -138,7 +139,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
-		writeError(w, apperr.FromGRPC(err))
+		writeError(w, r, apperr.FromGRPC(err))
 		return
 	}
 
@@ -160,13 +161,14 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 			IdempotencyKey: idempotencyKey + inventoryReleaseSuffix,
 		})
 		if releaseErr != nil {
-			handler.logger.Error("failed to release inventory after payment failure",
+			handler.logger.ErrorContext(r.Context(), "failed to release inventory after payment failure",
+				logging.RequestID(r.Context()),
 				slog.String("idempotency_key", idempotencyKey),
-				slog.Any("payment_error", err),
-				slog.Any("release_error", releaseErr),
+				slog.Group("payment_error", slog.String("message", err.Error())),
+				logging.Err(releaseErr),
 			)
 		}
-		writeError(w, apperr.FromGRPC(err))
+		writeError(w, r, apperr.FromGRPC(err))
 		return
 	}
 	payment := paymentResponse.GetPayment()
@@ -190,7 +192,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 				return
 			}
 		}
-		writeError(w, apperr.Internal(err))
+		writeError(w, r, apperr.Internal(err))
 		return
 	}
 
@@ -201,13 +203,13 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 func (handler *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
-		writeError(w, apperr.Unauthenticated("login is required"))
+		writeError(w, r, apperr.Unauthenticated("login is required"))
 		return
 	}
 
 	orders, err := handler.repo.FindByUser(claims.UserID)
 	if err != nil {
-		writeError(w, apperr.Internal(err))
+		writeError(w, r, apperr.Internal(err))
 		return
 	}
 
@@ -222,27 +224,27 @@ func (handler *OrderHandler) ListOrders(w http.ResponseWriter, r *http.Request) 
 func (handler *OrderHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
-		writeError(w, apperr.Unauthenticated("login is required"))
+		writeError(w, r, apperr.Unauthenticated("login is required"))
 		return
 	}
 
 	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
 	if err != nil {
-		writeError(w, apperr.InvalidArgument("invalid order id"))
+		writeError(w, r, apperr.InvalidArgument("invalid order id"))
 		return
 	}
 
 	order, err := handler.repo.FindByID(uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			writeError(w, apperr.NotFound("order"))
+			writeError(w, r, apperr.NotFound("order"))
 			return
 		}
-		writeError(w, apperr.Internal(err))
+		writeError(w, r, apperr.Internal(err))
 		return
 	}
 	if order.UserID != claims.UserID {
-		writeError(w, apperr.NotFound("order"))
+		writeError(w, r, apperr.NotFound("order"))
 		return
 	}
 

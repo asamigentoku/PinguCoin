@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { confirmMainImage, confirmProductFile, createListing, prepareUploads, removeProductFile, updateListing } from "@/app/sell/actions";
 import { categories } from "@/lib/categories";
 import { formatBytes, listingStatuses, MAX_FILE_BYTES, MAX_IMAGE_BYTES, safeBlobName, validateListing, type ListingInput, type ListingStatus } from "@/lib/listing";
+import { HttpStatusError, NetworkError, isTransientStorageError, withRetry } from "@/lib/retry";
 import type { ProductFile } from "@/lib/seller";
 import type { Product } from "@/lib/types";
 import { Dropzone } from "./dropzone";
@@ -15,15 +16,25 @@ type Queued = { key: string; file: File; progress: number; state: "queued" | "up
 // 署名付きURL(SAS)を使い、ブラウザからAzure Blobへ直接アップロードする(進捗を通知する)。
 // 戻り値はSASを含まない素のBlob URL(pingu-apiのconfirmに渡す値)。
 function putBlob(target: Target, prefix: string, file: File, onProgress: (percent: number) => void) {
+  // Blob 名は1回だけ決める。再試行は、同じ名前への上書き(PUT)なので、何回やっても結果は同じ(二重にならない)。
   const url = `${target.blobEndpoint.replace(/\/$/, "")}/${target.container}/${prefix}${safeBlobName(file.name)}`;
+  // 一時的な失敗(接続できない、Azure が処理できない 500 / 502 / 503)のときだけ、少し待って再試行する。
+  // 署名付き URL の期限切れ(403)などは、何度やっても同じなので、すぐにエラーにする。
+  return withRetry(() => putOnce(url, target.sasToken, file, onProgress), {
+    shouldRetry: isTransientStorageError,
+    onRetry: () => onProgress(0),
+  });
+}
+
+function putOnce(url: string, sasToken: string, file: File, onProgress: (percent: number) => void) {
   return new Promise<string>((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("PUT", `${url}?${target.sasToken.replace(/^\?/, "")}`);
+    request.open("PUT", `${url}?${sasToken.replace(/^\?/, "")}`);
     request.setRequestHeader("x-ms-blob-type", "BlockBlob");
     request.setRequestHeader("content-type", file.type || "application/octet-stream");
     request.upload.onprogress = (event) => event.lengthComputable && onProgress(Math.round((event.loaded / event.total) * 100));
-    request.onload = () => (request.status >= 200 && request.status < 300 ? resolve(url) : reject(new Error(`アップロードに失敗しました(${request.status})。`)));
-    request.onerror = () => reject(new Error("Azure Blobへ接続できませんでした。ストレージのCORS設定(許可するオリジン)を確認してください。"));
+    request.onload = () => (request.status >= 200 && request.status < 300 ? resolve(url) : reject(new HttpStatusError(request.status, `アップロードに失敗しました(${request.status})。`)));
+    request.onerror = () => reject(new NetworkError("Azure Blobへ接続できませんでした。ストレージのCORS設定(許可するオリジン)を確認してください。"));
     request.send(file);
   });
 }

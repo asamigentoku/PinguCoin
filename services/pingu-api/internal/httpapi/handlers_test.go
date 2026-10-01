@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/requestid"
 	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/orcanclient"
@@ -43,7 +45,7 @@ func TestWriteErrorMapsAppErrorsToHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			writeError(recorder, tt.err)
+			writeError(recorder, httptest.NewRequest("GET", "/", nil), tt.err)
 
 			if recorder.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", recorder.Code, tt.wantStatus)
@@ -63,7 +65,7 @@ func TestWriteErrorMapsAppErrorsToHTTP(t *testing.T) {
 func TestWriteErrorHidesInternalDetails(t *testing.T) {
 	for _, err := range []error{errors.New("dial tcp 10.0.0.5:5432: refused"), apperr.Internal(errors.New("dial tcp 10.0.0.5:5432: refused"))} {
 		recorder := httptest.NewRecorder()
-		writeError(recorder, err)
+		writeError(recorder, httptest.NewRequest("GET", "/", nil), err)
 
 		if recorder.Code != http.StatusInternalServerError {
 			t.Errorf("status = %d, want 500", recorder.Code)
@@ -102,9 +104,42 @@ func TestHealthEndpoints(t *testing.T) {
 	}
 }
 
+// ログの1行(Datadog の標準属性)。
+type httpLogLine struct {
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	RequestID string `json:"request_id"`
+	Duration  *int64 `json:"duration"`
+	HTTP      struct {
+		Method     string `json:"method"`
+		URL        string `json:"url"`
+		StatusCode int    `json:"status_code"`
+		UserAgent  string `json:"useragent"`
+		Referer    string `json:"referer"`
+	} `json:"http"`
+	Network struct {
+		Client struct {
+			IP string `json:"ip"`
+		} `json:"client"`
+	} `json:"network"`
+}
+
+func serveAndLog(t *testing.T, handler http.Handler, request *http.Request, buffer *bytes.Buffer) (line httpLogLine, logged bool) {
+	t.Helper()
+	buffer.Reset()
+	handler.ServeHTTP(httptest.NewRecorder(), request)
+	if buffer.Len() == 0 {
+		return line, false
+	}
+	if err := json.Unmarshal(buffer.Bytes(), &line); err != nil {
+		t.Fatalf("log line is not JSON: %s", buffer.String())
+	}
+	return line, true
+}
+
 func TestWithLogging(t *testing.T) {
 	var buffer bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buffer, nil))
+	logger := logging.New(logging.Config{Service: "pingu-api", Writer: &buffer})
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ok", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /bad", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusBadRequest) })
@@ -113,36 +148,135 @@ func TestWithLogging(t *testing.T) {
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	handler := WithLogging(logger)(mux)
 
-	levelOf := func(path string) string {
-		buffer.Reset()
-		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", path, nil))
-		if buffer.Len() == 0 {
-			return ""
+	for path, want := range map[string]struct {
+		status string
+		code   int
+	}{"/ok": {"info", 200}, "/bad": {"warn", 400}, "/boom": {"error", 500}} {
+		line, logged := serveAndLog(t, handler, httptest.NewRequest("GET", path, nil), &buffer)
+		if !logged || line.Status != want.status || line.HTTP.StatusCode != want.code || line.HTTP.URL != path || line.HTTP.Method != "GET" {
+			t.Errorf("%s: logged=%v line=%+v, want status %q code %d", path, logged, line, want.status, want.code)
 		}
-		var line struct {
-			Level  string `json:"level"`
-			Status int    `json:"status"`
-			Path   string `json:"path"`
-		}
-		if err := json.Unmarshal(buffer.Bytes(), &line); err != nil {
-			t.Fatalf("log line is not JSON: %s", buffer.String())
-		}
-		if line.Path != path {
-			t.Errorf("logged path = %q, want %q", line.Path, path)
-		}
-		return line.Level
-	}
-
-	for path, want := range map[string]string{"/ok": "INFO", "/bad": "WARN", "/boom": "ERROR"} {
-		if got := levelOf(path); got != want {
-			t.Errorf("%s logged at %q, want %q", path, got, want)
+		if line.Duration == nil || *line.Duration < 0 {
+			t.Errorf("%s: duration (ns) is missing", path)
 		}
 	}
 	// ヘルスチェックは数秒おきに呼ばれるので、ログを埋めないよう出さない。
 	for _, path := range []string{"/healthz", "/readyz"} {
-		if got := levelOf(path); got != "" {
-			t.Errorf("%s should not be logged, got a %s line", path, got)
+		if _, logged := serveAndLog(t, handler, httptest.NewRequest("GET", path, nil), &buffer); logged {
+			t.Errorf("%s should not be logged", path)
 		}
+	}
+}
+
+// クエリ文字列(トークンなどの秘密を含みうる)は、ログに出さない。User-Agent / Referer は、標準属性として出す。
+func TestWithLoggingStandardAttributesAndNoQueryString(t *testing.T) {
+	var buffer bytes.Buffer
+	handler := WithLogging(logging.New(logging.Config{Service: "pingu-api", Writer: &buffer}))(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	request := httptest.NewRequest("GET", "/api/v1/orders?token=SECRET&x=1", nil)
+	request.Header.Set("User-Agent", "test-agent/1.0")
+	request.Header.Set("Referer", "https://pingucoin.example/cart")
+
+	line, _ := serveAndLog(t, handler, request, &buffer)
+
+	if line.HTTP.URL != "/api/v1/orders" || strings.Contains(buffer.String(), "SECRET") {
+		t.Errorf("the query string leaked into the log: %s", buffer.String())
+	}
+	if line.HTTP.UserAgent != "test-agent/1.0" || line.HTTP.Referer != "https://pingucoin.example/cart" {
+		t.Errorf("http.useragent / http.referer = %q / %q", line.HTTP.UserAgent, line.HTTP.Referer)
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteAddr string
+		forwarded  string
+		want       string
+	}{
+		{"direct connection", "203.0.113.7:51234", "", "203.0.113.7"},
+		{"behind the ingress: the original client", "10.244.0.5:40000", "198.51.100.9, 10.244.0.5", "198.51.100.9"},
+		{"a malformed forwarded header is ignored", "203.0.113.7:51234", "not-an-ip", "203.0.113.7"},
+		{"an address without a port", "203.0.113.7", "", "203.0.113.7"},
+	}
+	for _, tt := range tests {
+		request := httptest.NewRequest("GET", "/", nil)
+		request.RemoteAddr = tt.remoteAddr
+		if tt.forwarded != "" {
+			request.Header.Set("X-Forwarded-For", tt.forwarded)
+		}
+		if got := clientIP(request); got != tt.want {
+			t.Errorf("%s: clientIP = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// リクエスト ID: 来たものを使い(安全な文字だけ)、無ければ作る。レスポンスにも、ログにも、同じ ID が出る。
+func TestRequestIDMiddleware(t *testing.T) {
+	var seen string
+	var buffer bytes.Buffer
+	logger := logging.New(logging.Config{Service: "pingu-api", Writer: &buffer})
+	handler := WithRequestID(WithLogging(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = requestid.FromContext(r.Context())
+	})))
+
+	// 来た ID は、そのまま使う。
+	request := httptest.NewRequest("GET", "/x", nil)
+	request.Header.Set(requestid.Header, "from-nextjs-123")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if seen != "from-nextjs-123" || recorder.Header().Get(requestid.Header) != "from-nextjs-123" {
+		t.Errorf("seen=%q response=%q", seen, recorder.Header().Get(requestid.Header))
+	}
+	var line httpLogLine
+	if err := json.Unmarshal(buffer.Bytes(), &line); err != nil || line.RequestID != "from-nextjs-123" {
+		t.Errorf("the log line must carry the same request_id: %+v (%v)", line, err)
+	}
+
+	// 無いときは、作る。
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/x", nil))
+	if len(seen) != 32 || recorder.Header().Get(requestid.Header) != seen {
+		t.Errorf("a missing ID should be generated and echoed: seen=%q header=%q", seen, recorder.Header().Get(requestid.Header))
+	}
+
+	// 変な ID(改行・長すぎ)は、使わない(ログの偽装を防ぐ)。
+	request = httptest.NewRequest("GET", "/x", nil)
+	request.Header.Set(requestid.Header, strings.Repeat("a", 300))
+	handler.ServeHTTP(httptest.NewRecorder(), request)
+	if len(seen) != 32 {
+		t.Errorf("an unsafe request ID must be replaced: %q", seen)
+	}
+}
+
+func TestAPIVersionHeader(t *testing.T) {
+	handler := WithAPIVersion(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+
+	for path, want := range map[string]string{"/api/v1/orders": "v1", "/api/v1/graphql": "v1", "/healthz": "", "/version": "", "/": ""} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
+		if got := recorder.Header().Get("X-API-Version"); got != want {
+			t.Errorf("%s: X-API-Version = %q, want %q", path, got, want)
+		}
+	}
+}
+
+func TestVersionEndpoint(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /version", NewHealthHandler(nil).Version)
+
+	recorder := call(mux, "GET", "/version", callOptions{})
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	body := decode[map[string]string](t, recorder)
+	for _, key := range []string{"service", "version", "commit", "build_time", "go_version", "api"} {
+		if body[key] == "" {
+			t.Errorf("%q is missing from %v", key, body)
+		}
+	}
+	if body["service"] != "pingu-api" || body["api"] != APIVersion {
+		t.Errorf("unexpected body: %v", body)
 	}
 }
 

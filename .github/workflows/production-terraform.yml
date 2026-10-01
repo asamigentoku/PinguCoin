@@ -1,20 +1,22 @@
 # 本番のインフラ(AKS / PostgreSQL / Blob / ACR / Key Vault)を Terraform で管理する。
-#   プルリクエスト ... plan だけ(何が変わるかを確認する。変更は加えない)
-#   main へのマージ ... plan のあと、「production-infra」環境の承認を待って apply する
+#   プルリクエスト       ... plan だけ(何が変わるかを確認する。変更は加えない)
+#   production ブランチ  ... plan のあと、「production-infra」環境の承認を待って apply する
+#   main ブランチ        ... 何も動かない(main へのマージでは、本番に変更が入らない)
 #
-# Azure へのログインは OIDC(パスワードなし)。準備は script/bootstrap-azure.sh を参照。
-# 設定する値は docs/DEPLOYMENT.md を参照。
-name: Terraform (production)
+# 本番用のワークフローは、名前の頭に production- を付けている(GitHub は、workflows/ の直下のファイルしか読まないため)。
+# 本番だけの処理(terraform init など)は、.github/actions/production/ の部品にまとめてある。
+# Azure へのログインは OIDC(パスワードなし)。準備は script/bootstrap-azure.sh、設定する値は docs/DEPLOYMENT.md を参照。
+name: "Production: Terraform"
 
 on:
   pull_request:
     paths:
       - "platform/terraform/envs/production/**"
-      - ".github/workflows/terraform-production.yml"
+      - ".github/workflows/production-terraform.yml"
+      - ".github/actions/production/terraform-init/**"
+  # 本番に反映するのは、production ブランチへの push だけ(main では動かない)。
   push:
-    branches: [main]
-    paths:
-      - "platform/terraform/envs/production/**"
+    branches: [production]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +25,7 @@ permissions:
 
 # state のロックと同じく、同時に1つだけ実行する(apply の途中で止めない)。
 concurrency:
-  group: terraform-production
+  group: production-terraform
   cancel-in-progress: false
 
 env:
@@ -39,6 +41,9 @@ env:
 jobs:
   plan:
     name: plan
+    # Dependabot の PR には、Azure にログインする権限(OIDC)を渡さないので、plan は動かさない(動かすと、失敗して赤くなるだけ)。
+    # Dependabot の Terraform の更新は、マージ前に、手元で plan を確認する(docs/DEPENDABOT.md)。
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -48,22 +53,14 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform fmt -check -recursive
 
-      - name: terraform init
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
-            -backend-config="key=production.tfstate" \
-            -backend-config="use_azuread_auth=true" \
-            -backend-config="use_oidc=true"
+      - uses: ./.github/actions/production/terraform-init
+        with:
+          working-directory: ${{ env.TF_WORKDIR }}
+          state-resource-group: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          state-storage-account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          state-container: ${{ vars.TFSTATE_CONTAINER }}
+          tfvars: ${{ vars.TFVARS }}
       - run: terraform validate
-
-      # 入力値(秘密ではない)は、GitHub の Variables「TFVARS」に、terraform.tfvars の中身をそのまま入れておく。
-      - name: terraform.tfvars を作る
-        env:
-          TFVARS: ${{ vars.TFVARS }}
-        run: printf '%s\n' "$TFVARS" > terraform.tfvars
 
       # plan のファイルは、パスワードなどの秘密を含むので、artifact には保存しない(apply で、もう一度 plan する)。
       - name: terraform plan
@@ -80,8 +77,9 @@ jobs:
 
   apply:
     name: apply
-    # PR では apply しない。main へのマージ(または手動実行)のときだけ、承認を待って apply する。
-    if: github.event_name != 'pull_request'
+    # PR では apply しない。production ブランチ(への push、またはそのブランチでの手動実行)のときだけ、承認を待って apply する。
+    # 手動実行は、ほかのブランチを選んでも、ここで止まる。
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/production'
     needs: plan
     runs-on: ubuntu-latest
     # この環境(production-infra)に「承認者」を設定すると、承認されるまでここで止まる。
@@ -93,20 +91,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
 
-      - name: terraform init
-        run: |
-          terraform init \
-            -backend-config="resource_group_name=${{ vars.TFSTATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TFSTATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TFSTATE_CONTAINER }}" \
-            -backend-config="key=production.tfstate" \
-            -backend-config="use_azuread_auth=true" \
-            -backend-config="use_oidc=true"
-
-      - name: terraform.tfvars を作る
-        env:
-          TFVARS: ${{ vars.TFVARS }}
-        run: printf '%s\n' "$TFVARS" > terraform.tfvars
+      - uses: ./.github/actions/production/terraform-init
+        with:
+          working-directory: ${{ env.TF_WORKDIR }}
+          state-resource-group: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          state-storage-account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          state-container: ${{ vars.TFSTATE_CONTAINER }}
+          tfvars: ${{ vars.TFVARS }}
 
       - name: terraform apply
         run: terraform apply -auto-approve -no-color -lock-timeout=10m

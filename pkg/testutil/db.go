@@ -28,7 +28,7 @@ const DatabaseURLEnv = "TEST_DATABASE_URL"
 
 // NewDB はテストごとに専用のスキーマを作り、そこに接続した *gorm.DB を返す
 // (テスト同士が互いのデータに影響しない。終了時にスキーマごと削除する)。
-// migrate にはそのプロジェクトのマイグレーション関数(database.AutoMigrate)を渡す。
+// migrate にはそのサービスのマイグレーション関数(database.Migrate。本番と同じ SQL を適用する)を渡す。
 func NewDB(t *testing.T, migrate func(*gorm.DB) error) *gorm.DB {
 	t.Helper()
 	base := os.Getenv(DatabaseURLEnv)

@@ -7,9 +7,9 @@ API(`orcan-api` / `payment-api` / `pingu-api`)を、Azure の AKS で動かし�
 ## 全体像
 
 ```text
-GitHub Actions ──(OIDC。パスワードなし)──▶ Azure
-  ├─ terraform-production.yml : インフラを作る・変える(承認が要る)
-  └─ deploy-production.yml    : イメージを ACR に push → AKS にデプロイ(承認が要る)
+GitHub Actions ──(OIDC。パスワードなし)──▶ Azure     ※ production ブランチへの push だけが、本番に反映される
+  ├─ production-terraform.yml : インフラを作る・変える(承認が要る)
+  └─ production-deploy.yml    : イメージを ACR に push → AKS にデプロイ(承認が要る)
 
 インターネット ─HTTPS─▶ Ingress(マネージドNGINX)─▶ pingu-api ─gRPC─▶ orcan-api  ─▶ Azure Blob
                                                          └─gRPC─▶ payment-api
@@ -62,6 +62,45 @@ DB 以外は、必要なところから、順番に上げられます。目安�
 1. **AKS**: `aks_node_count = 3`(あわせて、`aks/main.tf` に `zones = ["1","2","3"]` を足す)と `aks_sku_tier = "Standard"`。
 2. **Pod**: `platform/kubernetes/production/servers.yaml` の `replicas` を 2 にして、HPA と PDB(`autoscaling.yaml`)を同じフォルダに作り、`kustomization.yaml` の `resources` に足す(minikube の `platform/kubernetes/minikube/autoscaling.yaml` を参考にできる)。
 
+## ワークフローの構成
+
+GitHub Actions は、`.github/workflows/` の**直下**にあるファイルしか読みません(サブフォルダには置けません)。そこで、次のように分けています。
+
+```text
+.github/
+├── workflows/
+│   ├── ci.yml                    # 共通: PR と main / production への push で、テスト・検証をする
+│   ├── _go-test.yml              # 共通: Go のビルド・テスト(ci.yml と production-deploy.yml が呼び出す)
+│   ├── production-terraform.yml  # 本番: インフラ(plan / apply)
+│   └── production-deploy.yml     # 本番: アプリのデプロイ
+└── actions/production/           # 本番だけの処理の部品(composite action)
+    ├── terraform-init/           #   state に接続して init、tfvars を作る
+    ├── connect-aks/              #   AKS に接続する(kubectl / helm / kustomize の準備を含む)
+    ├── install-cert-manager/     #   cert-manager と ClusterIssuer
+    ├── create-secrets/           #   Key Vault の値から Kubernetes の Secret を作る
+    ├── apply-manifests/          #   イメージのタグを差し替えて適用し、ロールアウトを待つ
+    ├── smoke-test/               #   /readyz の確認
+    └── rollback/                 #   1つ前のリビジョンに戻す
+```
+
+- 本番用のワークフローは、名前の頭に `production-` を付けて、一覧でまとまるようにしています。
+- ワークフローの本体(入口、承認、ブランチの制限)は直下のファイルに、本番だけの具体的な処理は `actions/production/` の部品に書いています。
+- 共通の処理(Go のテスト)は、CI と本番デプロイが同じ `_go-test.yml` を使うので、本番に出す前にも、PR と同じ確認が走ります。
+
+## ブランチの運用
+
+| ブランチ | 動くもの |
+| --- | --- |
+| プルリクエスト | `ci.yml`(テスト・検証)、`production-terraform.yml` の plan(インフラを変える PR だけ。変更は加えない) |
+| `main` | `ci.yml` だけ。**本番には何も反映されない** |
+| `production` | `ci.yml` に加えて、`production-terraform.yml`(plan → 承認 → apply)と `production-deploy.yml`(テスト → ビルド → 承認 → デプロイ) |
+
+- 本番に出したいときは、`main` から `production` へ、プルリクエストでマージします(`main` の変更を、`production` に取り込む)。`production` への push が、本番への反映の合図です。
+- `production` ブランチは、**ブランチ保護**(直接 push の禁止、プルリクエストとレビューを必須)にしてください。
+- 手動実行(Actions の Run workflow)で、`production` 以外のブランチを選んでも、apply とデプロイには進みません(ワークフローが止めます)。
+- さらに、GitHub の Environment(`production-infra` / `production`)の **Deployment branches** を `production` だけに制限してください。ワークフローの書き換えでは、すり抜けられません。
+- Azure 側も同じです。Terraform 用の ID が本番にログインできるのは、`production` ブランチ(plan)と、承認された環境(apply)、プルリクエスト(plan)だけです(`bootstrap-azure.sh` が設定します)。
+
 ## 初回のセットアップ
 
 ### 1. Azure の準備(1回だけ)
@@ -75,12 +114,12 @@ Terraform の state を置く Storage と、GitHub Actions がログインする
 
 ### 2. GitHub の設定
 
-**Settings > Environments** で、次の2つを作り、**Required reviewers**(承認者)を設定します。
+**Settings > Environments** で、次の2つを作り、**Required reviewers**(承認者)と、**Deployment branches = `production` だけ**を設定します。
 
 | 環境 | 使うワークフロー |
 | --- | --- |
-| `production-infra` | `terraform-production.yml` の apply |
-| `production` | `deploy-production.yml` の deploy |
+| `production-infra` | `production-terraform.yml` の apply |
+| `production` | `production-deploy.yml` の deploy |
 
 **Variables**(秘密ではない値)に、スクリプトが表示した値を設定します。
 
@@ -108,7 +147,7 @@ Terraform の state を置く Storage と、GitHub Actions がログインする
 
 ### 4. インフラを作る
 
-`main` にマージするか、Actions から **Terraform (production)** を手動で実行します。plan の内容を確認して、`production-infra` を承認すると、`terraform apply` が走ります(10〜30分かかります)。終わると、ジョブの要約に `terraform output` が出ます。
+`production` ブランチに push するか、そのブランチで Actions の **Terraform (production)** を手動で実行します。plan の内容を確認して、`production-infra` を承認すると、`terraform apply` が走ります(10〜30分かかります)。終わると、ジョブの要約に `terraform output` が出ます。
 
 ### 5. デプロイ用の値を設定する
 
@@ -134,7 +173,7 @@ Terraform の state を置く Storage と、GitHub Actions がログインする
 
 ### 6. デプロイして、DNS を向ける
 
-1. Actions の **Deploy (production)** を実行(`main` へのマージでも動きます)。`production` を承認します。
+1. Actions の **Deploy (production)** を実行(`production` ブランチへの push でも動きます)。`production` を承認します。
 2. 終わったら、Ingress の IP を調べます。
 
    ```bash
@@ -151,16 +190,16 @@ Terraform の state を置く Storage と、GitHub Actions がログインする
 
 | やりたいこと | 方法 |
 | --- | --- |
-| API を更新する | `main` にマージ(`services/**` や `pkg/**` が変わったときに自動で動く)→ `production` を承認 |
+| API を更新する | `main` で開発 → `production` ブランチへマージ(`services/**` や `pkg/**` が変わったときに自動で動く)→ `production` を承認 |
 | 前の状態に戻す | デプロイが失敗したときは自動で戻る。あとから戻すなら、前の成功したコミットで **Deploy (production)** を再実行(イメージは git の SHA でタグ付けされているので、そのまま使える) |
 | Secret(Key Vault の値や `CLERK_SECRET_KEY`)を変えた | **Deploy (production)** を、`restart` にチェックを入れて手動で実行 |
-| インフラを変える | `platform/terraform/envs/production/` を変えて PR を出す。PR で plan を確認し、`main` へのマージ後に `production-infra` を承認 |
+| インフラを変える | `platform/terraform/envs/production/` を変えて PR を出す。PR で plan を確認し、`production` ブランチへのマージ後に `production-infra` を承認 |
 | ログを見る | `kubectl logs -n pingucoin deployment/pingu-api`(Container Insights を有効にすれば、Azure のポータルでも見られる) |
 
 ## 注意
 
 - **DB のユーザー**: 3つのサービスとも、同じ管理者ユーザーで接続しています。サービスごとに権限を絞ったユーザーを作るのが望ましいです(DB が仮想ネットワークの中にあり、CI から直接つながらないため、今は未対応)。
 - **Terraform の state**: パスワードなどの秘密を含みます。state の Storage には、アクセスできる人を最小限にしてください(`bootstrap-azure.sh` は、アクセスキーを使わず、Azure の権限だけで読み書きするようにしています)。
-- **PR の plan**: PR の plan も、インフラ用の ID(強い権限)で動きます。ワークフローを書き換える PR で悪用されないよう、`main` のブランチ保護(レビュー必須)を設定してください。
+- **PR の plan**: PR の plan も、インフラ用の ID(強い権限)で動きます。ワークフローを書き換える PR で悪用されないよう、`main` と `production` のブランチ保護(レビュー必須)を設定してください。
 - **削除の保護**: DB、Storage、Key Vault などは `prevent_destroy` と、削除後も一定期間戻せる設定が入っています。`terraform destroy` では消えません。
-- **起動時のマイグレーション**: 各サービスが、起動時にテーブルを作成・更新します。デプロイ中に古い Pod と新しい Pod が同時に動いても、DB のロックで1つずつ実行します(`pkg/migrate`)。
+- **起動時のマイグレーション**: 各サービスが、起動時に、まだ適用していない SQL のマイグレーション(`services/*/migrations/`)を、番号順に適用します。デプロイ中に古い Pod と新しい Pod が同時に動いても、DB のロックで1つずつ実行します。適用した内容は、サービスごとの記録のテーブル(`orcan_schema_migrations` など)に残ります。変更の足し方、古いアプリが動くための手順は [VERSIONING.md](VERSIONING.md) を参照。

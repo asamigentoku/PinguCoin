@@ -1,0 +1,24 @@
+name: Smoke test (production)
+description: クラスターの中から、pingu-api のヘルスチェック(/readyz。DB に接続できているか)を確認する。事前に connect-aks が必要。
+
+inputs:
+  namespace:
+    description: pingu-api がある namespace
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        kubectl port-forward -n "$NAMESPACE" service/pingu-api 18082:8082 &
+        forward=$!
+        trap 'kill $forward' EXIT
+        for i in $(seq 1 15); do
+          if curl -fsS http://localhost:18082/readyz; then echo; exit 0; fi
+          sleep 2
+        done
+        echo "readyz が 200 を返しません" >&2
+        exit 1

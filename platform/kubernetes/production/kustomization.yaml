@@ -1,4 +1,4 @@
-# 本番(AKS)用。GitHub Actions(deploy-production.yml)が、イメージのタグを git の SHA にして適用する。
+# 本番(AKS)用。GitHub Actions(production-deploy.yml)が、イメージのタグを git の SHA にして適用する。
 #   cd platform/kubernetes/production
 #   kustomize edit set image pingucoin/orcan-api=<acr>.azurecr.io/orcan-api:<sha>   (3つとも)
 #   kubectl apply -k .

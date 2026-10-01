@@ -4,7 +4,7 @@
 #
 # DBとBlob Storageはクラスターの外にある(Azure Database for PostgreSQL と Azure Blob Storage)。
 # 接続情報は <api>-env Secret で渡す。Secret はこのフォルダでは作らず、デプロイのワークフロー
-# (.github/workflows/deploy-production.yml)が、Key Vault の値から作る。
+# (.github/workflows/production-deploy.yml)が、Key Vault の値から作る。
 # イメージは Azure Container Registry のもの。kustomization.yaml の images が、ACR の名前と、デプロイごとのタグ(git の SHA)を決める。
 #
 # 環境変数の優先順位(後のものが勝つ):

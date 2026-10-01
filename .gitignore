@@ -87,3 +87,8 @@ platform/kubernetes/**/*.secret.yaml
 # === Logs ===
 *.log
 logs/
+
+# === Go test coverage (script/coverage.sh) ===
+coverage.out
+coverage.raw.out
+coverage.html

@@ -65,7 +65,12 @@ if [ "$SKIP_BUILD" = false ]; then
     image="pingucoin/$api:dev"
     echo "Building $image (host docker) ..."
     # コンテキストはリポジトリのルート(Go モジュールが1つで、pkg/ を共有しているため)。
-    docker build -t "$image" -f "$REPO_ROOT/services/$api/Dockerfile" "$REPO_ROOT"
+    # バージョン・コミット・ビルド時刻を埋め込む(ログの version 属性や /version に出る)。
+    docker build -t "$image" -f "$REPO_ROOT/services/$api/Dockerfile" \
+      --build-arg VERSION="$(git -C "$REPO_ROOT" describe --tags --always --dirty 2>/dev/null || echo dev)" \
+      --build-arg COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)" \
+      --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      "$REPO_ROOT"
     echo "Loading $image into minikube ..."
     minikube image rm "docker.io/$image" >/dev/null 2>&1 || true
     minikube image load "$image"

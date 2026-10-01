@@ -40,30 +40,30 @@ type pointsResponse struct {
 func (handler *PointHandler) GetPoints(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
-		writeError(w, apperr.Unauthenticated("login is required"))
+		writeError(w, r, apperr.Unauthenticated("login is required"))
 		return
 	}
 	userID := uint32(claims.UserID)
 
 	list, err := handler.payment.Point.ListPointTransactions(r.Context(), &paymentpb.ListPointTransactionsRequest{UserId: &userID})
 	if err != nil {
-		writeError(w, apperr.FromGRPC(err))
+		writeError(w, r, apperr.FromGRPC(err))
 		return
 	}
 	if len(list.GetTransactions()) == 0 {
 		if _, err := handler.payment.Point.CreditPoints(r.Context(), &paymentpb.CreditPointsRequest{UserId: userID, Amount: welcomeBonusPoints, Reason: "ウェルカムボーナス"}); err != nil {
-			writeError(w, apperr.FromGRPC(err))
+			writeError(w, r, apperr.FromGRPC(err))
 			return
 		}
 		if list, err = handler.payment.Point.ListPointTransactions(r.Context(), &paymentpb.ListPointTransactionsRequest{UserId: &userID}); err != nil {
-			writeError(w, apperr.FromGRPC(err))
+			writeError(w, r, apperr.FromGRPC(err))
 			return
 		}
 	}
 
 	account, err := handler.payment.Point.GetPointAccount(r.Context(), &paymentpb.GetPointAccountRequest{UserId: userID})
 	if err != nil {
-		writeError(w, apperr.FromGRPC(err))
+		writeError(w, r, apperr.FromGRPC(err))
 		return
 	}
 

@@ -28,7 +28,7 @@ type orderFixture struct {
 
 func newOrderFixture(t *testing.T) *orderFixture {
 	t.Helper()
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	f := &orderFixture{
 		inventory: &fakeInventory{},
 		payments:  &fakePayments{},

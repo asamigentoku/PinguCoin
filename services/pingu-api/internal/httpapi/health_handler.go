@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/asamigentoku/PinguCoin/pkg/version"
 )
 
 // HealthHandler はKubernetesのprobe用のエンドポイントを提供する。
@@ -19,6 +21,20 @@ type HealthHandler struct {
 
 func NewHealthHandler(ping func(context.Context) error) *HealthHandler {
 	return &HealthHandler{ping: ping}
+}
+
+// Version は GET /version。動いているプログラムのバージョン(ビルドのときに埋め込んだ、バージョン・コミット・ビルド時刻)を返す。
+// 「いま本番で動いているのは、どのバージョンか」を、すぐに確かめるため。認証は不要(秘密は含まない)。
+func (handler *HealthHandler) Version(w http.ResponseWriter, _ *http.Request) {
+	info := version.Get()
+	writeJSON(w, http.StatusOK, map[string]string{
+		"service":    "pingu-api",
+		"version":    info.Version,
+		"commit":     info.Commit,
+		"build_time": info.BuildTime,
+		"go_version": info.GoVersion,
+		"api":        APIVersion,
+	})
 }
 
 func (handler *HealthHandler) Live(w http.ResponseWriter, _ *http.Request) {

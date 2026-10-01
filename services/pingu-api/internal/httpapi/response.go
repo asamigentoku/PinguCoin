@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
 )
 
@@ -21,14 +22,14 @@ type errorResponse struct {
 
 // writeError はエラーをJSONレスポンスに変換する。*apperr.AppError以外(想定外のエラー)は
 // 内部情報を漏らさないよう500 internal server errorとして扱う。
-func writeError(w http.ResponseWriter, err error) {
+func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	appErr, ok := apperr.As(err)
 	if !ok {
 		appErr = apperr.Internal(err)
 	}
-	// 元エラー(DBエラー等)はクライアントには返さず、ここでサーバーログにのみ残す。
+	// 元エラー(DBエラー等)はクライアントには返さず、ここでサーバーログにのみ残す(request_id で、リクエストと結びつけられる)。
 	if appErr.Reason == apperr.ReasonInternal && appErr.Err != nil {
-		slog.Default().Error("internal error", slog.String("error", appErr.Err.Error()))
+		slog.Default().ErrorContext(r.Context(), "internal error", logging.RequestID(r.Context()), logging.Err(appErr.Err))
 	}
 	writeJSON(w, appErr.HTTPStatus, errorResponse{
 		Reason:  string(appErr.Reason),

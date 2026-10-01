@@ -9,5 +9,7 @@ kind: ConfigMap
 metadata:
   name: pingucoin-cluster-config
 data:
+  # ログの env 属性(Datadog の env)。pkg/logging が読む。全サービスで、同じ値にそろえる(.env の APP_ENV は、別の用途)。
+  DD_ENV: minikube
   ORCAN_API_ADDR: orcan-api:8080
   PAYMENT_API_ADDR: payment-api:8081

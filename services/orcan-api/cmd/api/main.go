@@ -10,10 +10,13 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/dbretry"
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
-	"github.com/asamigentoku/PinguCoin/pkg/migrate"
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/grpcserver"
@@ -24,8 +27,14 @@ import (
 
 func main() {
 	// JSON形式の構造化ログ。ログ収集基盤に食わせやすいようにstdoutへ出す。
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// Datadog の標準属性にそろえた JSON のログ(service / env / version が、すべてのログに付く)。
+	// 環境は APP_ENV、ログのレベルは LOG_LEVEL(debug / info / warn / error)で決める。
+	logger := logging.NewFromEnv("orcan-api")
 	slog.SetDefault(logger)
+	build := version.Get()
+	logger.Info("orcan-api starting",
+		slog.Group("build", slog.String("commit", build.Commit), slog.String("time", build.BuildTime), slog.String("go", build.GoVersion)),
+	)
 
 	cfg := config.Load()
 	if cfg.InternalAPIToken == "" {
@@ -33,28 +42,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := database.Connect(cfg, logger)
+	// DB が起動中・再起動中などで、一時的につながらないときは、バックオフつきで再試行する。
+	// 設定の間違い(接続文字列・パスワード・DB名)は、再試行せず、すぐに終了する。
+	db, err := dbretry.Connect(context.Background(), logger, func() (*gorm.DB, error) { return database.Connect(cfg, logger) })
 	if err != nil {
-		logger.Error("failed to connect database", slog.Any("error", err))
+		logger.Error("failed to connect database", logging.Err(err))
 		os.Exit(1)
 	}
 
-	// 起動時にモデル(internal/model)の定義に合わせてテーブルを作成・更新する。
-	if err := migrate.WithLock(context.Background(), db, database.AutoMigrate); err != nil {
-		logger.Error("failed to migrate database", slog.Any("error", err))
+	// 起動時に、まだ適用していない DB のマイグレーション(services/orcan-api/migrations の SQL)を、番号順に適用する。
+	// 複数の Pod が同時に起動しても、DB のロックで1つずつ実行する(pkg/dbmigrate)。
+	if err := database.Migrate(db); err != nil {
+		logger.Error("failed to migrate database", logging.Err(err))
 		os.Exit(1)
 	}
 
 	blobStorage, err := storage.New(cfg.AzureStorageConnectionString, cfg.AzureStoragePublicContainer, cfg.AzureStoragePrivateContainer, cfg.AppEnv)
 	if err != nil {
-		logger.Error("failed to init blob storage client", slog.Any("error", err))
+		logger.Error("failed to init blob storage client", logging.Err(err))
 		os.Exit(1)
 	}
 
 	// gRPCはHTTPサーバーと同じくTCPソケットで待ち受ける。
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
-		logger.Error("failed to listen", slog.Any("error", err))
+		logger.Error("failed to listen", logging.Err(err))
 		os.Exit(1)
 	}
 
@@ -64,6 +76,7 @@ func main() {
 	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
+			interceptor.RequestID(), // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
 			interceptor.Logging(logger),
 			interceptor.Auth(cfg.InternalAPIToken),
 		),
@@ -104,7 +117,7 @@ func main() {
 	// listenしているTCPソケット(listener)に対してリクエストの受付・処理ループを開始する。
 	// ここでブロックし、プロセスが終了するまで返ってこない。
 	if err := server.Serve(listener); err != nil {
-		logger.Error("failed to serve", slog.Any("error", err))
+		logger.Error("failed to serve", logging.Err(err))
 		os.Exit(1)
 	}
 }

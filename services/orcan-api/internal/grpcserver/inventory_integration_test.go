@@ -16,7 +16,7 @@ import (
 
 // 実際のPostgresが必要(TEST_DATABASE_URL)。注文APIが頼りにする、在庫APIのエラーコードを確かめる。
 func TestAdjustProductInventoryOverGRPC(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	product := &model.Product{UserID: 1, CategoryID: 1, Name: "Wallpaper", Price: 300}
 	if err := repository.NewProductRepository(db).Create(product); err != nil {
 		t.Fatal(err)

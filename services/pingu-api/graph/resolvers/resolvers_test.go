@@ -255,7 +255,7 @@ func TestDownloadRequiresLogin(t *testing.T) {
 // 出品者以外は、購入済み(決済が完了した注文がある)の場合にだけ、ファイルを見られる・ダウンロードできる。
 // 購入の記録はDBにあるので、実際のPostgres(TEST_DATABASE_URL)が必要。
 func TestPrivateFilesAreOnlyForTheSellerAndPaidBuyers(t *testing.T) {
-	db := testutil.NewDB(t, database.AutoMigrate)
+	db := testutil.NewDB(t, database.Migrate)
 	orders := repository.NewOrderRepository(db)
 	if err := orders.Create(&internalmodel.Order{UserID: buyer, ProductID: 5, Quantity: 1, UnitPrice: 300, TotalAmount: 300, PaymentID: 1, Status: "paid", IdempotencyKey: "paid-1"}); err != nil {
 		t.Fatal(err)

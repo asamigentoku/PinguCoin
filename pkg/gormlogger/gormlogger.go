@@ -10,6 +10,8 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
 )
 
 // slowQueryThreshold を超えたクエリは遅いクエリとしてWarnで出す。
@@ -70,24 +72,21 @@ func (gormLogger *slogGormLogger) Trace(_ context.Context, begin time.Time, fc f
 	case err != nil && !errors.Is(err, gorm.ErrRecordNotFound) && gormLogger.logLevel >= logger.Error:
 		sql, rows := fc()
 		gormLogger.logger.Error("gorm query failed",
-			slog.String("sql", sql),
-			slog.Int64("rows", rows),
-			slog.Duration("elapsed", elapsed),
-			slog.String("error", err.Error()),
+			slog.Group("db", slog.String("statement", sql), slog.Int64("rows_affected", rows)),
+			logging.Duration(elapsed),
+			logging.Err(err),
 		)
 	case elapsed > slowQueryThreshold && gormLogger.logLevel >= logger.Warn:
 		sql, rows := fc()
 		gormLogger.logger.Warn("gorm slow query",
-			slog.String("sql", sql),
-			slog.Int64("rows", rows),
-			slog.Duration("elapsed", elapsed),
+			slog.Group("db", slog.String("statement", sql), slog.Int64("rows_affected", rows)),
+			logging.Duration(elapsed),
 		)
 	case gormLogger.logLevel >= logger.Info:
 		sql, rows := fc()
 		gormLogger.logger.Debug("gorm query",
-			slog.String("sql", sql),
-			slog.Int64("rows", rows),
-			slog.Duration("elapsed", elapsed),
+			slog.Group("db", slog.String("statement", sql), slog.Int64("rows_affected", rows)),
+			logging.Duration(elapsed),
 		)
 	}
 }

@@ -22,7 +22,7 @@ production/
 ```
 
 - State は Azure Storage に置きます。接続先は `backend.hcl` で渡します(`backend.hcl.example` をコピー)。
-- 通常は、GitHub Actions(`.github/workflows/terraform-production.yml`)が実行します。ローカルで試すときは次のとおりです。
+- 通常は、GitHub Actions(`.github/workflows/production-terraform.yml`)が実行します。ローカルで試すときは次のとおりです。
 
 ```bash
 az login

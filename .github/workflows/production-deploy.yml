@@ -1,0 +1,146 @@
+# API(orcan-api / payment-api / pingu-api)を、本番の AKS にデプロイする。
+# 動くのは、production ブランチへの push(または、そのブランチでの手動実行)だけ。main へのマージでは動かない。
+#   1. テスト(CI と同じ。共通の _go-test.yml)
+#   2. イメージをビルドして、ACR に push(タグは git の SHA)
+#   3. 「production」環境の承認を待って、AKS にデプロイ(Secret は Key Vault の値から作る)
+#
+# 本番用のワークフローは、名前の頭に production- を付けている(GitHub は、workflows/ の直下のファイルしか読まないため)。
+# 本番だけの処理(AKS への接続、Secret の作成、適用、ロールバックなど)は、.github/actions/production/ の部品にまとめてある。
+# Azure へのログインは OIDC(パスワードなし)。準備は script/bootstrap-azure.sh、設定する値は docs/DEPLOYMENT.md を参照。
+name: "Production: Deploy"
+
+on:
+  push:
+    branches: [production]
+    paths:
+      - "services/**"
+      - "pkg/**"
+      - "go.mod"
+      - "go.sum"
+      - "platform/kubernetes/production/**"
+      - ".github/workflows/production-deploy.yml"
+      - ".github/actions/production/**"
+  workflow_dispatch:
+    inputs:
+      restart:
+        description: "イメージが同じでも、Pod を再起動する(Secret だけ変えたときなど)"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write # OIDC で Azure にログインするのに必要
+  contents: read
+
+# 同時に1つだけデプロイする。実行中のデプロイは止めない(途中で止めると、中途半端な状態になる)。
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  NAMESPACE: pingucoin
+
+jobs:
+  test:
+    name: test
+    uses: ./.github/workflows/_go-test.yml
+
+  build:
+    name: build (${{ matrix.service }})
+    needs: test
+    # 手動実行で、production 以外のブランチを選んでも、イメージの push やデプロイには進まない。
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [orcan-api, payment-api, pingu-api]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git describe で、直近のタグ(v1.2.3)からのバージョンを求めるため、タグも取得する
+
+      # イメージに埋め込む、バージョン(例: v1.2.3、タグの後にコミットがあれば v1.2.3-4-g1a2b3c4)。
+      - name: バージョンを求める
+        id: version
+        run: |
+          echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: ACR にログイン
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - uses: docker/setup-buildx-action@v3
+      # イメージのタグは git の SHA。同じタグを上書きしないので、いつでも、その時点のイメージに戻せる。
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ github.sha }}
+          # バージョン・コミット・ビルド時刻を、バイナリに埋め込む(ログの version 属性、/version、イメージのラベル)。
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.version.outputs.build_time }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    name: deploy
+    needs: build
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    # この環境(production)に「承認者」を設定すると、承認されるまでここで止まる。
+    environment:
+      name: production
+      url: https://${{ vars.PINGU_API_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: ./.github/actions/production/connect-aks
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      # TLS 証明書を自動で取得・更新する cert-manager(Ingress の HTTPS に使う)。入っていれば、何も変わらない。
+      - uses: ./.github/actions/production/install-cert-manager
+        with:
+          letsencrypt-email: ${{ vars.LETSENCRYPT_EMAIL }}
+
+      - uses: ./.github/actions/production/create-secrets
+        with:
+          key-vault-name: ${{ vars.KEY_VAULT_NAME }}
+          namespace: ${{ env.NAMESPACE }}
+          storage-public-container: ${{ vars.AZURE_STORAGE_PUBLIC_CONTAINER }}
+          storage-private-container: ${{ vars.AZURE_STORAGE_PRIVATE_CONTAINER }}
+          clerk-secret-key: ${{ secrets.CLERK_SECRET_KEY }}
+
+      - uses: ./.github/actions/production/apply-manifests
+        with:
+          acr-login-server: ${{ vars.ACR_NAME }}.azurecr.io
+          image-tag: ${{ github.sha }}
+          api-host: ${{ vars.PINGU_API_HOST }}
+          namespace: ${{ env.NAMESPACE }}
+          restart: ${{ github.event_name == 'workflow_dispatch' && inputs.restart }}
+
+      - uses: ./.github/actions/production/smoke-test
+        with:
+          namespace: ${{ env.NAMESPACE }}
+
+      # デプロイに失敗したら、直前の状態に戻す。
+      - name: 失敗したら元に戻す
+        if: failure()
+        uses: ./.github/actions/production/rollback
+        with:
+          namespace: ${{ env.NAMESPACE }}

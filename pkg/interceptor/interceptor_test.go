@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"strings"
 	"testing"
 
@@ -13,6 +12,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/requestid"
 )
 
 func ctxWithToken(token string) context.Context {
@@ -61,20 +63,32 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+// Datadog の標準属性にそろえた、1行分のログ。
 type logLine struct {
-	Level   string `json:"level"`
-	Msg     string `json:"msg"`
-	Method  string `json:"method"`
-	Code    string `json:"code"`
-	Error   string `json:"error"`
-	Message string `json:"message"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+	Service   string `json:"service"`
+	RequestID string `json:"request_id"`
+	Duration  *int64 `json:"duration"`
+	RPC       struct {
+		System  string `json:"system"`
+		Service string `json:"service"`
+		Method  string `json:"method"`
+		GRPC    struct {
+			StatusCode string `json:"status_code"`
+		} `json:"grpc"`
+	} `json:"rpc"`
+	Error struct {
+		Kind    string `json:"kind"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
-func runLogging(t *testing.T, method string, handlerErr error) (lines []logLine, err error) {
+func runLoggingWith(t *testing.T, ctx context.Context, method string, handlerErr error) (lines []logLine, err error) {
 	t.Helper()
 	var buffer bytes.Buffer
-	logger := slog.New(slog.NewJSONHandler(&buffer, nil))
-	_, err = Logging(logger)(context.Background(), nil, &grpc.UnaryServerInfo{FullMethod: method}, func(context.Context, any) (any, error) {
+	logger := logging.New(logging.Config{Service: "orcan-api", Writer: &buffer})
+	_, err = Logging(logger)(ctx, nil, &grpc.UnaryServerInfo{FullMethod: method}, func(context.Context, any) (any, error) {
 		return "response", handlerErr
 	})
 	for _, raw := range strings.Split(strings.TrimSpace(buffer.String()), "\n") {
@@ -90,17 +104,23 @@ func runLogging(t *testing.T, method string, handlerErr error) (lines []logLine,
 	return lines, err
 }
 
+func runLogging(t *testing.T, method string, handlerErr error) ([]logLine, error) {
+	t.Helper()
+	return runLoggingWith(t, context.Background(), method, handlerErr)
+}
+
 func TestLoggingLevels(t *testing.T) {
 	tests := []struct {
-		name      string
-		err       error
-		wantLevel string
-		wantMsg   string
+		name       string
+		err        error
+		wantStatus string
+		wantMsg    string
+		wantCode   string
 	}{
-		{"success", nil, "INFO", "grpc request completed"},
-		{"client error is a warning", status.Error(codes.InvalidArgument, "bad"), "WARN", "grpc request rejected"},
-		{"not found is a warning", status.Error(codes.NotFound, "missing"), "WARN", "grpc request rejected"},
-		{"server error is an error", status.Error(codes.Internal, "internal server error"), "ERROR", "grpc request failed"},
+		{"success", nil, "info", "grpc request completed", "OK"},
+		{"client error is a warning", status.Error(codes.InvalidArgument, "bad"), "warn", "grpc request rejected", "InvalidArgument"},
+		{"not found is a warning", status.Error(codes.NotFound, "missing"), "warn", "grpc request rejected", "NotFound"},
+		{"server error is an error", status.Error(codes.Internal, "internal server error"), "error", "grpc request failed", "Internal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,22 +132,53 @@ func TestLoggingLevels(t *testing.T) {
 			if len(lines) != 1 {
 				t.Fatalf("expected exactly one log line, got %d", len(lines))
 			}
-			if lines[0].Level != tt.wantLevel || lines[0].Msg != tt.wantMsg {
-				t.Errorf("log = {%s %q}, want {%s %q}", lines[0].Level, lines[0].Msg, tt.wantLevel, tt.wantMsg)
+			line := lines[0]
+			if line.Status != tt.wantStatus || line.Message != tt.wantMsg {
+				t.Errorf("log = {%s %q}, want {%s %q}", line.Status, line.Message, tt.wantStatus, tt.wantMsg)
 			}
-			if lines[0].Method != "/orcan.v1.ProductService/GetProduct" {
-				t.Errorf("method = %q", lines[0].Method)
+			if line.RPC.GRPC.StatusCode != tt.wantCode {
+				t.Errorf("rpc.grpc.status_code = %q, want %q", line.RPC.GRPC.StatusCode, tt.wantCode)
 			}
 		})
 	}
 }
 
+// 属性が、Datadog の標準属性(と、OpenTelemetry の rpc.*)にそろっている。
+func TestLoggingUsesStandardAttributes(t *testing.T) {
+	ctx := requestid.WithContext(context.Background(), "req-abc")
+
+	lines, _ := runLoggingWith(t, ctx, "/orcan.v1.ProductService/GetProduct", nil)
+
+	line := lines[0]
+	if line.Service != "orcan-api" {
+		t.Errorf("service = %q", line.Service)
+	}
+	if line.RPC.System != "grpc" || line.RPC.Service != "orcan.v1.ProductService" || line.RPC.Method != "GetProduct" {
+		t.Errorf("rpc = %+v", line.RPC)
+	}
+	if line.RequestID != "req-abc" {
+		t.Errorf("request_id = %q, want req-abc", line.RequestID)
+	}
+	if line.Duration == nil || *line.Duration < 0 {
+		t.Errorf("duration (ns) is missing: %v", line.Duration)
+	}
+}
+
+// 4xx 相当のエラーでは、error.message に、クライアントに返したメッセージが出る。
+func TestLoggingIncludesTheClientErrorMessage(t *testing.T) {
+	lines, _ := runLogging(t, "/orcan.v1.ProductService/GetProduct", status.Error(codes.NotFound, "product not found"))
+
+	if got := lines[0].Error; got.Kind != "NotFound" || got.Message != "product not found" {
+		t.Errorf("error = %+v", got)
+	}
+}
+
 // サーバー起因のエラーでは、クライアントには汎用メッセージしか返らないので、本当の原因をログに残す。
 func TestLoggingKeepsTheRealCauseForServerErrors(t *testing.T) {
-	cause := status.Error(codes.Internal, "pq: deadlock detected")
+	cause := status.Error(codes.Internal, "database connection reset")
 	lines, _ := runLogging(t, "/orcan.v1.ProductService/GetProduct", cause)
 
-	if len(lines) != 1 || !strings.Contains(lines[0].Error, "deadlock detected") {
+	if len(lines) != 1 || !strings.Contains(lines[0].Error.Message, "database connection reset") || lines[0].Error.Kind == "" {
 		t.Errorf("the cause was not logged: %+v", lines)
 	}
 }
@@ -154,5 +205,30 @@ func TestIsHealthCheck(t *testing.T) {
 		if got := isHealthCheck(method); got != want {
 			t.Errorf("isHealthCheck(%q) = %v, want %v", method, got, want)
 		}
+	}
+}
+
+// リクエスト ID: 呼び出し元から渡されたものを使い、無い・変なときは作る。
+func TestRequestIDInterceptor(t *testing.T) {
+	var seen string
+	handler := func(ctx context.Context, _ any) (any, error) {
+		seen = requestid.FromContext(ctx)
+		return nil, nil
+	}
+	call := func(ctx context.Context) string {
+		_, _ = RequestID()(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/x/y"}, handler)
+		return seen
+	}
+
+	passed := metadata.NewIncomingContext(context.Background(), metadata.Pairs(requestid.MetadataKey, "from-pingu-api"))
+	if got := call(passed); got != "from-pingu-api" {
+		t.Errorf("the caller's request ID should be used: %q", got)
+	}
+	if got := call(context.Background()); len(got) != 32 {
+		t.Errorf("a missing request ID should be generated: %q", got)
+	}
+	bad := metadata.NewIncomingContext(context.Background(), metadata.Pairs(requestid.MetadataKey, "bad id\nwith newline"))
+	if got := call(bad); got == "bad id\nwith newline" || len(got) != 32 {
+		t.Errorf("an unsafe request ID must be replaced: %q", got)
 	}
 }

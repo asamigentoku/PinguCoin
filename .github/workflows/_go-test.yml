@@ -1,0 +1,62 @@
+# 共通: Go のビルド・検証・テスト。ci.yml と production-deploy.yml が、同じものを呼び出して使う
+# (本番に出す前にも、PR と同じ確認をする)。単独では動かない(workflow_call だけ)。
+name: Go test
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go (build / vet / test)
+    runs-on: ubuntu-latest
+    # DB を使う統合テスト用の Postgres(テストごとに専用のスキーマを作って、終わったら消す)。
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pingucoin_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pingucoin_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pingucoin_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: go.mod / go.sum が整っているか
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l services pkg)"
+          if [ -n "$unformatted" ]; then echo "gofmt が必要なファイル:"; echo "$unformatted"; exit 1; fi
+      # テストとカバレッジの計測(script/coverage.sh)。全体の割合が MIN_COVERAGE(%)を下回ると失敗する。
+      # 下限は、カバレッジが知らないうちに下がらないための番人。テストを増やしたら、少しずつ上げる。
+      - name: go test(カバレッジつき)
+        env:
+          MIN_COVERAGE: "48"
+        run: bash script/coverage.sh
+      # 行ごとに、テストで通った所・通っていない所が分かるレポート(coverage.html)を、ダウンロードできるようにする。
+      - name: カバレッジのレポートを保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage.html
+            coverage.out
+          if-no-files-found: ignore
+          retention-days: 14

@@ -1,0 +1,28 @@
+name: Install cert-manager (production)
+description: TLS 証明書を自動で取得・更新する cert-manager と、Let's Encrypt の ClusterIssuer を入れる(入っていれば、何も変わらない)。事前に connect-aks が必要。
+
+inputs:
+  letsencrypt-email:
+    description: 証明書の期限切れなどの通知先
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: cert-manager
+      shell: bash
+      run: |
+        helm repo add jetstack https://charts.jetstack.io
+        helm repo update
+        helm upgrade --install cert-manager jetstack/cert-manager \
+          --namespace cert-manager --create-namespace \
+          --version v1.17.2 \
+          --set crds.enabled=true \
+          --wait --timeout 5m
+
+    - name: ClusterIssuer(Let's Encrypt)
+      shell: bash
+      env:
+        LETSENCRYPT_EMAIL: ${{ inputs.letsencrypt-email }}
+      run: |
+        sed "s|EMAIL|${LETSENCRYPT_EMAIL}|" platform/kubernetes/production/cert-manager/cluster-issuer.yaml | kubectl apply -f -

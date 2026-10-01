@@ -86,7 +86,7 @@ resource "random_password" "internal_api_token" {
 }
 
 # 秘密情報は Key Vault に置く。GitHub Actions がここから読んで、Kubernetes の Secret を作る。
-# 名前は、デプロイのワークフロー(.github/workflows/deploy-production.yml)と合わせる。
+# 名前は、デプロイのワークフロー(.github/workflows/production-deploy.yml)と合わせる。
 module "keyvault" {
   source               = "./keyvault"
   name                 = var.key_vault_name

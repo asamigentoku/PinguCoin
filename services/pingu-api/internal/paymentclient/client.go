@@ -30,10 +30,15 @@ func New(addr, internalToken string) (*Client, error) {
 		return nil, err
 	}
 
-	conn, err := grpc.NewClient(target,
+	// 一時的な失敗のときのリトライ(冪等なメソッドだけ)と、呼び出しの期限。
+	resilience, err := sharedgrpc.ResilienceOptions(RetryableMethods, sharedgrpc.DefaultTimeout)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient(target, append(resilience,
 		grpc.WithTransportCredentials(transportCredentials),
 		grpc.WithUnaryInterceptor(internalTokenInterceptor(internalToken)),
-	)
+	)...)
 	if err != nil {
 		return nil, err
 	}

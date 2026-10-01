@@ -4,7 +4,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, production]
 
 permissions:
   contents: read
@@ -15,47 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Go のビルド・検証・テスト。production-deploy.yml も同じものを使う(共通: _go-test.yml)。
   go:
-    name: Go (build / vet / test)
-    runs-on: ubuntu-latest
-    # DB を使う統合テスト用の Postgres(テストごとに専用のスキーマを作って、終わったら消す)。
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: pingucoin_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d pingucoin_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pingucoin_test?sslmode=disable
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: go.mod / go.sum が整っているか
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
-      - run: go build ./...
-      - run: go vet ./...
-      - name: gofmt
-        run: |
-          unformatted="$(gofmt -l services pkg)"
-          if [ -n "$unformatted" ]; then echo "gofmt が必要なファイル:"; echo "$unformatted"; exit 1; fi
-      - run: go test ./... -count=1
+    uses: ./.github/workflows/_go-test.yml
 
   proto:
-    name: protobuf (lint / 生成コードが最新か)
+    name: protobuf (lint / 互換性 / 生成コードが最新か)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 比較先(PR の宛先ブランチ)と比べるため
       - uses: bufbuild/buf-setup-action@v1
       - uses: actions/setup-go@v5
         with:
@@ -65,6 +35,21 @@ jobs:
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
       - run: buf lint
+      # サービス間の API(gRPC)の互換性を、PR の宛先ブランチと比べて確かめる。
+      # 項目や RPC の削除、型・番号の変更のような、互換性を壊す変更があると失敗する(docs/VERSIONING.md)。
+      # 意図して壊すときは、パッケージのバージョンを上げる(orcan.v1 → orcan.v2)。
+      - name: 互換性を壊す変更がないか(buf breaking)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          git fetch origin "$BASE":"refs/remotes/origin/$BASE"
+          # 比較先に buf.yaml が無い(ディレクトリ構成の移行前)ときは、比べられないので、移行後の PR から確かめる。
+          if git cat-file -e "refs/remotes/origin/$BASE:buf.yaml" 2>/dev/null; then
+            buf breaking --against ".git#ref=refs/remotes/origin/$BASE"
+          else
+            echo "比較先($BASE)に buf.yaml がないため、互換性の確認をスキップします"
+          fi
       - name: 生成コードがコミット済みのものと同じか
         run: |
           buf generate services/orcan-api/proto --template services/orcan-api/proto/buf.gen.yaml
@@ -85,12 +70,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 24: TypeScript のテスト(node --test)を、そのまま実行できる。
+          node-version: 24
           cache: npm
           cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
+      # テストがあるアプリだけ(client-web の retry など)。
+      - run: npm test --if-present
 
   docker:
     name: Docker build (${{ matrix.service }})
@@ -102,12 +90,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      # push はしない。Dockerfile がビルドできるかだけ確認する(デプロイは deploy-production.yml)。
+      # push はしない。Dockerfile がビルドできるかだけ確認する(デプロイは production-deploy.yml)。
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: services/${{ matrix.service }}/Dockerfile
           push: false
+          build-args: |
+            VERSION=ci-${{ github.sha }}
+            COMMIT=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 

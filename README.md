@@ -31,7 +31,9 @@
 │   │   └── production/       #     本番(AKS)用
 │   ├── terraform/envs/       #   staging(Supabase / Azure Blob)と production(AKS / PostgreSQL / Blob / ACR / Key Vault)
 │   └── docker/               #   ローカル用のPostgres / Redisなど(docker compose)
-├── .github/workflows/        # GitHub Actions(CI、Terraform、本番へのデプロイ)
+├── .github/                  # GitHub Actions
+│   ├── workflows/            #   ci.yml と _go-test.yml(共通)、production-terraform.yml / production-deploy.yml(本番)
+│   └── actions/production/   #   本番だけの処理の部品(AKSへの接続、Secretの作成、適用、ロールバックなど)
 ├── script/                   # 起動・停止・Azureの初期設定のスクリプト
 ├── docs/                     # 設計・API仕様・テスト・デプロイの説明
 ├── buf.yaml                  # protobufのワークスペース(各サービスのproto/を束ねる)
@@ -58,12 +60,18 @@ make help       # コマンド一覧
 make build      # 全サービスをビルド
 make test       # 単体テスト
 make test-db    # Postgresを起動して、統合テストを含む全テスト
+make cover      # テストのカバレッジを測る(coverage.html に行ごとのレポート)
+make cover-db   # Postgresも起動して、統合テストを含めたカバレッジを測る
 make proto      # .protoからGoのコードを生成し直す
 make up         # minikubeに起動(イメージのビルドから)
 make down       # minikubeのAPIを停止
 ```
 
 - 本番(Azure)へのデプロイ: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) / 月額コストの想定: [docs/COST.md](docs/COST.md)
+- バージョン管理(リリース・API・DBスキーマ): [docs/VERSIONING.md](docs/VERSIONING.md)
+- ログの形式(Datadogの標準属性、リクエストID): [docs/LOGGING.md](docs/LOGGING.md)
+- 依存関係の自動更新(Dependabot): [docs/DEPENDABOT.md](docs/DEPENDABOT.md)
+- リトライの方針(何を・どう再試行し、何を再試行しないか): [docs/RETRY.md](docs/RETRY.md)
 - テストの詳細: [docs/TESTING.md](docs/TESTING.md)
 - minikubeでの起動: [platform/kubernetes/minikube/README.md](platform/kubernetes/minikube/README.md)
 - API仕様: [docs/API_SPEC.md](docs/API_SPEC.md) / DB: [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)
