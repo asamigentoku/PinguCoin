@@ -1,101 +1,54 @@
-# Dependabot: 依存ライブラリ・Docker イメージ・GitHub Actions・Terraform のプロバイダーの更新を、プルリクエストで知らせる。
+# Dependabot: 依存ライブラリ・Docker イメージ・GitHub Actions・Terraform のプロバイダーの更新を、
+# **週に1回、1本のプルリクエストにまとめて**知らせる(multi-ecosystem-groups)。
 # 更新の PR も、通常の PR と同じく ci.yml が動く(テストが通れば、安心してマージできる)。
 # 方針・扱い方は docs/DEPENDABOT.md を参照。
 #
-# 共通のルール:
-#   - 週に1回(月曜 朝 9 時・日本時間)。毎日だと、PR が多すぎるため。
-#   - 同じ系統のライブラリは、1つの PR にまとめる(groups)。メジャーバージョンの更新は、まとめず、別の PR にする(影響が大きいため)。
-#   - 開く PR の数に上限を付ける(溜まりすぎて、見なくなるのを防ぐ)。
+# 1本にまとめる:
+#   - 下の multi-ecosystem-groups の「all-dependencies」に、すべての更新(updates)が入る。
+#   - メジャーバージョンの更新は、この PR に入れない(ignore)。影響が大きく、1本にまとめると、1つのせいで、PR 全体が通らなくなるため。
+#     メジャーを上げたいときは、docs/DEPENDABOT.md の手順で、ignore を一時的に外す。
+#   - 脆弱性の更新(Dependabot security updates)は、この設定とは別に、すぐに、個別の PR になる(有効にしておく)。
 version: 2
+
+multi-ecosystem-groups:
+  all-dependencies:
+    # 週に1回(月曜 朝 9 時・日本時間)。
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    commit-message:
+      prefix: "chore(deps)"
+    labels: [dependencies]
+    pull-request-branch-name:
+      separator: "/"
 
 updates:
   # ---------------------------------------------------------------- Go
   # Go のモジュールは、ルートに1つ(go.mod)。3つのサービスと pkg/ が使う。
   - package-ecosystem: gomod
     directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, go]
-    groups:
-      # gRPC と protobuf は、バージョンを揃えて上げる。
-      #   注意: protobuf を上げたら、生成コードも最新のツールで作り直すとよい(make proto)。
-      grpc-protobuf:
-        patterns:
-          - "google.golang.org/grpc*"
-          - "google.golang.org/protobuf*"
-          - "google.golang.org/genproto*"
-        update-types: [minor, patch]
-      azure-sdk:
-        patterns:
-          - "github.com/Azure/*"
-        update-types: [minor, patch]
-      gorm:
-        patterns:
-          - "gorm.io/*"
-          - "github.com/jackc/*"
-        update-types: [minor, patch]
-      go-minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
     ignore:
+      # メジャーバージョンは、この PR に入れない(上の説明を参照)。
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
       # gqlgen は、上げたら GraphQL の生成コードを作り直す必要がある(cd services/pingu-api && go tool gqlgen generate)。
       # 自動の PR では作り直せないので、手動で上げる。
       - dependency-name: "github.com/99designs/gqlgen"
 
   # ---------------------------------------------------------------- npm(フロントエンド)
   - package-ecosystem: npm
-    directory: /apps/client-web
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, javascript]
-    groups:
-      # Next.js と React は、揃えて上げる。
-      next-react:
-        patterns: ["next", "react", "react-dom", "@types/react*", "eslint-config-next"]
-        update-types: [minor, patch]
-      clerk:
-        patterns: ["@clerk/*"]
-        update-types: [minor, patch]
-      tailwind:
-        patterns: ["tailwindcss", "@tailwindcss/*", "postcss*"]
-        update-types: [minor, patch]
-      npm-minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
-
-  - package-ecosystem: npm
-    directory: /apps/admin-web
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, javascript]
-    groups:
-      next-react:
-        patterns: ["next", "react", "react-dom", "@types/react*", "eslint-config-next"]
-        update-types: [minor, patch]
-      tailwind:
-        patterns: ["tailwindcss", "@tailwindcss/*", "postcss*"]
-        update-types: [minor, patch]
-      npm-minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
+    directories:
+      - /apps/client-web
+      - /apps/admin-web
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---------------------------------------------------------------- Docker
   # 3つのサービスの Dockerfile(ビルド用の golang と、実行用の distroless のイメージ)。
@@ -104,32 +57,23 @@ updates:
       - /services/orcan-api
       - /services/payment-api
       - /services/pingu-api
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, docker]
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
     ignore:
-      # Go のバージョンは、go.mod / mise.toml / CI(setup-go)と揃えて、手動で上げる。
+      # Go のバージョンは、go.mod / mise.toml / CI(setup-go)と揃えて、手動で上げる(patch だけ、自動)。
       - dependency-name: "golang"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ローカル開発用の Postgres / Redis などのイメージ。
   - package-ecosystem: docker-compose
     directory: /platform/docker
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 2
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, docker]
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---------------------------------------------------------------- GitHub Actions
   # ワークフロー(/.github/workflows)と、本番だけの処理の部品(/.github/actions/production/*)で使うアクション。
@@ -137,36 +81,24 @@ updates:
     directories:
       - /
       - /.github/actions/production/*
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, github-actions]
-    groups:
-      actions-minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   # ---------------------------------------------------------------- Terraform
   # プロバイダー(azurerm など)と、ロックファイル(.terraform.lock.hcl)。
   # 本番の Terraform の plan は、Azure にログインできる ID で動くので、Dependabot の PR では動かない(動かさない)。
-  # 更新の PR は、ローカルか、手動で plan を確認してからマージする(docs/DEPENDABOT.md を参照)。
+  # この PR に Terraform の更新が入っているときは、マージ前に、手元で plan を確認する(docs/DEPENDABOT.md を参照)。
   - package-ecosystem: terraform
     directories:
       - /platform/terraform/envs/production
       - /platform/terraform/envs/staging
       - /platform/terraform/envs/staging/azure-blob
       - /platform/terraform/envs/staging/supabase
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "chore(deps)"
-    labels: [dependencies, terraform]
+    multi-ecosystem-group: all-dependencies
+    patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
