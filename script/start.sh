@@ -6,6 +6,7 @@
 #   bash script/start.sh                  # ビルド + 取り込み + Secret作成 + 適用
 #   bash script/start.sh --skip-build     # ビルドを省略(.env だけ変えたとき)
 #   bash script/start.sh --port-forward   # 最後にpingu-apiを8082で公開
+#   (監視の Grafana は、kubectl port-forward -n pingucoin svc/grafana 3001:3000 → http://localhost:3001。docs/MONITORING.md)
 #   bash script/start.sh --only pingu-api # 指定したAPIだけビルド・再起動(複数指定可)
 #
 # 事前に services/<api>/.env を用意しておくこと(.env.example をコピーして編集)。
@@ -93,10 +94,17 @@ done
 for api in "${APIS[@]}"; do
   kubectl rollout status -n "$NAMESPACE" "deployment/$api" --timeout=180s
 done
+
+# 監視(Prometheus / Grafana / kube-state-metrics)。イメージを初めて取るときは時間がかかる。
+# 監視が起動しなくても、API は動いているので、待ちきれなくても失敗にはしない(警告だけ)。
+for monitor in prometheus kube-state-metrics grafana; do
+  kubectl rollout status -n "$NAMESPACE" "deployment/$monitor" --timeout=240s     || echo "warning: deployment/$monitor is not ready yet (see: kubectl get pods -n $NAMESPACE)" >&2
+done
 kubectl get pods -n "$NAMESPACE"
 
 echo
 echo "Ready. GraphQL: http://localhost:8082/api/v1/graphql (after port-forward)"
+echo "Monitoring: kubectl port-forward -n $NAMESPACE svc/grafana 3001:3000   -> http://localhost:3001  (Prometheus: svc/prometheus 9090:9090)"
 
 # 6. 必要ならpingu-apiをホストに公開(Ctrl+Cで終了)
 if [ "$PORT_FORWARD" = true ]; then

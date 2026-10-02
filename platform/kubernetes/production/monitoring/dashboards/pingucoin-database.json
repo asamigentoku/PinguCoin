@@ -1,0 +1,856 @@
+{
+ "uid": "pingucoin-database",
+ "title": "PinguCoin / データベース",
+ "description": "接続プールと、クエリ(GORM)。",
+ "tags": [
+  "pingucoin"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 1,
+ "editable": false,
+ "graphTooltip": 1,
+ "refresh": "30s",
+ "time": {
+  "from": "now-1h",
+  "to": "now"
+ },
+ "templating": {
+  "list": [
+   {
+    "name": "app",
+    "label": "サービス",
+    "type": "query",
+    "datasource": {
+     "type": "prometheus",
+     "uid": "prometheus"
+    },
+    "query": {
+     "query": "label_values(up{job=\"pingucoin-apps\"}, app)",
+     "refId": "app"
+    },
+    "definition": "label_values(up{job=\"pingucoin-apps\"}, app)",
+    "includeAll": true,
+    "multi": true,
+    "allValue": ".*",
+    "current": {
+     "selected": true,
+     "text": [
+      "All"
+     ],
+     "value": [
+      "$__all"
+     ]
+    },
+    "refresh": 2,
+    "sort": 1
+   }
+  ]
+ },
+ "annotations": {
+  "list": [
+   {
+    "builtIn": 1,
+    "type": "dashboard",
+    "name": "Annotations & Alerts",
+    "enable": true,
+    "hide": true,
+    "iconColor": "rgba(0, 211, 255, 1)",
+    "datasource": {
+     "type": "grafana",
+     "uid": "-- Grafana --"
+    }
+   }
+  ]
+ },
+ "links": [
+  {
+   "title": "PinguCoin",
+   "type": "dashboards",
+   "tags": [
+    "pingucoin"
+   ],
+   "asDropdown": true,
+   "includeVars": false,
+   "keepTime": true
+  }
+ ],
+ "panels": [
+  {
+   "type": "row",
+   "title": "接続プール",
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "panels": [],
+   "id": 40
+  },
+  {
+   "type": "timeseries",
+   "title": "接続の数",
+   "description": "使用中が、上限に張りつくと、リクエストが、接続待ちで詰まる(上限が無制限なら、上限の線は出ない)。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "pingucoin_db_connections_in_use{app=~\"$app\"}",
+     "legendFormat": "{{app}} {{pod}} 使用中",
+     "refId": "A",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "pingucoin_db_connections_idle{app=~\"$app\"}",
+     "legendFormat": "{{app}} {{pod}} アイドル",
+     "refId": "B",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "pingucoin_db_connections_max_open{app=~\"$app\"} > 0",
+     "legendFormat": "{{app}} {{pod}} 上限",
+     "refId": "C",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 1
+   },
+   "id": 41
+  },
+  {
+   "type": "timeseries",
+   "title": "接続の待ち / 秒",
+   "description": "0 が正常。0 より大きければ、接続が空くのを、待たされている。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (rate(pingucoin_db_connection_wait_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} 待った回数",
+     "refId": "A",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (rate(pingucoin_db_connection_wait_seconds_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} 待った時間(秒 / 秒)",
+     "refId": "B",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 1
+   },
+   "id": 42
+  },
+  {
+   "type": "timeseries",
+   "title": "閉じた接続 / 秒",
+   "description": "多すぎると、接続の作り直しが、頻繁(SetMaxIdleConns が小さい)。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (rate(pingucoin_db_connections_closed_max_lifetime_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} 寿命",
+     "refId": "A",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (rate(pingucoin_db_connections_closed_max_idle_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} アイドル上限",
+     "refId": "B",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (rate(pingucoin_db_connections_closed_max_idle_time_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} アイドル時間",
+     "refId": "C",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 9
+   },
+   "id": 43
+  },
+  {
+   "type": "timeseries",
+   "title": "開いている接続(サービス別の合計)",
+   "description": "3 つの API の合計が、DB の最大接続数(Azure の B1ms は、少ない)を超えないように。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app) (pingucoin_db_connections_open{app=~\"$app\"})",
+     "legendFormat": "{{app}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 9
+   },
+   "id": 44
+  },
+  {
+   "type": "row",
+   "title": "クエリ",
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 17
+   },
+   "panels": [],
+   "id": 45
+  },
+  {
+   "type": "timeseries",
+   "title": "クエリ / 秒(操作別)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ops",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (operation) (rate(pingucoin_db_queries_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{operation}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 18
+   },
+   "id": 46
+  },
+  {
+   "type": "timeseries",
+   "title": "クエリ / 秒(テーブル別・上位 10)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ops",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "topk(10, sum by (app, table) (rate(pingucoin_db_queries_total{app=~\"$app\"}[$__rate_interval])))",
+     "legendFormat": "{{app}} {{table}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 18
+   },
+   "id": 47
+  },
+  {
+   "type": "timeseries",
+   "title": "結果別 / 秒",
+   "description": "ok = 成功、not_found = 該当なし(正常。エラーとは数えない)、error = 失敗。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ops",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (result) (rate(pingucoin_db_queries_total{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{result}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 26
+   },
+   "id": 48
+  },
+  {
+   "type": "timeseries",
+   "title": "エラー / 秒(テーブル・操作別)",
+   "description": "0 が正常。接続の失敗・SQL のエラー・制約違反など(重複の制約違反は、冪等性の競合で、正常に起きることもある)。",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ops",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app, table, operation) (rate(pingucoin_db_queries_total{app=~\"$app\", result=\"error\"}[$__rate_interval]))",
+     "legendFormat": "{{app}} {{table}} {{operation}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 26
+   },
+   "id": 49
+  },
+  {
+   "type": "timeseries",
+   "title": "処理時間(p50 / p95 / p99)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.5, sum by (le) (rate(pingucoin_db_query_duration_seconds_bucket{app=~\"$app\"}[$__rate_interval])))",
+     "legendFormat": "p50",
+     "refId": "A",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(pingucoin_db_query_duration_seconds_bucket{app=~\"$app\"}[$__rate_interval])))",
+     "legendFormat": "p95",
+     "refId": "B",
+     "editorMode": "code"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.99, sum by (le) (rate(pingucoin_db_query_duration_seconds_bucket{app=~\"$app\"}[$__rate_interval])))",
+     "legendFormat": "p99",
+     "refId": "C",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 34
+   },
+   "id": 50
+  },
+  {
+   "type": "timeseries",
+   "title": "処理時間の p95(テーブル別・上位 10)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "topk(10, histogram_quantile(0.95, sum by (le, app, table) (rate(pingucoin_db_query_duration_seconds_bucket{app=~\"$app\"}[$__rate_interval]))))",
+     "legendFormat": "{{app}} {{table}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 34
+   },
+   "id": 51
+  },
+  {
+   "type": "timeseries",
+   "title": "処理時間の平均(操作別)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 0,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "calcs": []
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (operation) (rate(pingucoin_db_query_duration_seconds_sum{app=~\"$app\"}[$__rate_interval])) / sum by (operation) (rate(pingucoin_db_query_duration_seconds_count{app=~\"$app\"}[$__rate_interval]))",
+     "legendFormat": "{{operation}}",
+     "refId": "A",
+     "editorMode": "code"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 42
+   },
+   "id": 52
+  },
+  {
+   "type": "table",
+   "title": "期間内のクエリ数(サービス・テーブル・操作・結果別)",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "custom": {
+      "align": "auto"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "showHeader": true,
+    "cellHeight": "sm",
+    "sortBy": [
+     {
+      "displayName": "件数",
+      "desc": true
+     }
+    ]
+   },
+   "transformations": [
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "__name__": true
+      },
+      "renameByName": {
+       "Value": "件数"
+      }
+     }
+    }
+   ],
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (app, table, operation, result) (increase(pingucoin_db_queries_total{app=~\"$app\"}[$__range]))",
+     "legendFormat": "",
+     "refId": "A",
+     "editorMode": "code",
+     "instant": true,
+     "range": false,
+     "format": "table"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 42
+   },
+   "id": 53
+  }
+ ]
+}

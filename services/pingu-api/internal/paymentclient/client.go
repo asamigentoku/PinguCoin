@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	pb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	sharedgrpc "github.com/asamigentoku/PinguCoin/services/pingu-api/internal/grpcclient"
 )
@@ -38,6 +39,9 @@ func New(addr, internalToken string) (*Client, error) {
 	conn, err := grpc.NewClient(target, append(resilience,
 		grpc.WithTransportCredentials(transportCredentials),
 		grpc.WithUnaryInterceptor(internalTokenInterceptor(internalToken)),
+		// メトリクス: 呼び出しの数・結果・時間(UnaryClientInterceptor)と、実際に送った回数(再試行を含む。ClientStatsHandler)。
+		grpc.WithChainUnaryInterceptor(metrics.UnaryClientInterceptor("payment-api")),
+		grpc.WithStatsHandler(metrics.ClientStatsHandler("payment-api")),
 	)...)
 	if err != nil {
 		return nil, err

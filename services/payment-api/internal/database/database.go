@@ -10,6 +10,7 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/dbmigrate"
 	"github.com/asamigentoku/PinguCoin/pkg/gormlogger"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/migrations"
 )
@@ -31,6 +32,14 @@ func Connect(cfg config.Config, logger *slog.Logger) (*gorm.DB, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect database: %w", err)
+	}
+
+	// メトリクス: クエリの数と処理時間(GORM のプラグイン)と、接続プールの状態(pkg/metrics)。
+	if err := db.Use(metrics.GORMPlugin()); err != nil {
+		return nil, fmt.Errorf("failed to enable query metrics: %w", err)
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		metrics.RegisterDBStats(sqlDB)
 	}
 
 	return db, nil

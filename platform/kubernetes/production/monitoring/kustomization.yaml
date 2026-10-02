@@ -1,0 +1,33 @@
+# 監視(Prometheus + Grafana + kube-state-metrics)。親の kustomization.yaml が、このフォルダごと取り込む
+# (GitHub Actions の `kubectl apply -k` で、API と一緒に入る)。
+# 仕組みと使い方は docs/MONITORING.md。
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - prometheus.yaml
+  - kube-state-metrics.yaml
+  - grafana.yaml
+  - network-policy.yaml
+
+# 設定ファイルから ConfigMap を作る。名前に、中身のハッシュが付くので、ファイルを直して適用すると、
+# それを使う Pod が、自動で作り直される(設定の反映のために、手で再起動しなくてよい)。
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+      - alert-rules.yml
+  - name: grafana-datasource
+    files:
+      - datasource.yaml=grafana-datasource.yaml
+  - name: grafana-dashboard-provider
+    files:
+      - provider.yaml=grafana-dashboard-provider.yaml
+  - name: grafana-dashboards
+    files:
+      - dashboards/pingucoin-overview.json
+      - dashboards/pingucoin-http-graphql.json
+      - dashboards/pingucoin-grpc.json
+      - dashboards/pingucoin-database.json
+      - dashboards/pingucoin-business.json
+      - dashboards/pingucoin-kubernetes.json
+      - dashboards/pingucoin-go-runtime.json

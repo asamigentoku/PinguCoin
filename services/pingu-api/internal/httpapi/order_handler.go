@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	orcanpb "github.com/asamigentoku/PinguCoin/services/orcan-api/proto/orcan/v1"
 	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
@@ -86,31 +87,37 @@ func toOrderResponse(order *model.Order) orderResponse {
 func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims, ok := reqcontext.UserFromContext(r.Context())
 	if !ok {
+		metrics.RecordOrder(metrics.OrderRejected, 0)
 		writeError(w, r, apperr.Unauthenticated("login is required"))
 		return
 	}
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get(idempotencyKeyHeader))
 	if idempotencyKey == "" {
+		metrics.RecordOrder(metrics.OrderRejected, 0)
 		writeError(w, r, apperr.InvalidArgument(idempotencyKeyHeader+" header is required"))
 		return
 	}
 
 	// 既に同じキーで処理済みならそれをそのまま返す(新たな在庫消費/決済/注文作成は一切行わない)。
 	if existing, err := handler.repo.FindByIdempotencyKey(idempotencyKey); err == nil {
+		metrics.RecordOrder(metrics.OrderReplayed, 0)
 		writeJSON(w, http.StatusOK, toOrderResponse(existing))
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		metrics.RecordOrder(metrics.OrderFailed, 0)
 		writeError(w, r, apperr.Internal(err))
 		return
 	}
 
 	var request createOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		metrics.RecordOrder(metrics.OrderRejected, 0)
 		writeError(w, r, apperr.InvalidArgument("invalid request body"))
 		return
 	}
 	if request.ProductID == 0 {
+		metrics.RecordOrder(metrics.OrderRejected, 0)
 		writeError(w, r, apperr.InvalidArgument("product_id is required"))
 		return
 	}
@@ -123,7 +130,9 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 
 	productResponse, err := handler.orcan.Product.GetProduct(r.Context(), &orcanpb.GetProductRequest{Id: request.ProductID})
 	if err != nil {
-		writeError(w, r, apperr.FromGRPC(err))
+		appErr := apperr.FromGRPC(err)
+		metrics.RecordOrder(orderFailureResult(appErr, metrics.OrderRejected), 0)
+		writeError(w, r, appErr)
 		return
 	}
 	product := productResponse.GetProduct()
@@ -139,7 +148,9 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
-		writeError(w, r, apperr.FromGRPC(err))
+		appErr := apperr.FromGRPC(err)
+		metrics.RecordOrder(orderFailureResult(appErr, metrics.OrderOutOfStock), 0)
+		writeError(w, r, appErr)
 		return
 	}
 
@@ -168,7 +179,9 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 				logging.Err(releaseErr),
 			)
 		}
-		writeError(w, r, apperr.FromGRPC(err))
+		appErr := apperr.FromGRPC(err)
+		metrics.RecordOrder(orderFailureResult(appErr, metrics.OrderInsufficientPoint), 0)
+		writeError(w, r, appErr)
 		return
 	}
 	payment := paymentResponse.GetPayment()
@@ -188,15 +201,33 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		// 「先に成功した方の結果を返す」形で救済する。
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			if existing, findErr := handler.repo.FindByIdempotencyKey(idempotencyKey); findErr == nil {
+				metrics.RecordOrder(metrics.OrderReplayed, 0)
 				writeJSON(w, http.StatusOK, toOrderResponse(existing))
 				return
 			}
 		}
+		metrics.RecordOrder(metrics.OrderFailed, 0)
 		writeError(w, r, apperr.Internal(err))
 		return
 	}
 
+	metrics.RecordOrder(metrics.OrderCreated, totalAmount)
 	writeJSON(w, http.StatusCreated, toOrderResponse(order))
+}
+
+// orderFailureResult は、注文の失敗を、メトリクスの結果に分類する。
+//   - 409(FailedPrecondition。在庫が足りない、ポイントが足りない)... businessResult(呼び出し側が、その段階に応じて決める)
+//   - 5xx(サーバー・相手のサービスの失敗)... failed(アラートの対象)
+//   - それ以外(404 や 400)... rejected(呼び出し側の問題)
+func orderFailureResult(appErr *apperr.AppError, businessResult string) string {
+	switch {
+	case appErr.HTTPStatus == http.StatusConflict:
+		return businessResult
+	case appErr.HTTPStatus >= http.StatusInternalServerError:
+		return metrics.OrderFailed
+	default:
+		return metrics.OrderRejected
+	}
 }
 
 // ListOrders は GET /api/v1/orders。ログイン中ユーザー自身の注文一覧を返す。

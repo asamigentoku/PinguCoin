@@ -92,3 +92,6 @@ logs/
 coverage.out
 coverage.raw.out
 coverage.html
+
+# === 負荷試験(vegeta)の結果 ===
+perfomance/load-test/results/

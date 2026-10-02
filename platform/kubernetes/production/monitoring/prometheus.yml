@@ -1,0 +1,80 @@
+# Prometheus の設定: 何を、どこから、どの間隔で取るか(scrape)。ConfigMap「prometheus-config」になる(kustomization.yaml)。
+# 変えたら、GitHub Actions(production-deploy.yml)の `kubectl apply -k` で、Prometheus が、新しい設定で、自動で再起動する
+# (ConfigMap の名前に、中身のハッシュが付くため)。
+global:
+  # 本番は、保存量と CPU を抑えるため、30 秒おき(ローカルは 15 秒)。
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+# アラートのルール(alert-rules.yml)。通知(Alertmanager)は置かない。画面(Prometheus の Alerts、Grafana の Alerting)で見る。
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+scrape_configs:
+  # ---- 3つの API(orcan-api / payment-api / pingu-api)の /metrics ----
+  # Pod を自動で見つけて(Kubernetes のサービスディスカバリ)、メトリクス用のポート(名前が metrics)を取る。
+  # Pod が増えても、入れ替わっても、設定は要らない。
+  - job_name: pingucoin-apps
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          own_namespace: true
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: (orcan-api|payment-api|pingu-api)
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: metrics
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: app
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_node_name]
+        target_label: node
+
+  # ---- コンテナの CPU・メモリ・ネットワーク(kubelet の cAdvisor)----
+  # API サーバーの proxy 経由で、各ノードの /metrics/cadvisor を取る(ノードのポートを開けなくてよい)。
+  # 取るのは、このアプリの namespace のコンテナと、ノード全体(id="/")だけ。ほかは捨てて、保存量を抑える。
+  - job_name: cadvisor
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    authorization:
+      credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: container_(cpu_usage_seconds_total|cpu_cfs_periods_total|cpu_cfs_throttled_periods_total|memory_working_set_bytes|memory_rss|oom_events_total|network_receive_bytes_total|network_transmit_bytes_total|network_receive_errors_total|network_transmit_errors_total|fs_usage_bytes)|machine_(cpu_cores|memory_bytes)
+        action: keep
+      # container_* は、このアプリの namespace(pingucoin)か、ノード全体(namespace が空で id が "/")だけを残す。machine_* は、全部残す。
+      - source_labels: [__name__, namespace, id]
+        regex: machine_.*;.*;.*|container_.*;(pingucoin;.*|;/)
+        action: keep
+      # Pod 全体の集計(container が空)は、中のコンテナの合計と重複するので捨てる(ノード全体の id="/" は残す)。
+      # ネットワークは、もともと Pod 単位(container が空)でしか無いので、捨てない。
+      - source_labels: [__name__, container, id]
+        regex: container_(cpu|memory|fs|oom)_.*;;/.{2,}
+        action: drop
+
+  # ---- Kubernetes の状態(Pod の再起動・Ready・Deployment のレプリカ数・リソースの要求と上限)----
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: ["kube-state-metrics:8080"]
+
+  # ---- 監視の仕組み自身(Prometheus と Grafana)----
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]

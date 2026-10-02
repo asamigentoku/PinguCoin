@@ -11,6 +11,7 @@ resources:
   - config.yaml         # 共通の設定(ConfigMap)
   - servers.yaml        # 3つのAPIのDeploymentとService(replicas: 1)
   - network-policy.yaml # 通信の制限(NetworkPolicy)
+  - monitoring          # 監視(Prometheus + Grafana + kube-state-metrics)。monitoring/ の中で完結している(インターネットには公開しない)
   - ingress.yaml        # インターネットからの入口(HTTPS)
 # ACR のイメージ。タグ(newTag)はデプロイのたびに、ワークフローが git の SHA に差し替える。
 # ACR の名前は Terraform の出力(acr_login_server)。ここの newName は、作成後に実際の値へ置き換える。

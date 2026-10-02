@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	orcanpb "github.com/asamigentoku/PinguCoin/services/orcan-api/proto/orcan/v1"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/clerkauth"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/orcanclient"
@@ -23,22 +24,26 @@ func WithOptionalAuth(orcan *orcanclient.Client) func(http.Handler) http.Handler
 		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 			token := extractBearerToken(request)
 			if token == "" {
+				metrics.RecordAuth("anonymous")
 				next.ServeHTTP(w, request)
 				return
 			}
 
 			clerkUserID, err := clerkauth.VerifySessionToken(request.Context(), token)
 			if err != nil {
+				metrics.RecordAuth("invalid_token")
 				next.ServeHTTP(w, request)
 				return
 			}
 
 			claims, err := resolveUser(request.Context(), orcan, clerkUserID)
 			if err != nil {
+				metrics.RecordAuth("profile_error")
 				next.ServeHTTP(w, request)
 				return
 			}
 
+			metrics.RecordAuth("authenticated")
 			ctx := reqcontext.WithUser(request.Context(), claims)
 			next.ServeHTTP(w, request.WithContext(ctx))
 		})

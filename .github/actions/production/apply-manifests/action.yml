@@ -59,3 +59,14 @@ runs:
           kubectl rollout status -n "$NAMESPACE" "deployment/${api}" --timeout=300s
         done
         kubectl get pods -n "$NAMESPACE"
+
+    # 監視(Prometheus / Grafana / kube-state-metrics)。API の本番は、監視が起動しなくても動くので、ここでは失敗にしない(警告だけ)。
+    # (監視の不具合で、デプロイを止めない。止めると、ロールバックの判断を、誤らせる)
+    - name: 監視の起動を確認する(失敗しても、デプロイは止めない)
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
+      run: |
+        for monitor in prometheus kube-state-metrics grafana; do
+          kubectl rollout status -n "$NAMESPACE" "deployment/${monitor}" --timeout=300s             || echo "::warning title=monitoring::deployment/${monitor} is not ready (kubectl get pods -n ${NAMESPACE})"
+        done

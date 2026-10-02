@@ -113,6 +113,22 @@ jobs:
           kubectl kustomize platform/kubernetes/minikube > /dev/null
           kubectl kustomize platform/kubernetes/production > /dev/null
 
+      # 監視の設定(Prometheus の設定・アラートのルール・Grafana のダッシュボード)の書き間違いがないか(docs/MONITORING.md)。
+      # promtool は、Prometheus のイメージに付いている。構文だけ確かめる(--syntax-only。実際の Kubernetes の中でしか無いファイルは、見ない)。
+      # アラートのルールは、テスト(alert-rules.test.yml)で、発火する・しないを確かめる(例: 在庫不足では、アラートが出ない)。
+      - name: Prometheus の設定とルール(promtool)
+        run: |
+          for env in minikube production; do
+            docker run --rm --entrypoint sh -v "$PWD/platform/kubernetes/$env/monitoring:/etc/prometheus:ro" prom/prometheus:v3.5.0               -c 'promtool check config --syntax-only /etc/prometheus/prometheus.yml && promtool check rules /etc/prometheus/alert-rules.yml && promtool test rules /etc/prometheus/alert-rules.test.yml'
+          done
+      # ダッシュボードの JSON が正しいか。ローカルと本番で、同じ中身か(2つは共有しないが、同じものを置く約束)。
+      - name: Grafana のダッシュボード(JSON)
+        run: |
+          for file in platform/kubernetes/minikube/monitoring/dashboards/*.json; do
+            python3 -m json.tool "$file" > /dev/null
+            diff -q "$file" "platform/kubernetes/production/monitoring/dashboards/$(basename "$file")"
+          done
+
   terraform:
     name: Terraform (${{ matrix.env }})
     runs-on: ubuntu-latest

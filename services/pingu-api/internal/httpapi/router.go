@@ -15,6 +15,7 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/graph"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/graph/resolvers"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/apperr"
@@ -37,6 +38,8 @@ const APIVersionPrefix = "/api/v1"
 //   - GET  /api/v1/orders/{id}  : 注文詳細
 //   - GET  /api/v1/points       : 自分のポイント残高と履歴
 //   - GET  /healthz, /readyz    : Kubernetesのprobe用(liveness / readiness)
+//
+// メトリクス(/metrics)は、このルーターには無い。別のポートで、別のサーバーが出す(pkg/metrics)。
 func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository, ping func(context.Context) error) http.Handler {
 	//muxはapp_router
 	mux := http.NewServeMux()
@@ -49,6 +52,7 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	graphqlServer.Use(extension.Introspection{})
 	graphqlServer.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
 	graphqlServer.SetErrorPresenter(newErrorPresenter(logger))
+	graphqlServer.AroundResponses(operationMetrics) // 操作の数・結果(エラー)・処理時間
 
 	mux.Handle("/", playground.Handler("PinguCoin GraphQL playground", APIVersionPrefix+"/graphql"))
 	mux.Handle(APIVersionPrefix+"/graphql", graphqlServer)
@@ -64,8 +68,10 @@ func NewRouter(logger *slog.Logger, orcan *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", orderHandler.GetOrder)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/points", NewPointHandler(payment).GetPoints)
 
-	// 内側から: 認証 → ログ → API のバージョンのヘッダー → リクエスト ID(いちばん外側。ログにも、レスポンスにも、同じ ID を出す)。
-	return WithRequestID(WithAPIVersion(WithLogging(logger)(WithOptionalAuth(orcan)(mux))))
+	// 内側から: ルートの記録(メトリクス)→ 認証 → ログ → API のバージョンのヘッダー → リクエスト ID → メトリクス(いちばん外側)。
+	// リクエスト ID は、ログにも、レスポンスにも、同じ ID を出すため、外側。メトリクスは、認証などを含めた処理時間を測るため、さらに外側。
+	// metrics.Route は、ServeMux を直接包む(合ったルートのパターンを、外側の metrics.HTTP に伝える)。
+	return metrics.HTTP(WithRequestID(WithAPIVersion(WithLogging(logger)(WithOptionalAuth(orcan)(metrics.Route(mux))))))
 }
 
 // newErrorPresenter はresolverが返したエラーをGraphQLのエラーレスポンスに変換する。

@@ -1,0 +1,3 @@
+POST http://localhost:8082/api/v1/graphql
+Content-Type: application/json
+@products-query.json

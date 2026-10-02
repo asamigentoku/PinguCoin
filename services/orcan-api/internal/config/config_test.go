@@ -46,3 +46,32 @@ func TestEmptyEnvironmentValueFallsBack(t *testing.T) {
 		t.Errorf("Port = %q, want the default", got)
 	}
 }
+
+func TestRedisDefaultsToDisabled(t *testing.T) {
+	for _, key := range []string{"REDIS_ENABLED", "REDIS_ADDR", "REDIS_PASSWORD", "REDIS_DB", "REDIS_PRODUCT_CACHE_TTL"} {
+		t.Setenv(key, "")
+	}
+	cfg := Load()
+	if cfg.RedisEnabled || cfg.RedisAddr != "localhost:6379" || cfg.ProductCacheTTL.Seconds() != 60 {
+		t.Errorf("unexpected redis defaults: %+v", cfg)
+	}
+}
+
+func TestRedisEnabledSwitch(t *testing.T) {
+	for value, want := range map[string]bool{"true": true, "TRUE": true, "1": true, "false": false, "0": false, "garbage": false} {
+		t.Setenv("REDIS_ENABLED", value)
+		if got := Load().RedisEnabled; got != want {
+			t.Errorf("REDIS_ENABLED=%q: got %v, want %v", value, got, want)
+		}
+	}
+}
+
+func TestRedisSettingsFromEnvironment(t *testing.T) {
+	t.Setenv("REDIS_ADDR", "redis:6379")
+	t.Setenv("REDIS_DB", "2")
+	t.Setenv("REDIS_PRODUCT_CACHE_TTL", "5m")
+	cfg := Load()
+	if cfg.RedisAddr != "redis:6379" || cfg.RedisDB != 2 || cfg.ProductCacheTTL.Minutes() != 5 {
+		t.Errorf("unexpected redis settings: %+v", cfg)
+	}
+}

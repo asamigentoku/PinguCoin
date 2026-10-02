@@ -7,10 +7,13 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/orcan-api/proto/orcan/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ProductInventoryServer は proto の `service ProductInventoryService` の実装。
@@ -99,6 +102,23 @@ func (server *ProductInventoryServer) DeleteProductInventory(ctx context.Context
 // AdjustProductInventory は在庫数(quantity)をamountだけ増減させる(負=消費、正=戻し)。
 // idempotency_keyで冪等性を担保する(同じキーの再送は二重に増減させない)。
 func (server *ProductInventoryServer) AdjustProductInventory(ctx context.Context, request *pb.AdjustProductInventoryRequest) (*pb.AdjustProductInventoryResponse, error) {
+	replayed := false
+	response, err := server.adjustProductInventory(ctx, request, &replayed)
+
+	// メトリクス: 在庫の増減の数(方向・結果別)。在庫不足は、サーバーの失敗ではなく、通常の結果(insufficient)として数える。
+	result := metrics.ResultOf(err)
+	switch {
+	case err == nil && replayed:
+		result = metrics.ResultReplayed
+	case status.Code(err) == codes.FailedPrecondition:
+		result = metrics.ResultInsufficient
+	}
+	metrics.RecordInventoryAdjustment(request.GetAmount(), result)
+	return response, err
+}
+
+// adjustProductInventory は AdjustProductInventory の本体。replayed には、同じ冪等性キーの再送だったかを書き込む(メトリクス用)。
+func (server *ProductInventoryServer) adjustProductInventory(ctx context.Context, request *pb.AdjustProductInventoryRequest, replayed *bool) (*pb.AdjustProductInventoryResponse, error) {
 	if request.GetProductId() == 0 {
 		return nil, apperr.InvalidArgument("product_id is required")
 	}
@@ -110,7 +130,8 @@ func (server *ProductInventoryServer) AdjustProductInventory(ctx context.Context
 		return nil, apperr.InvalidArgument("idempotency_key is required")
 	}
 
-	_, _, err := server.repo.AdjustAtomic(uint(request.GetProductId()), int(request.GetAmount()), request.GetReason(), idempotencyKey)
+	_, wasReplayed, err := server.repo.AdjustAtomic(uint(request.GetProductId()), int(request.GetAmount()), request.GetReason(), idempotencyKey)
+	*replayed = wasReplayed
 	if err != nil {
 		if errors.Is(err, repository.ErrInsufficientStock) {
 			return nil, apperr.FailedPrecondition("insufficient stock")

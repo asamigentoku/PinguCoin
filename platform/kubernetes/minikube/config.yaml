@@ -13,3 +13,5 @@ data:
   DD_ENV: minikube
   ORCAN_API_ADDR: orcan-api:8080
   PAYMENT_API_ADDR: payment-api:8081
+  # 商品キャッシュの Redis(redis.yaml)。使うかどうかは、services/orcan-api/.env の REDIS_ENABLED(true/false)で決める。
+  REDIS_ADDR: redis:6379

@@ -1,0 +1,1 @@
+{"query":"query { products { id userId categoryId name description imageUrl price status createdAt updatedAt } }"}

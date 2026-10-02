@@ -34,7 +34,7 @@
 ├── .github/                  # GitHub Actions
 │   ├── workflows/            #   ci.yml と _go-test.yml(共通)、production-terraform.yml / production-deploy.yml(本番)
 │   └── actions/production/   #   本番だけの処理の部品(AKSへの接続、Secretの作成、適用、ロールバックなど)
-├── script/                   # 起動・停止・Azureの初期設定のスクリプト
+├── script/                   # 起動・停止・監視の画面・Azureの初期設定のスクリプト
 ├── docs/                     # 設計・API仕様・テスト・デプロイの説明
 ├── buf.yaml                  # protobufのワークスペース(各サービスのproto/を束ねる)
 ├── go.mod / go.sum           # Goのモジュール(ルートに1つ)
@@ -70,6 +70,7 @@ make down       # minikubeのAPIを停止
 - 本番(Azure)へのデプロイ: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) / 月額コストの想定: [docs/COST.md](docs/COST.md)
 - バージョン管理(リリース・API・DBスキーマ): [docs/VERSIONING.md](docs/VERSIONING.md)
 - ログの形式(Datadogの標準属性、リクエストID): [docs/LOGGING.md](docs/LOGGING.md)
+- 監視(Prometheus + Grafana。メトリクス・ダッシュボード・アラート): [docs/MONITORING.md](docs/MONITORING.md)(`bash script/monitor.sh` で開く)
 - 依存関係の自動更新(Dependabot): [docs/DEPENDABOT.md](docs/DEPENDABOT.md)
 - リトライの方針(何を・どう再試行し、何を再試行しないか): [docs/RETRY.md](docs/RETRY.md)
 - テストの詳細: [docs/TESTING.md](docs/TESTING.md)

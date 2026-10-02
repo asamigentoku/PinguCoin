@@ -1,0 +1,215 @@
+# アラートのルール。条件を満たした状態が、`for` の間続くと、「firing(発火)」になる。
+# 通知(メール・Slack など)は、置いていない(Alertmanager 無し)。発火は、次の場所で見える:
+#   - Prometheus の Alerts 画面(kubectl port-forward -n pingucoin svc/prometheus 9090:9090 → http://localhost:9090/alerts。AKS の管理者として、az aks get-credentials したあと)
+#   - Grafana の「PinguCoin / 概要」の「発火中のアラート」と、Alerting > Alert rules
+# severity: critical = すぐ対応、warning = 見ておく。
+#
+# しきい値は、トラフィックが少ない(1 レプリカ・小さな利用)前提。少ない件数で、割合が、跳ねやすいので、
+# 割合のルールには、「一定以上のリクエストがあるとき」の条件を付けている。
+groups:
+  # ---------------------------------------------------------------- 稼働
+  - name: availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job="pingucoin-apps"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.app }} ({{ $labels.pod }}) のメトリクスが取れない"
+          description: "2 分以上、/metrics に届かない。Pod が落ちているか、起動していない。kubectl get pods / kubectl logs を確認する。"
+
+      - alert: PodNotReady
+        expr: kube_pod_status_ready{namespace="pingucoin", condition="false"} == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Pod {{ $labels.pod }} が 5 分以上 Ready でない"
+          description: "readiness probe(DB に接続できるか)が失敗している。DB の障害、または起動の失敗。"
+
+      - alert: PodRestarting
+        expr: increase(kube_pod_container_status_restarts_total{namespace="pingucoin"}[15m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.pod }} ({{ $labels.container }}) が再起動した"
+          description: "直近 15 分で再起動している。liveness の失敗、OOMKilled、アプリの異常終了のどれか。kubectl describe pod で、Last State を見る。"
+
+      - alert: ContainerOOMKilled
+        expr: |
+          increase(kube_pod_container_status_restarts_total{namespace="pingucoin"}[10m]) > 0
+          and on (namespace, pod, container)
+          kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.pod }} ({{ $labels.container }}) がメモリ不足で強制終了された"
+          description: "メモリの上限(limits)を超えた。上限を上げるか、メモリの使い方(リーク)を調べる。"
+
+      - alert: DeploymentReplicasUnavailable
+        expr: kube_deployment_status_replicas_available{namespace="pingucoin"} < kube_deployment_spec_replicas{namespace="pingucoin"}
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.deployment }} が、指定した数だけ動いていない"
+          description: "5 分以上、利用可能なレプリカが、指定より少ない。"
+
+  # ---------------------------------------------------------------- エラーと遅さ
+  - name: errors-and-latency
+    rules:
+      - alert: HttpServerErrors
+        expr: |
+          sum(rate(pingucoin_http_requests_total{code=~"5.."}[5m]))
+            / sum(rate(pingucoin_http_requests_total[5m])) > 0.05
+          and sum(rate(pingucoin_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "pingu-api の 5xx が 5% を超えている"
+          description: "5 分間の平均で、HTTP リクエストの 5% 以上が 5xx。ログ(level=error、request_id)と、下流の gRPC のエラーを見る。"
+
+      - alert: HttpSlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(pingucoin_http_request_duration_seconds_bucket[5m]))) > 1
+          and on (route) sum by (route) (rate(pingucoin_http_requests_total[5m])) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.route }} の p95 が 1 秒を超えている"
+          description: "10 分以上、遅い。DB・下流の gRPC・Blob の遅さを、ダッシュボード(データベース・gRPC)で確かめる。"
+
+      - alert: GrpcServerErrors
+        expr: |
+          sum by (app) (rate(pingucoin_grpc_server_handled_total{grpc_code=~"Internal|Unknown|Unavailable|DataLoss|DeadlineExceeded"}[5m]))
+            / sum by (app) (rate(pingucoin_grpc_server_handled_total[5m])) > 0.05
+          and sum by (app) (rate(pingucoin_grpc_server_handled_total[5m])) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.app }} の gRPC のサーバーエラーが 5% を超えている"
+          description: "Internal / Unavailable / DeadlineExceeded などの、サーバー側の失敗。入力の誤り(InvalidArgument など)は含まない。"
+
+      - alert: GrpcClientErrors
+        expr: |
+          sum by (target) (rate(pingucoin_grpc_client_handled_total{grpc_code=~"Internal|Unknown|Unavailable|DataLoss|DeadlineExceeded"}[5m]))
+            / sum by (target) (rate(pingucoin_grpc_client_handled_total[5m])) > 0.05
+          and sum by (target) (rate(pingucoin_grpc_client_handled_total[5m])) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "pingu-api から {{ $labels.target }} への呼び出しが、5% 以上失敗している"
+          description: "再試行しても失敗した、最終の結果。相手のサービス・ネットワークの障害。"
+
+      - alert: GrpcClientRetriesHigh
+        expr: |
+          sum by (target) (rate(pingucoin_grpc_client_attempts_total[5m]))
+            / sum by (target) (rate(pingucoin_grpc_client_handled_total[5m])) > 1.2
+          and sum by (target) (rate(pingucoin_grpc_client_handled_total[5m])) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.target }} への呼び出しの再試行が、20% を超えている"
+          description: "UNAVAILABLE などの一時的な失敗が、続いている(再試行で隠れて、まだ、エラーにはなっていない)。相手が不安定になりかけている。"
+
+      - alert: GraphqlErrors
+        expr: |
+          sum(rate(pingucoin_graphql_operations_total{result="error"}[10m]))
+            / sum(rate(pingucoin_graphql_operations_total[10m])) > 0.2
+          and sum(rate(pingucoin_graphql_operations_total[10m])) > 0.05
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "GraphQL の操作の 20% 以上が、エラーを返している"
+          description: "GraphQL は、エラーでも HTTP 200 を返すので、HTTP の 5xx には出ない。クライアントの誤り(不正なクエリ)も含む。"
+
+  # ---------------------------------------------------------------- データベース
+  - name: database
+    rules:
+      - alert: DbConnectionWaits
+        expr: sum by (app) (rate(pingucoin_db_connection_wait_total[5m])) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.app }} が、DB の接続が空くのを待たされている"
+          description: "接続プールの上限に達している。DB が遅いか、接続の上限(MaxOpenConns)が小さい。"
+
+      - alert: DbConnectionPoolNearLimit
+        expr: |
+          pingucoin_db_connections_in_use / (pingucoin_db_connections_max_open > 0) > 0.8
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.app }} の接続プールの 80% 以上が、使用中"
+          description: "上限に近い。(上限が無制限=0 のときは、この警告は出ない)"
+
+      - alert: DbQueryErrors
+        expr: sum by (app) (rate(pingucoin_db_queries_total{result="error"}[5m])) > 0.05
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.app }} の DB のクエリが、失敗し続けている"
+          description: "接続エラー・SQL のエラー。該当なし(not_found)は、正常なので含まない。ログ(error.message)を見る。"
+
+      - alert: DbSlowQueries
+        expr: |
+          histogram_quantile(0.95, sum by (le, app) (rate(pingucoin_db_query_duration_seconds_bucket[5m]))) > 0.5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.app }} の DB のクエリの p95 が 0.5 秒を超えている"
+          description: "インデックスの不足、ロックの待ち、DB の CPU 不足(Azure の B1ms は、バースト用のクレジットが尽きると、遅くなる)。"
+
+  # ---------------------------------------------------------------- 業務
+  - name: business
+    rules:
+      - alert: OrderFailures
+        expr: sum(increase(pingucoin_orders_total{result="failed"}[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "サーバー側の失敗で、注文できていない"
+          description: "result=failed は、在庫不足・ポイント不足ではなく、サーバーの失敗(在庫・決済・DB の失敗)。"
+
+      - alert: PaymentFailures
+        expr: sum(increase(pingucoin_payments_total{result="failed"}[10m])) > 0
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "決済がサーバー側の失敗で、失敗している"
+          description: "ポイント不足や入力の誤りではない、サーバーの失敗。お金に関わるので、すぐに確認する。"
+
+      - alert: BlobStorageFailures
+        expr: sum by (operation) (increase(pingucoin_blob_operations_total{result="failed"}[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Azure Blob Storage の {{ $labels.operation }} が失敗している"
+          description: "出品(画像・ファイルのアップロード)や、ダウンロードの URL の発行ができない。ストレージの接続文字列・ネットワーク・Azure の障害を確認する。"
+
+  # ---------------------------------------------------------------- リソース
+  - name: resources
+    rules:
+      - alert: ContainerMemoryNearLimit
+        expr: |
+          sum by (namespace, pod, container) (container_memory_working_set_bytes{namespace="pingucoin", container!=""})
+            / sum by (namespace, pod, container) (kube_pod_container_resource_limits{namespace="pingucoin", resource="memory"}) > 0.9
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.pod }} ({{ $labels.container }}) のメモリが、上限の 90% を超えている"
+          description: "超えると、OOMKilled で、再起動される。上限を上げるか、メモリの使い方を調べる。"
+
+      - alert: ContainerCpuThrottled
+        expr: |
+          sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total{namespace="pingucoin", container!=""}[5m]))
+            / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total{namespace="pingucoin", container!=""}[5m])) > 0.25
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.pod }} ({{ $labels.container }}) の CPU が、上限で抑えられている"
+          description: "25% 以上の期間で、CPU の上限(limits)に当たっている。応答が遅くなる。上限を上げる。"
+
+      - alert: PrometheusTargetMissing
+        expr: up{job=~"kube-state-metrics|cadvisor|grafana"} == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "監視の対象 {{ $labels.job }} が取れない"
+          description: "このあいだ、その分のグラフと、アラートが、止まる。"

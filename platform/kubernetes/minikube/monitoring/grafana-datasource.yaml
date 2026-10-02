@@ -1,0 +1,14 @@
+# Grafana のデータソース(どこからデータを読むか)。起動時に、自動で登録される(provisioning)。
+# uid を固定している: ダッシュボードの JSON が、この uid で参照する。
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s

@@ -16,6 +16,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/database"
@@ -30,6 +31,7 @@ func main() {
 	logger := logging.NewFromEnv("payment-api")
 	slog.SetDefault(logger)
 	build := version.Get()
+	metrics.Init("payment-api")
 	logger.Info("payment-api starting",
 		slog.Group("build", slog.String("commit", build.Commit), slog.String("time", build.BuildTime), slog.String("go", build.GoVersion)),
 	)
@@ -62,7 +64,8 @@ func main() {
 	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptor.RequestID(), // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
+			metrics.UnaryServerInterceptor(), // リクエストの数・結果・処理時間(認証に失敗したものも数える。いちばん外側)
+			interceptor.RequestID(),          // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
 			interceptor.Logging(logger),
 			interceptor.Auth(cfg.InternalAPIToken),
 		),
@@ -83,6 +86,8 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
+	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
 	health.Register(shutdownCtx, server, db, logger)
 	go func() {
 		<-shutdownCtx.Done()

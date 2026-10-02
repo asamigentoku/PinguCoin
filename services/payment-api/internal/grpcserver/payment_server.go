@@ -6,9 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/repository"
@@ -36,6 +39,31 @@ func NewPaymentServer(db *gorm.DB, payments *repository.PaymentRepository, refun
 // (ポイント決済など即時確定の決済を想定)。将来カード決済等の非同期ゲートウェイを繋ぐ場合は、
 // ここで status を "pending" のまま返し、Webhook等で確定させる形に拡張する。
 func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.CreatePaymentRequest) (*pb.CreatePaymentResponse, error) {
+	replayed := false
+	response, err := server.createPayment(ctx, request, &replayed)
+
+	// メトリクス: 決済の数を、結果(succeeded / replayed / insufficient / rejected / failed)別に、1回だけ数える。
+	// 支払い方法と通貨は、クライアントが決められる文字列なので、ラベルには、既知の値だけを使う(それ以外は other)。
+	result := metrics.ResultOf(err)
+	switch {
+	case err == nil && replayed:
+		result = metrics.ResultReplayed
+	case status.Code(err) == codes.FailedPrecondition:
+		result = metrics.ResultInsufficient // この RPC の FailedPrecondition は、ポイント不足だけ
+	}
+	var amount int64
+	if err == nil && !replayed {
+		amount = request.GetAmount()
+	}
+	metrics.RecordPayment(
+		metrics.Label(request.GetPaymentMethod(), model.PaymentMethodPoint),
+		metrics.Label(request.GetCurrency(), "POINT"),
+		result, amount)
+	return response, err
+}
+
+// createPayment は CreatePayment の本体。replayed には、同じ冪等性キーの再送で、最初の結果を返したかどうかを書き込む(メトリクス用)。
+func (server *PaymentServer) createPayment(ctx context.Context, request *pb.CreatePaymentRequest, replayed *bool) (*pb.CreatePaymentResponse, error) {
 	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
@@ -59,6 +87,7 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 	// 同じidempotency_keyの決済が既にあれば、新たに決済(ポイント消費含む)を作らず
 	// そのまま返す(リトライ・二重送信で二重決済にならないようにするため)。
 	if existing, err := server.payments.FindByIdempotencyKey(idempotencyKey); err == nil {
+		*replayed = true
 		return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, apperr.Internal(err)
@@ -90,6 +119,7 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 				return nil, apperr.FailedPrecondition("insufficient points")
 			}
 			if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+				*replayed = true
 				return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 			}
 			return nil, apperr.Internal(err)
@@ -99,6 +129,7 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 
 	if err := server.payments.Create(payment); err != nil {
 		if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+			*replayed = true
 			return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 		}
 		return nil, apperr.Internal(err)
@@ -188,6 +219,13 @@ func (server *PaymentServer) CancelPayment(ctx context.Context, request *pb.Canc
 // RefundPayment は確定済み決済(succeeded/partially_refunded)に対する返金。
 // amount を指定することで部分返金にも対応し、累計返金額が決済額を超える場合は拒否する。
 func (server *PaymentServer) RefundPayment(ctx context.Context, request *pb.RefundPaymentRequest) (*pb.RefundPaymentResponse, error) {
+	response, err := server.refundPayment(ctx, request)
+	metrics.RecordRefund(metrics.ResultOf(err)) // メトリクス: 返金の数(結果別)
+	return response, err
+}
+
+// refundPayment は RefundPayment の本体。
+func (server *PaymentServer) refundPayment(ctx context.Context, request *pb.RefundPaymentRequest) (*pb.RefundPaymentResponse, error) {
 	if request.GetPaymentId() == 0 {
 		return nil, apperr.InvalidArgument("payment_id is required")
 	}

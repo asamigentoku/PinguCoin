@@ -1,0 +1,84 @@
+# 監視の通信の許可。親の network-policy.yaml が、namespace 内への入ってくる通信を、すべて拒否しているので、
+# 監視に必要な通信だけを、ここで許可する。
+#
+#   Prometheus ─▶ 3つの API の /metrics(9090)   ... API のポート(8080 など)や、ほかの Pod へは、触れない
+#   Prometheus ─▶ kube-state-metrics(8080)
+#   Prometheus ─▶ Grafana(3000)                  ... Grafana 自身のメトリクス
+#   Grafana    ─▶ Prometheus(9090)
+#
+# /metrics は、インターネットに向けた入口(Ingress)の先の、pingu-api のポート(8082)とは別のポートで、
+# 許可するのは Prometheus だけ。利用者からも、同じ namespace のほかの Pod からも、メトリクスは見えない。
+# (port-forward は kubelet 経由なので、このポリシーの影響を受けない。Grafana・Prometheus の画面は、port-forward で開く)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-api-metrics
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [orcan-api, payment-api, pingu-api]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-kube-state-metrics
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-state-metrics
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-to-grafana-metrics
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-prometheus
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - port: 9090

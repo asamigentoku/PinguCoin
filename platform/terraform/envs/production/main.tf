@@ -85,6 +85,12 @@ resource "random_password" "internal_api_token" {
   special = false
 }
 
+# Grafana(監視の画面)の管理者のパスワード。Grafana は、インターネットに公開しない(port-forward だけ)。
+resource "random_password" "grafana_admin" {
+  length  = 24
+  special = false
+}
+
 # 秘密情報は Key Vault に置く。GitHub Actions がここから読んで、Kubernetes の Secret を作る。
 # 名前は、デプロイのワークフロー(.github/workflows/production-deploy.yml)と合わせる。
 module "keyvault" {
@@ -97,6 +103,7 @@ module "keyvault" {
 
   secrets = {
     "internal-api-token"        = random_password.internal_api_token.result
+    "grafana-admin-password"    = random_password.grafana_admin.result
     "orcan-database-url"        = module.postgres.database_urls["orcan"]
     "payment-database-url"      = module.postgres.database_urls["payment"]
     "pingu-database-url"        = module.postgres.database_urls["pingu"]

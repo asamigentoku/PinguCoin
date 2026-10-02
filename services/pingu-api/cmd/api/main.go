@@ -14,6 +14,7 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/dbretry"
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/clerkauth"
 	"github.com/asamigentoku/PinguCoin/services/pingu-api/internal/config"
@@ -30,6 +31,7 @@ func main() {
 	logger := logging.NewFromEnv("pingu-api")
 	slog.SetDefault(logger)
 	build := version.Get()
+	metrics.Init("pingu-api")
 	logger.Info("pingu-api starting",
 		slog.Group("build", slog.String("commit", build.Commit), slog.String("time", build.BuildTime), slog.String("go", build.GoVersion)),
 	)
@@ -99,6 +101,8 @@ func main() {
 	// 待つのは最大 25 秒(terminationGracePeriodSeconds の 30 秒より短く)。新しいリクエストは、受け付けない。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	// メトリクス(/metrics)。API とは別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
+	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)

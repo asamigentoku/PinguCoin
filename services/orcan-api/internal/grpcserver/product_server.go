@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/repository"
@@ -38,7 +39,7 @@ func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListP
 		userID = uint(request.GetUserId())
 	}
 
-	products, err := server.repo.FindAll(userID)
+	products, err := server.repo.FindAllCached(ctx, userID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -51,7 +52,7 @@ func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListP
 }
 
 func (server *ProductServer) GetProduct(ctx context.Context, request *pb.GetProductRequest) (*pb.GetProductResponse, error) {
-	product, err := server.repo.FindByID(uint(request.GetId()))
+	product, err := server.repo.FindByIDCached(ctx, uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product", err)
 	}
@@ -82,6 +83,7 @@ func (server *ProductServer) CreateProduct(ctx context.Context, request *pb.Crea
 	if err := server.repo.Create(product); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	metrics.RecordProductCreated() // メトリクス: 出品の数
 	return &pb.CreateProductResponse{Product: toProtoProduct(product)}, nil
 }
 

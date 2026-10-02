@@ -64,3 +64,22 @@ spec:
   ingress:
     - ports:
         - port: 8082
+---
+# Redis(商品キャッシュ)には、orcan-api からだけ接続できる。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-orcan-api-to-redis
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: orcan-api
+      ports:
+        - port: 6379

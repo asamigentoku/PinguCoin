@@ -79,6 +79,9 @@ spec:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api
               containerPort: 8080
+            # メトリクス(/metrics)。API のポートとは別。Prometheus だけが取る(NetworkPolicy)。Service には出さない。
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - secretRef:
                 name: orcan-api-env
@@ -196,6 +199,9 @@ spec:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api
               containerPort: 8081
+            # メトリクス(/metrics)。API のポートとは別。Prometheus だけが取る(NetworkPolicy)。Service には出さない。
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - secretRef:
                 name: payment-api-env
@@ -313,6 +319,9 @@ spec:
             # probeとServiceからは、番号ではなくこの名前で参照する。
             - name: api
               containerPort: 8082
+            # メトリクス(/metrics)。API のポートとは別。Prometheus だけが取る(NetworkPolicy)。Service には出さない。
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - secretRef:
                 name: pingu-api-env

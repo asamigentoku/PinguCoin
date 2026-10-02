@@ -29,7 +29,8 @@
 | Blob Storage | LRS、画像と販売ファイル | 約 1〜5 | 保存量による(1 GB あたり約 0.02〜0.03 ドル)。アクセスの回数でも少し増える |
 | Key Vault | Standard | 1 未満 | |
 | プライベート DNS ゾーン | ×1 | 1 未満 | |
-| Log Analytics | Container Insights は無効 | ほぼ 0 | 有効にすると、ログの量に応じて増える |
+| 監視(Prometheus + Grafana) | 既存のノードに載せる(ノードは増やさない)。Prometheus のディスク 5 GiB(StandardSSD) | 1 未満 | [MONITORING.md](MONITORING.md)。メモリの上限は合計 約 1 GiB。ノードの 8 GiB に収まる |
+| Log Analytics | Container Insights は無効 | ほぼ 0 | 有効にすると、ログの量に応じて増える(監視は、Prometheus で行うので、不要) |
 | 外へ出る通信 | 月 100 GB まで無料の見込み | 0〜 | 画像・ファイルの配信が増えると、超えた分がかかる |
 | **合計** | | **約 145** | |
 
@@ -57,7 +58,7 @@
 | --- | --- | --- |
 | OS ディスクを小さくする(`os_disk_size_gb = 64`) | 数ドル | |
 | 使わない時間は止める(`az aks stop`、`az postgres flexible-server stop`) | ノードの料金(約 70 ドル)が、止めた時間の分だけ減る | PostgreSQL は最大 7 日で、自動で起動する。止めている間はサービスが使えない。検証中心の間に向いている |
-| ノードを `Standard_B2s`(4 GiB)にする | 約 35 ドル | 3 つの API とシステムの Pod が載る、ぎりぎりのメモリ。不足すると、Pod が再起動を繰り返す |
+| ノードを `Standard_B2s`(4 GiB)にする | 約 35 ドル | **おすすめしない。** 3 つの API・システムの Pod・監視(上限の合計 約 1 GiB)で、メモリが足りなくなり、Pod が再起動を繰り返す。やるなら、監視を外す |
 
 ## 構成を上げたときの増え方
 

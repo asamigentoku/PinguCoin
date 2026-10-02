@@ -23,6 +23,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
+
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 )
 
 // ErrBlobNotInProductPath はfile_urlが対象商品のパス配下(かつ想定コンテナ)を
@@ -79,7 +81,8 @@ func New(connectionString, publicContainer, privateContainer, env string) (*Blob
 // 商品作成時に呼ばれ、以降は(コンテナが既に存在する限り)実質的に無視されるだけの
 // 冪等な呼び出しになる。アップロードURL発行時にも念のため再度呼び、
 // 過去に作られた商品に対しても自己修復的に動くようにしている。
-func (storage *BlobStorage) EnsureContainers(ctx context.Context) error {
+func (storage *BlobStorage) EnsureContainers(ctx context.Context) (err error) {
+	defer func(start time.Time) { metrics.ObserveBlob("ensure_containers", start, err) }(time.Now()) // メトリクス: Blob の操作の数と時間
 	publicAccess := container.PublicAccessTypeBlob
 	if _, err := storage.client.CreateContainer(ctx, storage.publicContainer, &azblob.CreateContainerOptions{Access: &publicAccess}); err != nil &&
 		!bloberror.HasCode(err, bloberror.ContainerAlreadyExists) {
@@ -143,7 +146,8 @@ type UploadURL struct {
 // という制約はクライアント側の実装による取り決めでしかない点に注意する。真にパス単位で
 // 権限を絞りたい場合は、ファイルごとのBlob SASを発行する方式や、ADLS Gen2(階層名前空間)の
 // 導入を検討すること。
-func (storage *BlobStorage) issueContainerUploadURL(ctx context.Context, containerName string) (*UploadURL, error) {
+func (storage *BlobStorage) issueContainerUploadURL(ctx context.Context, containerName string) (uploadURL *UploadURL, err error) {
+	defer func(start time.Time) { metrics.ObserveBlob("upload_url", start, err) }(time.Now())
 	if err := storage.EnsureContainers(ctx); err != nil {
 		return nil, err
 	}
@@ -190,7 +194,8 @@ func (storage *BlobStorage) IssueAssetUploadURL(ctx context.Context, isPublic bo
 // IssueDownloadURL は非公開コンテナ内の指定したBlob1つだけに限定した、読み取り専用の
 // 署名付きURLを発行する(コンテナ全体ではなくBlob単位でスコープすることで、
 // 他の商品ファイルへのアクセスを防ぐ)。
-func (storage *BlobStorage) IssueDownloadURL(ctx context.Context, blobName string) (string, time.Time, error) {
+func (storage *BlobStorage) IssueDownloadURL(ctx context.Context, blobName string) (downloadURL string, expires time.Time, err error) {
+	defer func(start time.Time) { metrics.ObserveBlob("download_url", start, err) }(time.Now())
 	blobClient := storage.client.ServiceClient().NewContainerClient(storage.privateContainer).NewBlobClient(blobName)
 	expiresAt := time.Now().Add(DownloadURLExpiry)
 
@@ -299,9 +304,10 @@ func (storage *BlobStorage) DeleteAssetBlob(ctx context.Context, blobName string
 	return storage.DeleteFileBlob(ctx, blobName)
 }
 
-func (storage *BlobStorage) deleteBlob(ctx context.Context, containerName, blobName string) error {
+func (storage *BlobStorage) deleteBlob(ctx context.Context, containerName, blobName string) (err error) {
+	defer func(start time.Time) { metrics.ObserveBlob("delete", start, err) }(time.Now())
 	containerClient := storage.client.ServiceClient().NewContainerClient(containerName)
-	_, err := containerClient.NewBlobClient(blobName).Delete(ctx, nil)
+	_, err = containerClient.NewBlobClient(blobName).Delete(ctx, nil)
 	if err != nil && !bloberror.HasCode(err, bloberror.BlobNotFound) {
 		return err
 	}

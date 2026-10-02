@@ -1,0 +1,139 @@
+# alert-rules.yml のテスト(promtool test rules)。作ったメトリクスの値を入れて、アラートが、発火する・しないを確かめる。
+#   docker run --rm --entrypoint promtool -v "$PWD/platform/kubernetes/minikube/monitoring:/m:ro" prom/prometheus:v3.5.0 test rules /m/alert-rules.test.yml
+# CI(ci.yml の「Prometheus の設定とルール」)でも、実行する。
+# 大事なのは「発火しない」ほう: 呼び出し側の誤り(入力の誤り・在庫不足)や、少ないトラフィックで、起こしてはいけない。
+rule_files:
+  - alert-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # ---- API の Pod が 2 分以上落ちている → ServiceDown。落ちたのが 1 分だけなら、発火しない ----
+  - interval: 1m
+    input_series:
+      - series: 'up{job="pingucoin-apps", app="orcan-api", pod="orcan-1"}'
+        values: '1 1 0 0 0 0 0 0'
+      - series: 'up{job="pingucoin-apps", app="payment-api", pod="payment-1"}'
+        values: '1 1 0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 7m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: pingucoin-apps, app: orcan-api, pod: orcan-1}
+            exp_annotations:
+              summary: "orcan-api (orcan-1) のメトリクスが取れない"
+              description: "2 分以上、/metrics に届かない。Pod が落ちているか、起動していない。kubectl get pods / kubectl logs を確認する。"
+
+  # ---- HTTP の 5xx: 割合が高く、かつ、トラフィックが十分あるときだけ発火 ----
+  - interval: 1m
+    input_series:
+      # 毎分 12 件(0.2 リクエスト/秒)のうち、2 件が 5xx(約 17%)。
+      - series: 'pingucoin_http_requests_total{route="/api/v1/orders", code="200", app="pingu-api"}'
+        values: '0+10x20'
+      - series: 'pingucoin_http_requests_total{route="/api/v1/orders", code="500", app="pingu-api"}'
+        values: '0+2x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HttpServerErrors
+        exp_alerts: []   # for: 5m に、まだ届いていない
+      - eval_time: 15m
+        alertname: HttpServerErrors
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: "pingu-api の 5xx が 5% を超えている"
+              description: "5 分間の平均で、HTTP リクエストの 5% 以上が 5xx。ログ(level=error、request_id)と、下流の gRPC のエラーを見る。"
+
+  # 1 時間に 1 件のリクエストが、たまたま 5xx(割合は 100%)でも、トラフィックが少なすぎるので、発火しない。
+  - interval: 1m
+    input_series:
+      - series: 'pingucoin_http_requests_total{route="/api/v1/orders", code="500", app="pingu-api"}'
+        values: '0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HttpServerErrors
+        exp_alerts: []
+
+  # ---- gRPC のサーバーエラー: 入力の誤り(InvalidArgument)や在庫不足(FailedPrecondition)では、発火しない ----
+  - interval: 1m
+    input_series:
+      - series: 'pingucoin_grpc_server_handled_total{app="orcan-api", grpc_code="OK"}'
+        values: '0+10x20'
+      - series: 'pingucoin_grpc_server_handled_total{app="orcan-api", grpc_code="InvalidArgument"}'
+        values: '0+10x20'
+      - series: 'pingucoin_grpc_server_handled_total{app="orcan-api", grpc_code="FailedPrecondition"}'
+        values: '0+10x20'
+      - series: 'pingucoin_grpc_server_handled_total{app="payment-api", grpc_code="OK"}'
+        values: '0+10x20'
+      - series: 'pingucoin_grpc_server_handled_total{app="payment-api", grpc_code="Internal"}'
+        values: '0+5x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: GrpcServerErrors
+        exp_alerts:
+          # payment-api だけ(Internal が 33%)。orcan-api は、失敗が 2/3 でも、InvalidArgument と FailedPrecondition なので、発火しない。
+          - exp_labels: {severity: critical, app: payment-api}
+            exp_annotations:
+              summary: "payment-api の gRPC のサーバーエラーが 5% を超えている"
+              description: "Internal / Unavailable / DeadlineExceeded などの、サーバー側の失敗。入力の誤り(InvalidArgument など)は含まない。"
+
+  # ---- 業務: サーバーの失敗(failed)だけがアラート。在庫不足・ポイント不足は、通常の結果 ----
+  - interval: 1m
+    input_series:
+      - series: 'pingucoin_orders_total{result="out_of_stock"}'
+        values: '0+5x30'
+      - series: 'pingucoin_orders_total{result="insufficient_point"}'
+        values: '0+5x30'
+      - series: 'pingucoin_payments_total{method="point", result="failed"}'
+        values: '0 0 0 0 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: OrderFailures
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: PaymentFailures
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: "決済がサーバー側の失敗で、失敗している"
+              description: "ポイント不足や入力の誤りではない、サーバーの失敗。お金に関わるので、すぐに確認する。"
+
+  # ---- DB の接続プール: 上限が決まっていて、80% を超えたときだけ。上限なし(0)のときは、出ない ----
+  - interval: 1m
+    input_series:
+      - series: 'pingucoin_db_connections_in_use{app="pingu-api", pod="p1"}'
+        values: '9x20'
+      - series: 'pingucoin_db_connections_max_open{app="pingu-api", pod="p1"}'
+        values: '10x20'
+      - series: 'pingucoin_db_connections_in_use{app="orcan-api", pod="o1"}'
+        values: '9x20'
+      - series: 'pingucoin_db_connections_max_open{app="orcan-api", pod="o1"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: DbConnectionPoolNearLimit
+        exp_alerts:
+          - exp_labels: {severity: warning, app: pingu-api, pod: p1}
+            exp_annotations:
+              summary: "pingu-api の接続プールの 80% 以上が、使用中"
+              description: "上限に近い。(上限が無制限=0 のときは、この警告は出ない)"
+
+  # ---- gRPC の再試行: 送った回数が、呼び出しの数の 1.2 倍を超えたら ----
+  - interval: 1m
+    input_series:
+      - series: 'pingucoin_grpc_client_handled_total{target="orcan-api", grpc_code="OK"}'
+        values: '0+10x30'
+      - series: 'pingucoin_grpc_client_attempts_total{target="orcan-api"}'
+        values: '0+14x30'
+      - series: 'pingucoin_grpc_client_handled_total{target="payment-api", grpc_code="OK"}'
+        values: '0+10x30'
+      - series: 'pingucoin_grpc_client_attempts_total{target="payment-api"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: GrpcClientRetriesHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, target: orcan-api}
+            exp_annotations:
+              summary: "orcan-api への呼び出しの再試行が、20% を超えている"
+              description: "UNAVAILABLE などの一時的な失敗が、続いている(再試行で隠れて、まだ、エラーにはなっていない)。相手が不安定になりかけている。"

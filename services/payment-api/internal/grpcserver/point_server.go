@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/repository"
@@ -63,6 +64,13 @@ func (server *PointServer) ListPointTransactions(ctx context.Context, request *p
 
 // CreditPoints は決済連携以外の手動付与(例: キャンペーン)。
 func (server *PointServer) CreditPoints(ctx context.Context, request *pb.CreditPointsRequest) (*pb.CreditPointsResponse, error) {
+	response, err := server.creditPoints(ctx, request)
+	metrics.RecordPointTransaction(model.PointTransactionTypeCredit, metrics.ResultOf(err), request.GetAmount()) // メトリクス: ポイントの付与
+	return response, err
+}
+
+// creditPoints は CreditPoints の本体。
+func (server *PointServer) creditPoints(ctx context.Context, request *pb.CreditPointsRequest) (*pb.CreditPointsResponse, error) {
 	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
@@ -86,6 +94,13 @@ func (server *PointServer) CreditPoints(ctx context.Context, request *pb.CreditP
 
 // DebitPoints は決済連携以外の手動消費(例: 運用による調整)。
 func (server *PointServer) DebitPoints(ctx context.Context, request *pb.DebitPointsRequest) (*pb.DebitPointsResponse, error) {
+	response, err := server.debitPoints(ctx, request)
+	metrics.RecordPointTransaction(model.PointTransactionTypeDebit, metrics.ResultOf(err), request.GetAmount()) // メトリクス: ポイントの消費
+	return response, err
+}
+
+// debitPoints は DebitPoints の本体。
+func (server *PointServer) debitPoints(ctx context.Context, request *pb.DebitPointsRequest) (*pb.DebitPointsResponse, error) {
 	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}

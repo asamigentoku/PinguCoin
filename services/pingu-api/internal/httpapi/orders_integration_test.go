@@ -251,3 +251,49 @@ func TestHasPaidOrder(t *testing.T) {
 		t.Error("a pending order was treated as purchased")
 	}
 }
+
+// 注文の結果が、メトリクスに数えられる。成立した注文の合計ポイントも。
+// 在庫不足・ポイント不足は、サーバーの失敗(failed)ではなく、通常の結果として、別のラベルで数える
+// (failed を、アラートの対象にするので、混ぜない)。
+func TestOrderOutcomesAreCounted(t *testing.T) {
+	result := func(name string) float64 {
+		return metricValue(t, "pingucoin_orders_total", map[string]string{"result": name})
+	}
+	amount := func() float64 { return metricValue(t, "pingucoin_order_amount_points_total", nil) }
+
+	f := newOrderFixture(t)
+	created, replayed, outOfStock, insufficient, rejected, failed := result("created"), result("replayed"), result("out_of_stock"), result("insufficient_point"), result("rejected"), result("failed")
+	amountBefore := amount()
+
+	f.order("1", "key-ok", `{"product_id":10,"quantity":2}`) // 300 x 2 = 600 ポイント
+	f.order("1", "key-ok", `{"product_id":10,"quantity":2}`) // 同じキーの再送
+	f.order("1", "key-bad", `{"product_id":0}`)              // 入力の誤り
+
+	f.inventory.err = status.Error(codes.FailedPrecondition, "insufficient stock")
+	f.order("2", "key-stock", `{"product_id":10}`)
+	f.inventory.err = nil
+
+	f.payments.err = status.Error(codes.FailedPrecondition, "insufficient points")
+	f.order("2", "key-points", `{"product_id":10}`)
+	f.payments.err = status.Error(codes.Internal, "payment backend down")
+	f.order("2", "key-down", `{"product_id":10}`)
+
+	for _, check := range []struct {
+		name        string
+		got, before float64
+	}{
+		{"created", result("created"), created},
+		{"replayed", result("replayed"), replayed},
+		{"out_of_stock", result("out_of_stock"), outOfStock},
+		{"insufficient_point", result("insufficient_point"), insufficient},
+		{"rejected", result("rejected"), rejected},
+		{"failed", result("failed"), failed},
+	} {
+		if got := check.got - check.before; got != 1 {
+			t.Errorf("%s increased by %v, want 1", check.name, got)
+		}
+	}
+	if got := amount() - amountBefore; got != 600 {
+		t.Errorf("order amount increased by %v, want 600 (replays and failures must not add)", got)
+	}
+}

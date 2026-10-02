@@ -12,10 +12,12 @@ import (
 	"google.golang.org/grpc/reflection"
 	"gorm.io/gorm"
 
+	"github.com/asamigentoku/PinguCoin/pkg/cache"
 	"github.com/asamigentoku/PinguCoin/pkg/dbretry"
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
+	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/orcan-api/internal/database"
@@ -32,6 +34,7 @@ func main() {
 	logger := logging.NewFromEnv("orcan-api")
 	slog.SetDefault(logger)
 	build := version.Get()
+	metrics.Init("orcan-api")
 	logger.Info("orcan-api starting",
 		slog.Group("build", slog.String("commit", build.Commit), slog.String("time", build.BuildTime), slog.String("go", build.GoVersion)),
 	)
@@ -76,7 +79,8 @@ func main() {
 	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			interceptor.RequestID(), // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
+			metrics.UnaryServerInterceptor(), // リクエストの数・結果・処理時間(認証に失敗したものも数える。いちばん外側)
+			interceptor.RequestID(),          // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
 			interceptor.Logging(logger),
 			interceptor.Auth(cfg.InternalAPIToken),
 		),
@@ -87,7 +91,16 @@ func main() {
 	// 「このgRPCサーバーに、このRPCが来たらこの実装(grpcserver.NewXxxServer)を呼ぶ」
 	// というルーティングをserverの内部に登録する処理。
 	// 各実装(grpcserver.NewXxxServer)はDBアクセス用のrepositoryを注入されて動く。
-	productRepo := repository.NewProductRepository(db)
+	// 商品の読み取りキャッシュ。REDIS_ENABLED=true のときだけ Redis を使う(false なら nil で、常に DB から読む)。
+	var productCache *cache.Cache
+	if cfg.RedisEnabled {
+		productCache = cache.New(cache.Config{Addr: cfg.RedisAddr, Password: cfg.RedisPassword, DB: cfg.RedisDB, TTL: cfg.ProductCacheTTL}, logger)
+		defer productCache.Close()
+		logger.Info("product cache enabled (redis)", slog.String("addr", cfg.RedisAddr), slog.Duration("ttl", cfg.ProductCacheTTL))
+	} else {
+		logger.Info("product cache disabled (REDIS_ENABLED=false)")
+	}
+	productRepo := repository.NewProductRepository(db).WithCache(productCache)
 	detailRepo := repository.NewProductDetailRepository(db)
 	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(productRepo, detailRepo, blobStorage))
 	pb.RegisterProductAssetServiceServer(server, grpcserver.NewProductAssetServer(repository.NewProductAssetRepository(db), productRepo, blobStorage))
@@ -105,6 +118,8 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
+	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
 	health.Register(shutdownCtx, server, db, logger)
 	go func() {
 		<-shutdownCtx.Done()

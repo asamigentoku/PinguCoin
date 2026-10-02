@@ -27,7 +27,7 @@ GitHub Actions ──(OIDC。パスワードなし)──▶ Azure     ※ produ
 | アプリの定義 | Kubernetes のマニフェスト(kustomize。minikube とは共有せず、このフォルダだけで完結) | `platform/kubernetes/production` |
 
 - DB は**インターネットに公開しません**(仮想ネットワークの中だけ)。AKS からだけつながります。
-- 秘密情報(DB の接続URL、Storage の接続文字列、サービス間のトークン)は Terraform が作って Key Vault に入れ、デプロイのたびに GitHub Actions が読んで Kubernetes の Secret にします。
+- 秘密情報(DB の接続URL、Storage の接続文字列、サービス間のトークン、Grafana の管理者パスワード)は Terraform が作って Key Vault に入れ、デプロイのたびに GitHub Actions が読んで Kubernetes の Secret にします。
 
 ## コスト最小の構成
 
@@ -195,6 +195,7 @@ Terraform の state を置く Storage と、GitHub Actions がログインする
 | Secret(Key Vault の値や `CLERK_SECRET_KEY`)を変えた | **Deploy (production)** を、`restart` にチェックを入れて手動で実行 |
 | インフラを変える | `platform/terraform/envs/production/` を変えて PR を出す。PR で plan を確認し、`production` ブランチへのマージ後に `production-infra` を承認 |
 | ログを見る | `kubectl logs -n pingucoin deployment/pingu-api`(Container Insights を有効にすれば、Azure のポータルでも見られる) |
+| メトリクス・グラフ・アラートを見る | `bash script/monitor.sh`(Grafana: http://localhost:3001、Prometheus: http://localhost:9090)。AKS の管理者だけ。インターネットには公開していない。[MONITORING.md](MONITORING.md) |
 
 ## 注意
 

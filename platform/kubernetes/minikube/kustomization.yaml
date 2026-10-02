@@ -6,5 +6,7 @@ resources:
   - namespace.yaml      # 専用のnamespace「pingucoin」
   - config.yaml         # 共通の設定(ConfigMap)
   - servers.yaml        # 3つのAPIのDeploymentとService(リソース・probe・ローリングアップデートなど)
+  - redis.yaml          # 商品キャッシュ用のRedis(orcan-apiが REDIS_ENABLED=true のときだけ使う)
   - autoscaling.yaml    # 自動スケール(HPA)と、同時に落とせる数の制限(PDB)
   - network-policy.yaml # 通信の制限(NetworkPolicy)
+  - monitoring          # 監視(Prometheus + Grafana + kube-state-metrics)。monitoring/ の中で完結している

@@ -1,0 +1,14 @@
+# ダッシュボードの置き場所(ConfigMap「grafana-dashboards」の JSON)を、Grafana に教える。
+# ファイルが変わったら(ConfigMap の更新)、自動で反映される。画面から編集して保存はできない(allowUiUpdates: false)。
+# 直したいときは、JSON を直して、適用する(docs/MONITORING.md)。
+apiVersion: 1
+providers:
+  - name: pingucoin
+    orgId: 1
+    folder: PinguCoin
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
