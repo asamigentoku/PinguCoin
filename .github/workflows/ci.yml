@@ -76,6 +76,8 @@ jobs:
           cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # PageProps / LayoutProps は Next.js が生成するグローバル型。tsc の前に生成しておく。
+      - run: npx next typegen
       - run: npx tsc --noEmit
       # テストがあるアプリだけ(client-web の retry など)。
       - run: npm test --if-present
