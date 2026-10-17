@@ -30,7 +30,7 @@ jobs:
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/pingucoin_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: go.mod / go.sum が整っているか

@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0 # 比較先(PR の宛先ブランチ)と比べるため
       - uses: bufbuild/buf-setup-action@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: protoc-gen-go / protoc-gen-go-grpc
