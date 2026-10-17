@@ -24,7 +24,7 @@ services:
       - pingucoin
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: pingucoin-redis
     restart: unless-stopped
     environment:
