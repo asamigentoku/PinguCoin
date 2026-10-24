@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"gorm.io/gorm"
 
-	"github.com/asamigentoku/PinguCoin/pkg/cache"
 	"github.com/asamigentoku/PinguCoin/pkg/dbretry"
 	"github.com/asamigentoku/PinguCoin/pkg/health"
 	"github.com/asamigentoku/PinguCoin/pkg/interceptor"
@@ -91,16 +90,7 @@ func main() {
 	// 「このgRPCサーバーに、このRPCが来たらこの実装(grpcserver.NewXxxServer)を呼ぶ」
 	// というルーティングをserverの内部に登録する処理。
 	// 各実装(grpcserver.NewXxxServer)はDBアクセス用のrepositoryを注入されて動く。
-	// 商品の読み取りキャッシュ。REDIS_ENABLED=true のときだけ Redis を使う(false なら nil で、常に DB から読む)。
-	var productCache *cache.Cache
-	if cfg.RedisEnabled {
-		productCache = cache.New(cache.Config{Addr: cfg.RedisAddr, Password: cfg.RedisPassword, DB: cfg.RedisDB, TTL: cfg.ProductCacheTTL}, logger)
-		defer productCache.Close()
-		logger.Info("product cache enabled (redis)", slog.String("addr", cfg.RedisAddr), slog.Duration("ttl", cfg.ProductCacheTTL))
-	} else {
-		logger.Info("product cache disabled (REDIS_ENABLED=false)")
-	}
-	productRepo := repository.NewProductRepository(db).WithCache(productCache)
+	productRepo := repository.NewProductRepository(db)
 	detailRepo := repository.NewProductDetailRepository(db)
 	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(productRepo, detailRepo, blobStorage))
 	pb.RegisterProductAssetServiceServer(server, grpcserver.NewProductAssetServer(repository.NewProductAssetRepository(db), productRepo, blobStorage))

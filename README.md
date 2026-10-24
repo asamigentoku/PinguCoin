@@ -30,7 +30,7 @@
 │   │   ├── minikube/         #     ローカル用
 │   │   └── production/       #     本番(AKS)用
 │   ├── terraform/envs/       #   staging(Supabase / Azure Blob)と production(AKS / PostgreSQL / Blob / ACR / Key Vault)
-│   └── docker/               #   ローカル用のPostgres / Redisなど(docker compose)
+│   └── docker/               #   ローカル用のPostgresなど(docker compose)
 ├── .github/                  # GitHub Actions
 │   ├── workflows/            #   ci.yml と _go-test.yml(共通)、production-terraform.yml / production-deploy.yml(本番)
 │   └── actions/production/   #   本番だけの処理の部品(AKSへの接続、Secretの作成、適用、ロールバックなど)

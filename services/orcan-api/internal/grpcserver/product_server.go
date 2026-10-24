@@ -39,7 +39,7 @@ func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListP
 		userID = uint(request.GetUserId())
 	}
 
-	products, err := server.repo.FindAllCached(ctx, userID)
+	products, err := server.repo.FindAll(userID)
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
@@ -52,7 +52,7 @@ func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListP
 }
 
 func (server *ProductServer) GetProduct(ctx context.Context, request *pb.GetProductRequest) (*pb.GetProductResponse, error) {
-	product, err := server.repo.FindByIDCached(ctx, uint(request.GetId()))
+	product, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product", err)
 	}

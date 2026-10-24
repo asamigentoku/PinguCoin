@@ -77,11 +77,6 @@ var (
 		Help: "在庫の増減の数(方向・結果別)。direction は increase / decrease。",
 	}, []string{"direction", "result"})
 
-	cacheRequests = factory().NewCounterVec(prometheus.CounterOpts{
-		Name: "pingucoin_cache_requests_total",
-		Help: "キャッシュ(Redis)の参照の結果(キャッシュ名・結果別)。result は hit / miss / error。",
-	}, []string{"cache", "result"})
-
 	productsCreated = factory().NewCounter(prometheus.CounterOpts{
 		Name: "pingucoin_products_created_total",
 		Help: "出品(商品の作成)の数。",
@@ -106,9 +101,6 @@ func RecordOrder(result string, points int64) {
 		orderAmount.Add(float64(points))
 	}
 }
-
-// RecordCache は、キャッシュの参照の結果(hit / miss / error)を数える。
-func RecordCache(cache, result string) { cacheRequests.WithLabelValues(cache, result).Inc() }
 
 // RecordAuth は、認証の結果を数える。
 func RecordAuth(result string) { authRequests.WithLabelValues(result).Inc() }
