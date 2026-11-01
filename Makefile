@@ -34,7 +34,7 @@ cover-db: ## 使い捨てのPostgresを起動して、統合テストを含め�
 
 proto: ## .proto を検査して、Goのコードを生成し直す(services/<service>/proto/)
 	buf lint
-	buf generate services/orcan-api/proto --template services/orcan-api/proto/buf.gen.yaml
+	buf generate services/media-api/proto --template services/media-api/proto/buf.gen.yaml
 	buf generate services/payment-api/proto --template services/payment-api/proto/buf.gen.yaml
 
 tidy: ## go.mod / go.sum を整える

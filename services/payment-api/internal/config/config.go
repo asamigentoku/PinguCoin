@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 // Config はアプリケーションの設定値を保持する。
 type Config struct {
@@ -13,13 +16,21 @@ type Config struct {
 	DBName      string
 	DBSSLMode   string
 
-	// InternalAPIToken はpingu-apiからのgRPC呼び出しを検証するための共有シークレット。
-	// pingu-api/orcan-api/payment-apiで同じ値を設定する。
+	// InternalAPIToken はbffからのgRPC呼び出しを検証するための共有シークレット。
+	// bff/media-api/payment-apiで同じ値を設定する。
 	InternalAPIToken string
+	KafkaBrokers     []string
 }
 
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
+
 func Load() Config {
+	var brokers []string
+	for _, broker := range strings.Split(os.Getenv("KAFKA_BROKERS"), ",") {
+		if value := strings.TrimSpace(broker); value != "" {
+			brokers = append(brokers, value)
+		}
+	}
 	return Config{
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		Port:        getEnv("PORT", "8081"),
@@ -31,6 +42,7 @@ func Load() Config {
 		DBSSLMode:   getEnv("DB_SSLMODE", "disable"),
 
 		InternalAPIToken: getEnv("INTERNAL_API_TOKEN", ""),
+		KafkaBrokers:     brokers,
 	}
 }
 

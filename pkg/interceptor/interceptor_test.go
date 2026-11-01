@@ -220,8 +220,8 @@ func TestRequestIDInterceptor(t *testing.T) {
 		return seen
 	}
 
-	passed := metadata.NewIncomingContext(context.Background(), metadata.Pairs(requestid.MetadataKey, "from-pingu-api"))
-	if got := call(passed); got != "from-pingu-api" {
+	passed := metadata.NewIncomingContext(context.Background(), metadata.Pairs(requestid.MetadataKey, "from-bff"))
+	if got := call(passed); got != "from-bff" {
 		t.Errorf("the caller's request ID should be used: %q", got)
 	}
 	if got := call(context.Background()); len(got) != 32 {

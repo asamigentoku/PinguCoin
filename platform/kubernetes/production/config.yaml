@@ -10,5 +10,7 @@ metadata:
 data:
   # ログの env 属性(Datadog の env)。pkg/logging が読む。全サービスで、同じ値にそろえる。
   DD_ENV: production
-  ORCAN_API_ADDR: orcan-api:8080
+  MEDIA_API_ADDR: media-api:8080
   PAYMENT_API_ADDR: payment-api:8081
+  INVENTORY_API_ADDR: inventory-api:8083
+  ORDER_API_ADDR: order-api:8084

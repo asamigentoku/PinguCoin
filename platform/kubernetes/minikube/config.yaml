@@ -1,7 +1,7 @@
 # クラスター内の宛先だけを決める設定(機密ではない)。
 #
 # 各APIの環境変数は services/<api>/.env から作ったSecret(<api>-env)で渡す。
-# ただし .env の ORCAN_API_ADDR=localhost:8080 のような値は、Pod内では届かない。
+# ただし .env の MEDIA_API_ADDR=localhost:8080 のような値は、Pod内では届かない。
 # そこでこのConfigMapを servers.yaml の envFrom の「最後」に置き、
 # .env の値よりも優先させて、クラスター内のService名に向ける。
 apiVersion: v1
@@ -11,5 +11,7 @@ metadata:
 data:
   # ログの env 属性(Datadog の env)。pkg/logging が読む。全サービスで、同じ値にそろえる(.env の APP_ENV は、別の用途)。
   DD_ENV: minikube
-  ORCAN_API_ADDR: orcan-api:8080
+  MEDIA_API_ADDR: media-api:8080
   PAYMENT_API_ADDR: payment-api:8081
+  INVENTORY_API_ADDR: inventory-api:8083
+  ORDER_API_ADDR: order-api:8084

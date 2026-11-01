@@ -25,7 +25,6 @@ configMapGenerator:
   - name: grafana-dashboards
     files:
       - dashboards/pingucoin-overview.json
-      - dashboards/pingucoin-http-graphql.json
       - dashboards/pingucoin-grpc.json
       - dashboards/pingucoin-database.json
       - dashboards/pingucoin-business.json

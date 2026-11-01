@@ -1,12 +1,12 @@
-# pingu-api を、インターネットに公開する入口(HTTPS)。
+# bff を、インターネットに公開する入口(HTTPS)。
 #   - ingressClassName: AKS の「アプリケーションルーティング」アドオン(マネージドの NGINX)。Terraform で有効にする。
 #   - TLS 証明書: cert-manager が Let's Encrypt から自動で取得・更新する(production/cert-manager/ を参照)。
-#   - host は、ワークフローが PINGU_API_HOST(GitHub の Environment 変数)に差し替える。
-# orcan-api / payment-api は公開しない(クラスター内の通信だけ)。
+#   - host は、デプロイ時に BFF_API_HOSTへ差し替える。
+# media-api / payment-api は公開しない(クラスター内の通信だけ)。
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: pingu-api
+  name: bff
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     # 商品ファイルのアップロードは Azure Blob に直接送るので、API 本体に大きなリクエストは来ない。
@@ -16,7 +16,7 @@ spec:
   tls:
     - hosts:
         - api.pingucoin.example
-      secretName: pingu-api-tls
+      secretName: bff-tls
   rules:
     - host: api.pingucoin.example
       http:
@@ -25,6 +25,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: pingu-api
+                name: bff
                 port:
                   number: 8082

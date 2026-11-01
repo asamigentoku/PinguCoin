@@ -39,7 +39,7 @@ output "azure_storage_private_container" {
 }
 
 output "azure_storage_connection_string" {
-  description = "Set this as AZURE_STORAGE_CONNECTION_STRING in the orcan-api Vercel project."
+  description = "Set this as AZURE_STORAGE_CONNECTION_STRING in the media-api Vercel project."
   value       = module.azure_blob.connection_string
   sensitive   = true
 }

@@ -1,4 +1,4 @@
-// Package metrics は、3つのサービス(orcan-api / payment-api / pingu-api)共通の、Prometheus 向けのメトリクスを提供する。
+// Package metrics は、3つのサービス(orcan-api / payment-api / bff)共通の、Prometheus 向けのメトリクスを提供する。
 //
 // メトリクスは、ログ(1件ずつの出来事)と違って、「数」の推移(1秒あたりのリクエスト数、エラーの割合、処理時間の分布、
 // DB の接続の使用状況など)を、安く、長く持つためのもの。Prometheus が、各 Pod の /metrics を定期的に取りに来て(scrape)、
@@ -7,10 +7,10 @@
 // 出すメトリクス(すべて pingucoin_ で始まる。Go のランタイムとプロセスのメトリクスは、go_ / process_ のまま)
 //
 //	pingucoin_build_info                      ... バージョン(値は常に 1。ラベルに service / version / commit)
-//	pingucoin_http_*                          ... HTTP サーバー(pingu-api)               http.go
-//	pingucoin_graphql_*                       ... GraphQL の操作(pingu-api)              services/pingu-api/internal/httpapi
+//	pingucoin_http_*                          ... HTTP サーバー(bff)               http.go
+//	pingucoin_graphql_*                       ... GraphQL の操作(bff)              services/bff/internal/httpapi
 //	pingucoin_grpc_server_*                   ... gRPC サーバー(orcan-api / payment-api)  grpc.go
-//	pingucoin_grpc_client_*                   ... gRPC クライアント(pingu-api → 他の2つ)   grpc.go
+//	pingucoin_grpc_client_*                   ... gRPC クライアント(bff → 他の2つ)   grpc.go
 //	pingucoin_db_*                            ... DB の接続プールと、クエリ                 db.go
 //	pingucoin_orders_* / payments_* / ...     ... 業務の数(注文・決済・ポイント・在庫・Blob) business.go
 //

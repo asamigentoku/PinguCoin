@@ -20,7 +20,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
   } catch {
     return (
       <div className="shell">
-        <EmptyState title="商品情報を取得できませんでした" body="pingu-apiの起動状態を確認して、もう一度お試しください。" href="/products" action="商品一覧へ戻る" />
+        <EmptyState title="商品情報を取得できませんでした" body="bffの起動状態を確認して、もう一度お試しください。" href="/products" action="商品一覧へ戻る" />
       </div>
     );
   }

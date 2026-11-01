@@ -1,7 +1,7 @@
 # payment-api
 
 決済ドメインを扱うAPI。Go + [gRPC](https://grpc.io/) + [GORM](https://gorm.io/) (PostgreSQL) 構成。
-proto定義は[buf](https://buf.build/)で管理し、このサービスの `proto/payment/v1` に置く(生成したGoのコードも同じ場所)。呼び出し側の `pingu-api` も、この生成コードをそのまま import する。
+proto定義は[buf](https://buf.build/)で管理し、このサービスの `proto/payment/v1` に置く(生成したGoのコードも同じ場所)。呼び出し側の `bff` も、この生成コードをそのまま import する。
 
 ## 機能
 
@@ -25,7 +25,7 @@ proto定義は[buf](https://buf.build/)で管理し、このサービスの `pro
 
 | テーブル | 説明 |
 | --- | --- |
-| `payments` | 決済(`user_id`=購入者, `product_id`=orcan-apiの`products.id`への参照) |
+| `payments` | 決済(`user_id`=購入者, `product_id`=media-apiの`products.id`への参照) |
 | `refunds` | 返金(1決済に対して複数件になり得る = 部分返金対応) |
 | `point_accounts` | ユーザーごとのポイント残高(1ユーザー1件) |
 | `point_transactions` | ポイント増減履歴(`type`: `credit`/`debit`/`payment`/`refund`) |
@@ -35,7 +35,7 @@ proto定義は[buf](https://buf.build/)で管理し、このサービスの `pro
 
 ## エラーレスポンス / ログ
 
-orcan-apiと同じ方針。`internal/apperr`でアプリ固有のエラー(`NotFound`/`InvalidArgument`/`FailedPrecondition`/`Internal`)のみを返し、
+media-apiと同じ方針。`internal/apperr`でアプリ固有のエラー(`NotFound`/`InvalidArgument`/`FailedPrecondition`/`Internal`)のみを返し、
 DBの生エラーはクライアントに漏らさずログにのみ残す。`internal/interceptor.Logging`で全RPCを構造化ログ(JSON)に出力する。
 
 ## 起動確認
@@ -63,5 +63,5 @@ go run ./cmd/api
 ```
 
 `DB_NAME`のデータベース(デフォルト`payment`)は事前に作成しておく必要がある
-(`orcan-api`と同じPostgresインスタンスを使う場合、`orcan`用に自動作成される`orcan`とは別に作成が必要)。
+(`media-api`と同じPostgresインスタンスを使う場合、`orcan`用に自動作成される`orcan`とは別に作成が必要)。
 起動時に `internal/database.Migrate` が、未適用の SQL マイグレーション(`migrations/`。テーブルは `payments`, `refunds`, `point_accounts`, `point_transactions`)を番号順に適用する(仕組みは `docs/VERSIONING.md`)。

@@ -10,7 +10,7 @@ option go_package = "github.com/asamigentoku/PinguCoin/services/payment-api/prot
 message Payment {
   uint32 id = 1;
   uint32 user_id = 2;
-  // orcan-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
+  // media-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
   uint32 product_id = 3;
   int64 amount = 4;
   string currency = 5;        // "JPY", "POINT" など
@@ -51,7 +51,7 @@ message CreatePaymentRequest {
   string currency = 4;
   string payment_method = 5;
   // idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
-  // 作られない(最初に処理した結果をそのまま返す)。呼び出し元(pingu-api)は必ず指定すること。
+  // 作られない(最初に処理した結果をそのまま返す)。呼び出し元(bff)は必ず指定すること。
   string idempotency_key = 6;
 }
 

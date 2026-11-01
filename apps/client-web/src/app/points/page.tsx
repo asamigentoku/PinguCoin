@@ -27,7 +27,7 @@ export default async function PointsPage() {
       <PageHeader title="ポイントをためる" lead="ポイントは、作品の購入に使えます。" />
       <section className="shell sell-section">
         {!points ? (
-          <EmptyState title="ポイントを読み込めませんでした" body="pingu-apiとpayment-apiが起動しているか確認して、ページを再読み込みしてください。" href="/points" action="再読み込みする" />
+          <EmptyState title="ポイントを読み込めませんでした" body="bffとpayment-apiが起動しているか確認して、ページを再読み込みしてください。" href="/points" action="再読み込みする" />
         ) : (
           <>
             <div className="points-hero">

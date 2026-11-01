@@ -14,7 +14,7 @@ type Target = { blobEndpoint: string; container: string; sasToken: string };
 type Queued = { key: string; file: File; progress: number; state: "queued" | "uploading" | "done" | "error" };
 
 // 署名付きURL(SAS)を使い、ブラウザからAzure Blobへ直接アップロードする(進捗を通知する)。
-// 戻り値はSASを含まない素のBlob URL(pingu-apiのconfirmに渡す値)。
+// 戻り値はSASを含まない素のBlob URL(bffのconfirmに渡す値)。
 function putBlob(target: Target, prefix: string, file: File, onProgress: (percent: number) => void) {
   // Blob 名は1回だけ決める。再試行は、同じ名前への上書き(PUT)なので、何回やっても結果は同じ(二重にならない)。
   const url = `${target.blobEndpoint.replace(/\/$/, "")}/${target.container}/${prefix}${safeBlobName(file.name)}`;

@@ -8,12 +8,12 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: orcan-api
+  name: media-api
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: orcan-api
+    name: media-api
   minReplicas: 2
   maxReplicas: 5
   metrics:
@@ -35,12 +35,12 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: orcan-api
+  name: media-api
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: orcan-api
+      app: media-api
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -82,12 +82,12 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: pingu-api
+  name: bff
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: pingu-api
+    name: bff
   minReplicas: 2
   maxReplicas: 5
   metrics:
@@ -109,9 +109,9 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: pingu-api
+  name: bff
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: pingu-api
+      app: bff

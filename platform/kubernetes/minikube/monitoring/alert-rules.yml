@@ -62,7 +62,7 @@ groups:
         for: 5m
         labels: {severity: critical}
         annotations:
-          summary: "pingu-api の 5xx が 5% を超えている"
+          summary: "bff の 5xx が 5% を超えている"
           description: "5 分間の平均で、HTTP リクエストの 5% 以上が 5xx。ログ(level=error、request_id)と、下流の gRPC のエラーを見る。"
 
       - alert: HttpSlowRequests
@@ -94,7 +94,7 @@ groups:
         for: 5m
         labels: {severity: critical}
         annotations:
-          summary: "pingu-api から {{ $labels.target }} への呼び出しが、5% 以上失敗している"
+          summary: "bff から {{ $labels.target }} への呼び出しが、5% 以上失敗している"
           description: "再試行しても失敗した、最終の結果。相手のサービス・ネットワークの障害。"
 
       - alert: GrpcClientRetriesHigh
@@ -108,16 +108,16 @@ groups:
           summary: "{{ $labels.target }} への呼び出しの再試行が、20% を超えている"
           description: "UNAVAILABLE などの一時的な失敗が、続いている(再試行で隠れて、まだ、エラーにはなっていない)。相手が不安定になりかけている。"
 
-      - alert: GraphqlErrors
+      - alert: BffServerErrors
         expr: |
-          sum(rate(pingucoin_graphql_operations_total{result="error"}[10m]))
-            / sum(rate(pingucoin_graphql_operations_total[10m])) > 0.2
-          and sum(rate(pingucoin_graphql_operations_total[10m])) > 0.05
+          sum(rate(pingucoin_http_requests_total{app="bff",code=~"5.."}[10m]))
+            / sum(rate(pingucoin_http_requests_total{app="bff"}[10m])) > 0.2
+          and sum(rate(pingucoin_http_requests_total{app="bff"}[10m])) > 0.05
         for: 10m
         labels: {severity: warning}
         annotations:
-          summary: "GraphQL の操作の 20% 以上が、エラーを返している"
-          description: "GraphQL は、エラーでも HTTP 200 を返すので、HTTP の 5xx には出ない。クライアントの誤り(不正なクエリ)も含む。"
+          summary: "BFFのリクエストの20%以上が5xxを返している"
+          description: "BFF REST APIのサーバーエラー率が高くなっている。"
 
   # ---------------------------------------------------------------- データベース
   - name: database

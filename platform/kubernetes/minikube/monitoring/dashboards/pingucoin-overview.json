@@ -521,7 +521,7 @@
   },
   {
    "type": "row",
-   "title": "リクエスト(pingu-api の入口)",
+   "title": "リクエスト(bff の入口)",
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -723,7 +723,7 @@
   {
    "type": "timeseries",
    "title": "gRPC(サービス間)/ 秒",
-   "description": "orcan-api / payment-api が受けた呼び出し。",
+   "description": "media-api / payment-api が受けた呼び出し。",
    "datasource": {
     "type": "prometheus",
     "uid": "prometheus"
@@ -1105,7 +1105,7 @@
       "type": "prometheus",
       "uid": "prometheus"
      },
-     "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"pingucoin\", container=~\"orcan-api|payment-api|pingu-api\"}[$__rate_interval]))",
+     "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"pingucoin\", container=~\"media-api|payment-api|bff\"}[$__rate_interval]))",
      "legendFormat": "{{container}}",
      "refId": "A",
      "editorMode": "code"
@@ -1161,7 +1161,7 @@
       "type": "prometheus",
       "uid": "prometheus"
      },
-     "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"pingucoin\", container=~\"orcan-api|payment-api|pingu-api\"})",
+     "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"pingucoin\", container=~\"media-api|payment-api|bff\"})",
      "legendFormat": "{{container}}",
      "refId": "A",
      "editorMode": "code"

@@ -1,7 +1,7 @@
 # 3つのAPIのDeployment(Podの定義)とService(クラスター内の宛先)。minikube(ローカル)用。
 #
 # DBとBlob Storageはクラスターの外(staging)にある。接続情報は各APIの
-# services/<api>/.env に書き、script/start.sh がSecret(orcan-api-env など)にして渡す。
+# services/<api>/.env に書き、script/start.sh がSecret(media-api-env など)にして渡す。
 #
 # 環境変数の優先順位(後のものが勝つ):
 #   1. envFrom の1つ目 ... <api>-env Secret(.env の中身がそのまま入る)
@@ -16,10 +16,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: orcan-api
+  name: media-api
 spec:
   selector:
-    app: orcan-api
+    app: media-api
   ports:
     - port: 8080
       targetPort: api
@@ -27,7 +27,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: orcan-api
+  name: media-api
 spec:
   # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
   replicas: 2
@@ -42,11 +42,11 @@ spec:
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app: orcan-api
+      app: media-api
   template:
     metadata:
       labels:
-        app: orcan-api
+        app: media-api
     spec:
       # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
       automountServiceAccountToken: false
@@ -60,14 +60,14 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: orcan-api
+              app: media-api
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: orcan-api
-          image: pingucoin/orcan-api:dev
+        - name: media-api
+          image: pingucoin/media-api:dev
           # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
@@ -79,7 +79,7 @@ spec:
               containerPort: 9090
           envFrom:
             - secretRef:
-                name: orcan-api-env
+                name: media-api-env
             - configMapRef:
                 name: pingucoin-cluster-config
           env:
@@ -256,10 +256,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: pingu-api
+  name: bff
 spec:
   selector:
-    app: pingu-api
+    app: bff
   ports:
     - port: 8082
       targetPort: api
@@ -267,7 +267,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pingu-api
+  name: bff
 spec:
   # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
   replicas: 2
@@ -282,11 +282,11 @@ spec:
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      app: pingu-api
+      app: bff
   template:
     metadata:
       labels:
-        app: pingu-api
+        app: bff
     spec:
       # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
       automountServiceAccountToken: false
@@ -300,14 +300,14 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: pingu-api
+              app: bff
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: pingu-api
-          image: pingucoin/pingu-api:dev
+        - name: bff
+          image: pingucoin/bff:dev
           # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
           imagePullPolicy: Never
           ports:
@@ -319,7 +319,7 @@ spec:
               containerPort: 9090
           envFrom:
             - secretRef:
-                name: pingu-api-env
+                name: bff-env
             - configMapRef:
                 name: pingucoin-cluster-config
           env:
@@ -338,7 +338,7 @@ spec:
           #   startupProbe   ... 起動が終わるまで待つ。終わるまで他のprobeは動かない(最大 5秒 x 30回)
           #   readinessProbe ... 失敗するとServiceの宛先から外し、リクエストを送らない(再起動はしない)
           #   livenessProbe  ... 失敗が続くとコンテナを再起動する(固まったプロセスの自動復旧)
-          # HTTPのヘルスチェック。services/pingu-api/internal/httpapi/health_handler.go を参照。
+          # HTTPのヘルスチェック。services/bff/internal/httpapi/health_handler.go を参照。
           #   /readyz  ... DBに接続できる間だけ200(できなければ503)
           #   /healthz ... プロセスが応答できれば常に200(DBの障害では再起動しない)
           startupProbe:

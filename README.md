@@ -8,14 +8,14 @@
 ```text
 .
 ├── services/                 # マイクロサービス(それぞれが1つのAPI)
-│   ├── orcan-api/            #   商品・ユーザー・在庫・アセット(gRPC)
+│   ├── media-api/            #   商品・ユーザー・在庫・アセット(gRPC)
 │   │   ├── cmd/api/          #     エントリーポイント(main.go)
 │   │   ├── internal/         #     このサービスだけが使うコード(grpcserver / repository / model など)
 │   │   ├── proto/            #     このサービスのprotobuf(.protoと、生成したGoのコード)
 │   │   ├── Dockerfile
 │   │   └── .env.example
 │   ├── payment-api/          #   決済・返金・ポイント(gRPC)
-│   └── pingu-api/            #   ゲートウェイ(GraphQL / REST)。上の2つを呼び出す
+│   └── bff/            #   REST BFF。内部APIを呼び出す
 ├── pkg/                      # 複数のサービスで共有するGoのコード
 │   ├── interceptor/          #   gRPCのサービス間認証・リクエストログ
 │   ├── health/               #   gRPCのヘルスチェック(grpc.health.v1)
@@ -45,11 +45,11 @@
 ### 依存の向き
 
 ```text
-apps/*  ──GraphQL/REST──▶  pingu-api ──gRPC──▶  orcan-api
+apps/*  ──REST──▶  bff ──gRPC──▶  media-api
                                       └─gRPC──▶  payment-api
 ```
 
-- `pingu-api` は、`orcan-api` / `payment-api` が生成した protobuf のコード(`services/*/proto`)をそのまま import します。コピーは持ちません。
+- `bff` は、`media-api` / `payment-api` が生成した protobuf のコード(`services/*/proto`)をそのまま import します。コピーは持ちません。
 - `internal/` は、そのサービスの外から import できません。複数のサービスで使うコードだけを `pkg/` に置きます。
 - エラー型(`internal/apperr`)と設定(`internal/config`)は、サービスごとに性質が違う(gRPC と HTTP、環境変数の項目)ので、サービスの中に置いています。
 

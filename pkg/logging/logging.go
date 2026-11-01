@@ -9,7 +9,7 @@
 //	timestamp   ログの時刻(ISO 8601 / RFC 3339、UTC)
 //	status      ログのレベル(debug / info / warn / error)
 //	message     ログの本文
-//	service     サービス名(orcan-api / payment-api / pingu-api)
+//	service     サービス名(orcan-api / payment-api / bff)
 //	env         環境(local / staging / production。環境変数 DD_ENV。無ければ APP_ENV)
 //	version     サービスのバージョン(pkg/version)
 //

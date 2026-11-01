@@ -10,12 +10,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// internalTokenMetadataKey はpingu-apiがサービス間認証用の共有トークンを乗せるgRPCメタデータのキー。
+// internalTokenMetadataKey はbffがサービス間認証用の共有トークンを乗せるgRPCメタデータのキー。
 const internalTokenMetadataKey = "x-internal-token"
 
-// Auth はpingu-api以外からの直接のgRPC呼び出しを拒否するための、サービス間認証インターセプター。
-// エンドユーザーの認証(Clerkセッショントークンの検証)はpingu-api側で完結しており、
-// 呼び出される側(orcan-api / payment-api)はユーザーを識別しない。ここで検証するのは「呼び出し元がpingu-apiであること」のみ。
+// Auth はbff以外からの直接のgRPC呼び出しを拒否するための、サービス間認証インターセプター。
+// エンドユーザーの認証(Clerkセッショントークンの検証)はbff側で完結しており、
+// 呼び出される側(orcan-api / payment-api)はユーザーを識別しない。ここで検証するのは「呼び出し元がbffであること」のみ。
 func Auth(token string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, request any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if isHealthCheck(info.FullMethod) {

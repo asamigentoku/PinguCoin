@@ -1,14 +1,14 @@
 # Minikube ローカル環境
 
-ローカルの Kubernetes(minikube)で、3つの Go サーバー(orcan-api / payment-api / pingu-api)だけを動かします。
+ローカルの Kubernetes(minikube)で、3つの Go サーバー(media-api / payment-api / bff)だけを動かします。
 
 **DB と Azure Storage はクラスター内に立ち上げません。** 各 API の `.env` に、Terraform で作った staging の Supabase(PostgreSQL)と Azure Blob Storage の接続情報を書いて使います(`platform/terraform/envs/staging`)。
 
 - API 同士の通信は、クラスター内のプライベートなネットワークで平文の gRPC(h2c)を使います。
-- ホストに公開するのは `pingu-api` だけです(port-forward)。
+- ホストに公開するのは `bff` だけです(port-forward)。
 
 > 注意: staging の**本物のデータ**に接続します。書き込みや削除に気をつけてください。
-> Blob の保存パスを分けたい場合は、`orcan-api/.env` の `APP_ENV` を `staging` 以外(例: `minikube`)にしてください。
+> Blob の保存パスを分けたい場合は、`media-api/.env` の `APP_ENV` を `staging` 以外(例: `minikube`)にしてください。
 
 ## 環境変数の仕組み
 
@@ -20,8 +20,8 @@ services/<api>/.env ──> Secret「<api>-env」──(envFrom)──> Pod の�
 ```
 
 - `.env` は `.gitignore` に入っているので、git には入りません。
-- `.env` の中身は、そのまま Secret(`orcan-api-env` / `payment-api-env` / `pingu-api-env`)になります。
-- `.env` に `ORCAN_API_ADDR=localhost:8080` と書いてあっても、Pod 内では届きません。そのため `config.yaml` の ConfigMap が、`ORCAN_API_ADDR` と `PAYMENT_API_ADDR` をクラスター内の Service 名で上書きします。
+- `.env` の中身は、そのままサービス別Secret(`media-api-env` / `inventory-api-env` / `order-api-env` / `payment-api-env` / `bff-env`)になります。各APIの`DATABASE_URL`は別データベースを指定してください。
+- `.env` に `MEDIA_API_ADDR=localhost:8080` と書いてあっても、Pod 内では届きません。そのため `config.yaml` の ConfigMap が、`MEDIA_API_ADDR` と `PAYMENT_API_ADDR` をクラスター内の Service 名で上書きします。
 - `PORT` は Service のポートと合わせるため、`servers.yaml` で固定しています(`.env` の値は無視されます)。
 
 ## ファイル構成
@@ -51,9 +51,9 @@ services/<api>/.env ──> Secret「<api>-env」──(envFrom)──> Pod の�
 各 API で `.env.example` をコピーして編集します(リポジトリのルートで実行)。
 
 ```bash
-cp services/orcan-api/.env.example   services/orcan-api/.env
+cp services/media-api/.env.example   services/media-api/.env
 cp services/payment-api/.env.example services/payment-api/.env
-cp services/pingu-api/.env.example   services/pingu-api/.env
+cp services/bff/.env.example   services/bff/.env
 ```
 
 staging に接続するために、最低限次を設定します。
@@ -61,11 +61,11 @@ staging に接続するために、最低限次を設定します。
 | 変数 | 対象 | 内容 |
 | --- | --- | --- |
 | `DATABASE_URL` | 3つとも | Supabase の Connect 画面にある Transaction pooler URL。設定すると `DB_*` より優先されます |
-| `AZURE_STORAGE_CONNECTION_STRING` | orcan-api | `terraform output -raw azure_storage_connection_string` の値 |
-| `AZURE_STORAGE_PUBLIC_CONTAINER` / `AZURE_STORAGE_PRIVATE_CONTAINER` | orcan-api | `pingue-public` / `pingue` |
-| `APP_ENV` | orcan-api | Blob パスの環境名 |
-| `INTERNAL_API_TOKEN` | 3つとも | **同じ値**にします(pingu-api から内部 API を呼ぶときの共有トークン) |
-| `CLERK_SECRET_KEY` | pingu-api | Clerk のシークレットキー |
+| `AZURE_STORAGE_CONNECTION_STRING` | media-api | `terraform output -raw azure_storage_connection_string` の値 |
+| `AZURE_STORAGE_PUBLIC_CONTAINER` / `AZURE_STORAGE_PRIVATE_CONTAINER` | media-api | `pingue-public` / `pingue` |
+| `APP_ENV` | media-api | Blob パスの環境名 |
+| `INTERNAL_API_TOKEN` | 3つとも | **同じ値**にします(bff から内部 API を呼ぶときの共有トークン) |
+| `CLERK_SECRET_KEY` | bff | Clerk のシークレットキー |
 
 ## 起動(スクリプト)
 
@@ -78,8 +78,8 @@ bash script/start.sh
 オプション:
 
 - `--skip-build` ... イメージのビルドを省略します(`.env` だけ変えたとき)。
-- `--port-forward` ... 起動後に `pingu-api` を `localhost:8082` に公開します(Ctrl+C で終了)。
-- `--only <api>` ... 指定した API だけビルドして再起動します(例: `--only pingu-api`。複数回指定できます)。
+- `--port-forward` ... 起動後に `bff` を `localhost:8082` に公開します(Ctrl+C で終了)。
+- `--only <api>` ... 指定した API だけビルドして再起動します(例: `--only bff`。複数回指定できます)。
 
 `start.sh` は次の処理をします。
 
@@ -106,9 +106,9 @@ minikube start --driver=docker
 **2. イメージをビルドする**(minikube 内の Docker に作られます)
 
 ```bash
-minikube image build -t pingucoin/orcan-api:dev -f services/orcan-api/Dockerfile .
+minikube image build -t pingucoin/media-api:dev -f services/media-api/Dockerfile .
 minikube image build -t pingucoin/payment-api:dev -f services/payment-api/Dockerfile .
-minikube image build -t pingucoin/pingu-api:dev -f services/pingu-api/Dockerfile .
+minikube image build -t pingucoin/bff:dev -f services/bff/Dockerfile .
 ```
 
 ビルドのコンテキストは、リポジトリのルート(最後の `.`)です。Go のモジュールが1つで、`pkg/` を3つのサービスで共有しているため、サービスのフォルダをコンテキストにすると `pkg/` が届きません。`-f` はコンテキストからの相対パスなので、ルートで実行すれば `services/<api>/Dockerfile` で見つかります。
@@ -124,8 +124,8 @@ minikube image ls | grep pingucoin
 minikube 内でのビルドは、メモリ不足で `go build` が途中で止まったり、`error reading from server: EOF` で落ちたりすることがあります。その場合は、ホストの Docker でビルドして、できたイメージを minikube に取り込みます。ホストのほうが CPU とメモリに余裕があるので、速く終わります。
 
 ```bash
-docker build -t pingucoin/orcan-api:dev -f services/orcan-api/Dockerfile .
-minikube image load pingucoin/orcan-api:dev
+docker build -t pingucoin/media-api:dev -f services/media-api/Dockerfile .
+minikube image load pingucoin/media-api:dev
 ```
 
 他の API も、名前を変えて同じように実行します。`docker build` だけではホスト側にイメージができるだけで、minikube からは見えません(`ErrImageNeverPull` の原因になります)。必ず `minikube image load` までやります。
@@ -139,15 +139,17 @@ kubectl apply -f platform/kubernetes/minikube/namespace.yaml
 **4. `.env` から Secret を作る**
 
 ```bash
-kubectl create secret generic orcan-api-env -n pingucoin --from-env-file=services/orcan-api/.env
+kubectl create secret generic media-api-env -n pingucoin --from-env-file=services/media-api/.env
 kubectl create secret generic payment-api-env -n pingucoin --from-env-file=services/payment-api/.env
-kubectl create secret generic pingu-api-env -n pingucoin --from-env-file=services/pingu-api/.env
+kubectl create secret generic inventory-api-env -n pingucoin --from-env-file=services/inventory-api/.env
+kubectl create secret generic order-api-env -n pingucoin --from-env-file=services/order-api/.env
+kubectl create secret generic bff-env -n pingucoin --from-env-file=services/bff/.env
 ```
 
 すでに Secret がある場合は「AlreadyExists」で失敗します。`.env` を編集して更新したいときは、先に削除してから作り直します。
 
 ```bash
-kubectl delete secret orcan-api-env payment-api-env pingu-api-env -n pingucoin
+kubectl delete secret media-api-env inventory-api-env order-api-env payment-api-env bff-env -n pingucoin
 ```
 
 **5. マニフェストを適用して、起動を待つ**
@@ -158,10 +160,10 @@ kubectl wait --for=condition=ready pod --all -n pingucoin --timeout=180s
 kubectl get pods -n pingucoin
 ```
 
-**6. pingu-api を公開する**(プロセスは起動したままにします)
+**6. bff を公開する**(プロセスは起動したままにします)
 
 ```bash
-kubectl port-forward -n pingucoin service/pingu-api 8082:8082
+kubectl port-forward -n pingucoin service/bff 8082:8082
 ```
 
 **後から変更したとき**
@@ -169,7 +171,7 @@ kubectl port-forward -n pingucoin service/pingu-api 8082:8082
 `.env` を変更した場合は、手順4で Secret を作り直したあと、該当の Deployment を再起動します。
 
 ```bash
-kubectl rollout restart -n pingucoin deployment/orcan-api
+kubectl rollout restart -n pingucoin deployment/media-api
 ```
 
 コードを変更した場合は、該当 API の手順2(ビルド)をもう一度実行してから、同じく `rollout restart` します。
@@ -190,7 +192,7 @@ Kubernetes で一般的に設定するものを、3つの API すべてに入れ
 | `automountServiceAccountToken: false` | `servers.yaml` | Kubernetes API を呼ばないので、トークンを Pod に渡さない |
 | HPA | `autoscaling.yaml` | CPU 使用率 70% を目安に 2〜5 個で自動スケール。増やすのは素早く、減らすのは 5 分落ち着いてから |
 | PDB | `autoscaling.yaml` | ノードの drain などの間も、最低 1 つは動かし続ける |
-| NetworkPolicy | `network-policy.yaml` | 入ってくる通信を既定で全部拒否し、orcan-api と payment-api は pingu-api からだけ受け付ける |
+| NetworkPolicy | `network-policy.yaml` | 入ってくる通信を既定で全部拒否し、media-api と payment-api は bff からだけ受け付ける |
 
 HPA は CPU 使用率を取るために metrics-server が必要です。`start.sh` が `minikube addons enable metrics-server` を実行します(有効になった直後は、`kubectl get hpa -n pingucoin` の `TARGETS` が数分間 `<unknown>` のままです)。
 
@@ -200,31 +202,31 @@ HPA は CPU 使用率を取るために metrics-server が必要です。`start.
 
 | API | 方式 | readiness(トラフィックを受けてよいか) | liveness(生きているか) |
 | --- | --- | --- | --- |
-| orcan-api / payment-api | gRPC 標準の `grpc.health.v1` | サービス名 `""`。DB に接続できる間だけ SERVING | サービス名 `liveness`。プロセスが動いている限り常に SERVING |
-| pingu-api | HTTP | `GET /readyz`。DB に接続できる間だけ 200(できなければ 503) | `GET /healthz`。常に 200 |
+| media-api / payment-api | gRPC 標準の `grpc.health.v1` | サービス名 `""`。DB に接続できる間だけ SERVING | サービス名 `liveness`。プロセスが動いている限り常に SERVING |
+| bff | HTTP | `GET /readyz`。DB に接続できる間だけ 200(できなければ 503) | `GET /healthz`。常に 200 |
 
 - liveness に DB の状態を含めないのは、DB が一時的に落ちただけで Pod を再起動し続けないためです。DB が落ちたときは、readiness だけが落ちて Service の宛先から外れます(再起動はされません)。
 - gRPC のヘルスチェックは、サービス間認証(`x-internal-token`)の対象外です。kubelet はトークンを持たないためです。返すのは「動いているか」だけです。
 - どのヘルスチェックも、数秒おきに呼ばれてもログが埋まらないよう、リクエストログに出しません。
-- orcan-api と payment-api は、SIGTERM を受けると readiness を落とし、処理中のリクエストが終わるのを待ってから止まります。
+- media-api と payment-api は、SIGTERM を受けると readiness を落とし、処理中のリクエストが終わるのを待ってから止まります。
 
 確認するコマンド:
 
 ```bash
 kubectl get hpa,pdb,networkpolicy -n pingucoin        # 設定が入っているか
-kubectl describe pod -n pingucoin -l app=pingu-api    # Events に probe の失敗が出ていないか
-kubectl port-forward -n pingucoin service/pingu-api 8082:8082
+kubectl describe pod -n pingucoin -l app=bff    # Events に probe の失敗が出ていないか
+kubectl port-forward -n pingucoin service/bff 8082:8082
 curl localhost:8082/readyz                            # 別のターミナルで
 ```
 
-## pingu-api にアクセスする
+## bff にアクセスする
 
-`http://localhost:8082/` で GraphQL Playground が開きます。GraphQL のエンドポイントは `http://localhost:8082/api/v1/graphql` です(port-forward を起動している間だけ使えます)。
+BFFのREST APIは`http://localhost:8082/api/v1`です(port-forwardを起動している間だけ利用できます)。
 
 gRPC サーバーを直接確認する場合:
 
 ```bash
-kubectl port-forward -n pingucoin service/orcan-api 8080:8080
+kubectl port-forward -n pingucoin service/media-api 8080:8080
 grpcurl -plaintext localhost:8080 list
 ```
 
@@ -237,8 +239,8 @@ grpcurl -plaintext -H "x-internal-token: <INTERNAL_API_TOKEN の値>" localhost:
 ## ログ
 
 ```bash
-kubectl logs -n pingucoin deployment/pingu-api -f
-kubectl logs -n pingucoin deployment/orcan-api -f
+kubectl logs -n pingucoin deployment/bff -f
+kubectl logs -n pingucoin deployment/media-api -f
 kubectl logs -n pingucoin deployment/payment-api -f
 ```
 

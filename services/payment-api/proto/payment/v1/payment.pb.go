@@ -27,7 +27,7 @@ type Payment struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Id     uint32                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId uint32                 `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	// orcan-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
+	// media-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
 	ProductId     uint32 `protobuf:"varint,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
 	Amount        int64  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	Currency      string `protobuf:"bytes,5,opt,name=currency,proto3" json:"currency,omitempty"`                                // "JPY", "POINT" など
@@ -234,7 +234,7 @@ type CreatePaymentRequest struct {
 	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
 	PaymentMethod string                 `protobuf:"bytes,5,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`
 	// idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
-	// 作られない(最初に処理した結果をそのまま返す)。呼び出し元(pingu-api)は必ず指定すること。
+	// 作られない(最初に処理した結果をそのまま返す)。呼び出し元(bff)は必ず指定すること。
 	IdempotencyKey string `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache

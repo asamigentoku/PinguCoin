@@ -24,13 +24,13 @@ const PaymentMethodPoint = "point"
 type Payment struct {
 	ID     uint `gorm:"primaryKey" json:"id"`
 	UserID uint `gorm:"not null;index" json:"user_id"`
-	// orcan-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
+	// media-api の products.id への参照。サービスをまたぐため外部キーは張らずID参照のみ。
 	ProductID     uint   `gorm:"not null;index" json:"product_id"`
 	Amount        int64  `gorm:"not null" json:"amount"`
 	Currency      string `gorm:"size:10;not null" json:"currency"`
 	PaymentMethod string `gorm:"size:30;not null" json:"payment_method"`
 	Status        string `gorm:"size:20;not null;default:'pending'" json:"status"`
-	// IdempotencyKeyは呼び出し元(pingu-api)が発行する冪等性キー。同じキーでの再呼び出しは
+	// IdempotencyKeyは呼び出し元(bff)が発行する冪等性キー。同じキーでの再呼び出しは
 	// 新たに決済(ポイント消費含む)を作らず、最初に作られたこのPaymentをそのまま返す。
 	IdempotencyKey string         `gorm:"size:255;not null;uniqueIndex" json:"idempotency_key"`
 	CreatedAt      time.Time      `json:"created_at"`

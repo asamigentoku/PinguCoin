@@ -31,7 +31,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
       <section className="shell products-section">
         <ProductToolbar query={query} />
         {!apiAvailable ? (
-          <EmptyState title="商品を読み込めませんでした" body="pingu-apiが起動しているか確認して、ページを再読み込みしてください。" href="/products" action="再読み込みする" />
+          <EmptyState title="商品を読み込めませんでした" body="bffが起動しているか確認して、ページを再読み込みしてください。" href="/products" action="再読み込みする" />
         ) : result.total === 0 ? (
           <EmptyState
             title={products.length ? "条件に合う作品がありません" : "作品はまだありません"}

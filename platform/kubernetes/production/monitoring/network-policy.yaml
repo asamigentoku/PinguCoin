@@ -6,7 +6,7 @@
 #   Prometheus ─▶ Grafana(3000)                  ... Grafana 自身のメトリクス
 #   Grafana    ─▶ Prometheus(9090)
 #
-# /metrics は、インターネットに向けた入口(Ingress)の先の、pingu-api のポート(8082)とは別のポートで、
+# /metrics は、インターネットに向けた入口(Ingress)の先の、bff のポート(8082)とは別のポートで、
 # 許可するのは Prometheus だけ。利用者からも、同じ namespace のほかの Pod からも、メトリクスは見えない。
 # (port-forward は kubelet 経由なので、このポリシーの影響を受けない。Grafana・Prometheus の画面は、AKS の管理者が、port-forward で開く)
 apiVersion: networking.k8s.io/v1
@@ -18,7 +18,7 @@ spec:
     matchExpressions:
       - key: app
         operator: In
-        values: [orcan-api, payment-api, pingu-api]
+        values: [media-api, payment-api, bff]
   policyTypes:
     - Ingress
   ingress:

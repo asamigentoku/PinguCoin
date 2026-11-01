@@ -41,7 +41,7 @@ export default async function PurchasesPage() {
       <PageHeader title="購入履歴" lead="購入した作品は、ここからいつでもダウンロードできます。" />
       <section className="shell sell-section">
         {!apiAvailable ? (
-          <EmptyState title="購入履歴を読み込めませんでした" body="pingu-apiが起動しているか確認して、ページを再読み込みしてください。" href="/purchases" action="再読み込みする" />
+          <EmptyState title="購入履歴を読み込めませんでした" body="bffが起動しているか確認して、ページを再読み込みしてください。" href="/purchases" action="再読み込みする" />
         ) : orders.length === 0 ? (
           <EmptyState title="購入した作品はまだありません" body="気になる作品を探してみましょう。" href="/products" action="商品を探す" />
         ) : (

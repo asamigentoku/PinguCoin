@@ -31,7 +31,7 @@ export default async function ManagePage() {
       </PageHeader>
       <section className="shell sell-section">
         {!apiAvailable ? (
-          <EmptyState title="出品を読み込めませんでした" body="pingu-apiが起動しているか確認して、ページを再読み込みしてください。" href="/sell/manage" action="再読み込みする" />
+          <EmptyState title="出品を読み込めませんでした" body="bffが起動しているか確認して、ページを再読み込みしてください。" href="/sell/manage" action="再読み込みする" />
         ) : products.length === 0 ? (
           <EmptyState title="出品はまだありません" body="最初の作品を出品してみましょう。" href="/sell" action="商品を出品する" />
         ) : (

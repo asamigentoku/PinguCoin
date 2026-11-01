@@ -11,7 +11,7 @@ rule_files:
   - /etc/prometheus/alert-rules.yml
 
 scrape_configs:
-  # ---- 3つの API(orcan-api / payment-api / pingu-api)の /metrics ----
+  # ---- 3つの API(media-api / payment-api / bff)の /metrics ----
   # Pod を自動で見つけて(Kubernetes のサービスディスカバリ)、メトリクス用のポート(名前が metrics)を取る。
   # Pod が増えても、入れ替わっても、設定は要らない。
   - job_name: pingucoin-apps
@@ -21,7 +21,7 @@ scrape_configs:
           own_namespace: true
     relabel_configs:
       - source_labels: [__meta_kubernetes_pod_label_app]
-        regex: (orcan-api|payment-api|pingu-api)
+        regex: (media-api|payment-api|bff)
         action: keep
       - source_labels: [__meta_kubernetes_pod_container_port_name]
         regex: metrics

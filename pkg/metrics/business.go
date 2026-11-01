@@ -12,7 +12,7 @@ import (
 // 技術のメトリクス(HTTP / gRPC / DB)だけでは見えない異常を見つけるためのもの。
 // ラベルは、すべて、有限の固定の値(結果の種類など)。ユーザー ID・商品 ID・金額そのものは、ラベルに入れない。
 
-// 注文の結果(pingu-api)。
+// 注文の結果(bff)。
 const (
 	OrderCreated           = "created"            // 新しく注文できた
 	OrderReplayed          = "replayed"           // 同じ冪等性キーの再送。最初の結果を返した
@@ -44,7 +44,7 @@ var (
 
 	authRequests = factory().NewCounterVec(prometheus.CounterOpts{
 		Name: "pingucoin_auth_requests_total",
-		Help: "認証の結果(pingu-api)。anonymous = トークン無し、authenticated = 成功、invalid_token = 検証に失敗、profile_error = ユーザーの解決に失敗。",
+		Help: "認証の結果(bff)。anonymous = トークン無し、authenticated = 成功、invalid_token = 検証に失敗、profile_error = ユーザーの解決に失敗。",
 	}, []string{"result"})
 
 	payments = factory().NewCounterVec(prometheus.CounterOpts{

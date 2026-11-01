@@ -20,6 +20,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/database"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/eventconsumer"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/grpcserver"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
@@ -61,11 +62,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// interceptor.Auth はpingu-api以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
+	// interceptor.Auth はbff以外からの直接のgRPC呼び出しを拒否する(サービス間認証)。
 	server := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			metrics.UnaryServerInterceptor(), // リクエストの数・結果・処理時間(認証に失敗したものも数える。いちばん外側)
-			interceptor.RequestID(),          // 呼び出し元(pingu-api)のリクエスト ID を受け取る(Logging より前)
+			interceptor.RequestID(),          // 呼び出し元(bff)のリクエスト ID を受け取る(Logging より前)
 			interceptor.Logging(logger),
 			interceptor.Auth(cfg.InternalAPIToken),
 		),
@@ -73,12 +74,13 @@ func main() {
 
 	pointRepo := repository.NewPointRepository(db)
 
-	pb.RegisterPaymentServiceServer(server, grpcserver.NewPaymentServer(
+	paymentServer := grpcserver.NewPaymentServer(
 		db,
 		repository.NewPaymentRepository(db),
 		repository.NewRefundRepository(db),
 		pointRepo,
-	))
+	)
+	pb.RegisterPaymentServiceServer(server, paymentServer)
 	pb.RegisterPointServiceServer(server, grpcserver.NewPointServer(pointRepo))
 
 	reflection.Register(server)
@@ -86,8 +88,15 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	consumer, err := eventconsumer.New(cfg.KafkaBrokers, paymentServer, logger)
+	if err != nil {
+		logger.Error("kafka consumer failed", logging.Err(err))
+		os.Exit(1)
+	}
+	defer consumer.Close()
 	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
 	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
+	go consumer.Run(shutdownCtx)
 	health.Register(shutdownCtx, server, db, logger)
 	go func() {
 		<-shutdownCtx.Done()

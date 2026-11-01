@@ -49,7 +49,7 @@
  "panels": [
   {
    "type": "row",
-   "title": "サーバー側(orcan-api / payment-api が受ける)",
+   "title": "サーバー側(media-api / payment-api が受ける)",
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -527,7 +527,7 @@
   },
   {
    "type": "row",
-   "title": "クライアント側(pingu-api が、orcan-api / payment-api を呼ぶ)",
+   "title": "クライアント側(bff が、media-api / payment-api を呼ぶ)",
    "collapsed": false,
    "gridPos": {
     "h": 1,

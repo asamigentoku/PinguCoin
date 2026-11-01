@@ -187,7 +187,7 @@ func TestNewFromEnv(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "error")
 	var buffer bytes.Buffer
 	// NewFromEnv は標準出力に出すので、同じ設定の New で、環境変数の読み取りを確かめる。
-	logger := New(Config{Service: "pingu-api", Env: os.Getenv("APP_ENV"), Level: ParseLevel(os.Getenv("LOG_LEVEL")), Writer: &buffer})
+	logger := New(Config{Service: "bff", Env: os.Getenv("APP_ENV"), Level: ParseLevel(os.Getenv("LOG_LEVEL")), Writer: &buffer})
 
 	logger.Warn("hidden")
 	logger.Error("shown")
@@ -195,7 +195,7 @@ func TestNewFromEnv(t *testing.T) {
 	if !strings.Contains(buffer.String(), `"env":"staging"`) || strings.Contains(buffer.String(), "hidden") {
 		t.Errorf("unexpected output: %s", buffer.String())
 	}
-	if NewFromEnv("pingu-api") == nil {
+	if NewFromEnv("bff") == nil {
 		t.Error("NewFromEnv returned nil")
 	}
 }

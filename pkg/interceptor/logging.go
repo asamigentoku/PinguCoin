@@ -16,9 +16,9 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/requestid"
 )
 
-// RequestID は、呼び出し元(pingu-api)から渡されたリクエスト ID(メタデータ x-request-id)を、context に持たせる。
+// RequestID は、呼び出し元(bff)から渡されたリクエスト ID(メタデータ x-request-id)を、context に持たせる。
 // 渡されていなければ(または、使えない文字を含んでいれば)新しく作る。Logging より前に置くこと。
-// これで、1つのリクエストを、pingu-api と orcan-api / payment-api をまたいで、同じ request_id で追える。
+// これで、1つのリクエストを、bff と orcan-api / payment-api をまたいで、同じ request_id で追える。
 func RequestID() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, request any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		incoming := ""

@@ -79,7 +79,7 @@ module "aks" {
   tags                       = local.tags
 }
 
-# サービス間の共有トークン。pingu-api が orcan-api / payment-api を呼ぶときの認証に使う(3つで同じ値)。
+# サービス間の共有トークン。bff が media-api / payment-api を呼ぶときの認証に使う(3つで同じ値)。
 resource "random_password" "internal_api_token" {
   length  = 48
   special = false

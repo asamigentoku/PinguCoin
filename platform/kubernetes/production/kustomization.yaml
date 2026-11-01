@@ -1,6 +1,6 @@
 # 本番(AKS)用。GitHub Actions(production-deploy.yml)が、イメージのタグを git の SHA にして適用する。
 #   cd platform/kubernetes/production
-#   kustomize edit set image pingucoin/orcan-api=<acr>.azurecr.io/orcan-api:<sha>   (3つとも)
+#   kustomize edit set image pingucoin/media-api=<acr>.azurecr.io/media-api:<sha>   (3つとも)
 #   kubectl apply -k .
 # minikube とは共有しない。このフォルダだけで完結している。
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -10,18 +10,25 @@ resources:
   - namespace.yaml      # 専用のnamespace「pingucoin」
   - config.yaml         # 共通の設定(ConfigMap)
   - servers.yaml        # 3つのAPIのDeploymentとService(replicas: 1)
+  - domain-services.yaml
   - network-policy.yaml # 通信の制限(NetworkPolicy)
   - monitoring          # 監視(Prometheus + Grafana + kube-state-metrics)。monitoring/ の中で完結している(インターネットには公開しない)
   - ingress.yaml        # インターネットからの入口(HTTPS)
 # ACR のイメージ。タグ(newTag)はデプロイのたびに、ワークフローが git の SHA に差し替える。
 # ACR の名前は Terraform の出力(acr_login_server)。ここの newName は、作成後に実際の値へ置き換える。
 images:
-  - name: pingucoin/orcan-api
-    newName: pingucoinprodacr.azurecr.io/orcan-api
+  - name: pingucoin/media-api
+    newName: pingucoinprodacr.azurecr.io/media-api
     newTag: latest
   - name: pingucoin/payment-api
     newName: pingucoinprodacr.azurecr.io/payment-api
     newTag: latest
-  - name: pingucoin/pingu-api
-    newName: pingucoinprodacr.azurecr.io/pingu-api
+  - name: pingucoin/inventory-api
+    newName: pingucoinprodacr.azurecr.io/inventory-api
+    newTag: latest
+  - name: pingucoin/order-api
+    newName: pingucoinprodacr.azurecr.io/order-api
+    newTag: latest
+  - name: pingucoin/bff
+    newName: pingucoinprodacr.azurecr.io/bff
     newTag: latest

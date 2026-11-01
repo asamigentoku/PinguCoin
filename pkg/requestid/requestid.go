@@ -2,10 +2,10 @@
 //
 // 流れ:
 //
-//		ブラウザ/Next.js ─ HTTP ヘッダー X-Request-Id ─▶ pingu-api ─ gRPC メタデータ x-request-id ─▶ orcan-api / payment-api
+//		ブラウザ/Next.js ─ HTTP ヘッダー X-Request-Id ─▶ bff ─ gRPC メタデータ x-request-id ─▶ orcan-api / payment-api
 //
-//	  - pingu-api は、リクエストに X-Request-Id があればそれを使い(なければ作って)、レスポンスにも付ける。
-//	  - pingu-api が gRPC で呼ぶとき、同じ ID をメタデータで渡す。orcan-api / payment-api も、同じ ID をログに出す。
+//	  - bff は、リクエストに X-Request-Id があればそれを使い(なければ作って)、レスポンスにも付ける。
+//	  - bff が gRPC で呼ぶとき、同じ ID をメタデータで渡す。orcan-api / payment-api も、同じ ID をログに出す。
 //	  - すべてのログに、同じ `request_id` が出るので、ログ管理(Datadog など)で、`request_id` で検索すれば、
 //	    1つのリクエストが、どのサービスを通って、どこで失敗したかを、横断して追える。
 //
