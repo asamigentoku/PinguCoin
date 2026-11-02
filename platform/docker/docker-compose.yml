@@ -49,7 +49,7 @@ services:
     build: {context: ../.., dockerfile: services/media-api/Dockerfile}
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://media_service:media_local@postgres:5432/media?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/media?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
     ports: ["8080:8080"]
@@ -62,7 +62,7 @@ services:
     build: {context: ../.., dockerfile: services/inventory-api/Dockerfile}
     environment:
       PORT: 8083
-      DATABASE_URL: postgres://inventory_service:inventory_local@postgres:5432/inventory?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/inventory?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       KAFKA_BROKERS: kafka:29092
     ports: ["8083:8083"]
@@ -72,7 +72,7 @@ services:
     build: {context: ../.., dockerfile: services/payment-api/Dockerfile}
     environment:
       PORT: 8081
-      DATABASE_URL: postgres://payment_service:payment_local@postgres:5432/payment?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/payment?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       KAFKA_BROKERS: kafka:29092
     ports: ["8081:8081"]
@@ -82,7 +82,7 @@ services:
     build: {context: ../.., dockerfile: services/order-api/Dockerfile}
     environment:
       PORT: 8084
-      DATABASE_URL: postgres://order_service:order_local@postgres:5432/orders?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/orders?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       KAFKA_BROKERS: kafka:29092
       KAFKA_ORDER_TOPIC: orders.created.v1

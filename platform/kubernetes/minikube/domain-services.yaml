@@ -20,8 +20,11 @@ spec:
           image: pingucoin/inventory-api:dev
           imagePullPolicy: Never
           ports: [{name: api, containerPort: 8083}]
-          envFrom: [{secretRef: {name: inventory-api-env}}, {configMapRef: {name: pingucoin-cluster-config}}]
-          env: [{name: PORT, value: "8083"}]
+          envFrom: [{configMapRef: {name: pingucoin-cluster-config}}]
+          env:
+            - {name: PORT, value: "8083"}
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/inventory?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           readinessProbe: {grpc: {port: 8083}}
           livenessProbe: {grpc: {port: 8083, service: liveness}}
 ---
@@ -47,7 +50,10 @@ spec:
           image: pingucoin/order-api:dev
           imagePullPolicy: Never
           ports: [{name: api, containerPort: 8084}]
-          envFrom: [{secretRef: {name: order-api-env}}, {configMapRef: {name: pingucoin-cluster-config}}]
-          env: [{name: PORT, value: "8084"}]
+          envFrom: [{configMapRef: {name: pingucoin-cluster-config}}]
+          env:
+            - {name: PORT, value: "8084"}
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/orders?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           readinessProbe: {grpc: {port: 8084}}
           livenessProbe: {grpc: {port: 8084, service: liveness}}

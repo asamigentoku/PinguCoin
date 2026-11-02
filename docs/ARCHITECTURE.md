@@ -27,8 +27,8 @@ asset ownership lives in `media-api`; stock mutations live in `inventory-api`; o
 state lives in `order-api`.
 
 Each service owns a separate PostgreSQL database. The databases may run on the
-same PostgreSQL server in local development, but schemas, migrations, credentials,
-and direct table access are never shared. The BFF is stateless and has no business
+same PostgreSQL server and port in local development, while the database names,
+migrations, and direct table access are separated. The BFF is stateless and has no business
 database; purchase authorization is checked through `order-api.HasPaidOrder`.
 
 `order-api` has no direct connection to media, inventory, or payment. It commits the

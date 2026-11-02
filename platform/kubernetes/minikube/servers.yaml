@@ -85,6 +85,8 @@ spec:
           env:
             - name: PORT
               value: "8080"
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/media?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:
@@ -205,6 +207,8 @@ spec:
           env:
             - name: PORT
               value: "8081"
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/payment?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:
@@ -325,6 +329,7 @@ spec:
           env:
             - name: PORT
               value: "8082"
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:

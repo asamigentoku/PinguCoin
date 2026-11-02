@@ -10,6 +10,7 @@ RUN go mod download
 COPY pkg ./pkg
 COPY services/media-api/proto ./services/media-api/proto
 COPY services/payment-api/proto ./services/payment-api/proto
+COPY services/order-api/proto ./services/order-api/proto
 COPY services/bff ./services/bff
 ARG VERSION=dev
 ARG COMMIT=unknown

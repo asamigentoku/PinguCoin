@@ -15,3 +15,4 @@ data:
   PAYMENT_API_ADDR: payment-api:8081
   INVENTORY_API_ADDR: inventory-api:8083
   ORDER_API_ADDR: order-api:8084
+  KAFKA_BROKERS: kafka:9092
