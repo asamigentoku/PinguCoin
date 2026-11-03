@@ -19,9 +19,13 @@ func New(addr, token string) (*Client, error) {
 	if e != nil {
 		return nil, e
 	}
-	conn, e := grpc.NewClient(target, grpc.WithTransportCredentials(creds), grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	resilience, e := sharedgrpc.ResilienceOptions(RetryableMethods, sharedgrpc.DefaultTimeout)
+	if e != nil {
+		return nil, e
+	}
+	conn, e := grpc.NewClient(target, append(resilience, grpc.WithTransportCredentials(creds), grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		return invoker(metadata.AppendToOutgoingContext(ctx, "x-internal-token", token), method, req, reply, cc, opts...)
-	}), grpc.WithChainUnaryInterceptor(metrics.UnaryClientInterceptor("order-api")), grpc.WithStatsHandler(metrics.ClientStatsHandler("order-api")))
+	}), grpc.WithChainUnaryInterceptor(metrics.UnaryClientInterceptor("order-api")), grpc.WithStatsHandler(metrics.ClientStatsHandler("order-api")))...)
 	if e != nil {
 		return nil, e
 	}

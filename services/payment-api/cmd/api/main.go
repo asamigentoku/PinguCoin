@@ -96,7 +96,12 @@ func main() {
 	defer consumer.Close()
 	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
 	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
-	go consumer.Run(shutdownCtx)
+	go func() {
+		if err := consumer.Run(shutdownCtx); err != nil {
+			logger.Error("payment consumer stopped after retries", logging.Err(err))
+			stopSignals()
+		}
+	}()
 	health.Register(shutdownCtx, server, db, logger)
 	go func() {
 		<-shutdownCtx.Done()

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 
@@ -42,20 +43,20 @@ func (r *Repository) CreateOrGet(candidate *model.Order, paymentMethod, topic st
 	return &existing, true, nil
 }
 
-func (r *Repository) ApplyInventoryResult(orderID uint, reserved bool, reason string) error {
+func (r *Repository) ApplyInventoryResult(ctx context.Context, orderID uint, reserved bool, reason string) error {
 	status := "payment_pending"
 	if !reserved {
 		status = "failed"
 	}
-	return r.db.Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"pending", "inventory_pending"}).Updates(map[string]any{"status": status, "failure_reason": reason}).Error
+	return r.db.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"pending", "inventory_pending"}).Updates(map[string]any{"status": status, "failure_reason": reason}).Error
 }
 
-func (r *Repository) ApplyPaymentResult(orderID, paymentID uint, succeeded bool, reason string) error {
+func (r *Repository) ApplyPaymentResult(ctx context.Context, orderID, paymentID uint, succeeded bool, reason string) error {
 	status := "paid"
 	if !succeeded {
 		status = "failed"
 	}
-	return r.db.Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"payment_pending", "pending"}).Updates(map[string]any{"status": status, "payment_id": paymentID, "failure_reason": reason}).Error
+	return r.db.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"payment_pending", "pending"}).Updates(map[string]any{"status": status, "payment_id": paymentID, "failure_reason": reason}).Error
 }
 func (r *Repository) Find(id, user uint) (*model.Order, error) {
 	var row model.Order

@@ -83,10 +83,12 @@ func (server *PaymentServer) createPayment(ctx context.Context, request *pb.Crea
 	if idempotencyKey == "" {
 		return nil, apperr.InvalidArgument("idempotency_key is required")
 	}
+	db := server.db.WithContext(ctx)
+	payments := server.payments.WithTx(db)
 
 	// 同じidempotency_keyの決済が既にあれば、新たに決済(ポイント消費含む)を作らず
 	// そのまま返す(リトライ・二重送信で二重決済にならないようにするため)。
-	if existing, err := server.payments.FindByIdempotencyKey(idempotencyKey); err == nil {
+	if existing, err := payments.FindByIdempotencyKey(idempotencyKey); err == nil {
 		*replayed = true
 		return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -106,8 +108,8 @@ func (server *PaymentServer) createPayment(ctx context.Context, request *pb.Crea
 	// point払いの場合は「決済の作成」と「ポイント残高の消費」を1トランザクションにまとめる。
 	// 片方だけ成功する(決済は作られたのにポイントは減っていない、等)状態を防ぐため。
 	if payment.PaymentMethod == model.PaymentMethodPoint {
-		err := server.db.Transaction(func(tx *gorm.DB) error {
-			if err := server.payments.WithTx(tx).Create(payment); err != nil {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := payments.WithTx(tx).Create(payment); err != nil {
 				return err
 			}
 			paymentID := payment.ID
@@ -118,7 +120,7 @@ func (server *PaymentServer) createPayment(ctx context.Context, request *pb.Crea
 			if errors.Is(err, repository.ErrInsufficientPoints) {
 				return nil, apperr.FailedPrecondition("insufficient points")
 			}
-			if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+			if existing, ok := server.recoverDuplicatePayment(ctx, err, idempotencyKey); ok {
 				*replayed = true
 				return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 			}
@@ -127,8 +129,8 @@ func (server *PaymentServer) createPayment(ctx context.Context, request *pb.Crea
 		return &pb.CreatePaymentResponse{Payment: toProtoPayment(payment)}, nil
 	}
 
-	if err := server.payments.Create(payment); err != nil {
-		if existing, ok := server.recoverDuplicatePayment(err, idempotencyKey); ok {
+	if err := payments.Create(payment); err != nil {
+		if existing, ok := server.recoverDuplicatePayment(ctx, err, idempotencyKey); ok {
 			*replayed = true
 			return &pb.CreatePaymentResponse{Payment: toProtoPayment(existing)}, nil
 		}
@@ -139,11 +141,11 @@ func (server *PaymentServer) createPayment(ctx context.Context, request *pb.Crea
 
 // recoverDuplicatePayment は、同時に同じidempotency_keyでリクエストが来た場合の競合に備え、
 // ユニーク制約違反(gorm.ErrDuplicatedKey)を「先に成功した方の結果を返す」形で救済する。
-func (server *PaymentServer) recoverDuplicatePayment(err error, idempotencyKey string) (*model.Payment, bool) {
+func (server *PaymentServer) recoverDuplicatePayment(ctx context.Context, err error, idempotencyKey string) (*model.Payment, bool) {
 	if !errors.Is(err, gorm.ErrDuplicatedKey) {
 		return nil, false
 	}
-	existing, findErr := server.payments.FindByIdempotencyKey(idempotencyKey)
+	existing, findErr := server.payments.WithTx(server.db.WithContext(ctx)).FindByIdempotencyKey(idempotencyKey)
 	if findErr != nil {
 		return nil, false
 	}

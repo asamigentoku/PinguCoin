@@ -2,26 +2,29 @@ package outbox
 
 import (
 	"context"
+	"github.com/asamigentoku/PinguCoin/pkg/consumerretry"
 	"github.com/asamigentoku/PinguCoin/services/order-api/internal/model"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"gorm.io/gorm"
+	"log/slog"
 	"time"
 )
 
 type Publisher struct {
 	db     *gorm.DB
 	client *kgo.Client
+	logger *slog.Logger
 }
 
-func New(db *gorm.DB, brokers []string) (*Publisher, error) {
+func New(db *gorm.DB, brokers []string, logger *slog.Logger) (*Publisher, error) {
 	if len(brokers) == 0 {
-		return &Publisher{db: db}, nil
+		return &Publisher{db: db, logger: logger}, nil
 	}
 	c, e := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.RequiredAcks(kgo.AllISRAcks()))
 	if e != nil {
 		return nil, e
 	}
-	return &Publisher{db: db, client: c}, nil
+	return &Publisher{db: db, client: c, logger: logger}, nil
 }
 func (p *Publisher) Close() {
 	if p.client != nil {
@@ -50,8 +53,10 @@ func (p *Publisher) flush(ctx context.Context) {
 	}
 	for i := range events {
 		event := &events[i]
-		result := p.client.ProduceSync(ctx, &kgo.Record{Topic: event.Topic, Key: []byte(event.EventKey), Value: event.Payload})
-		if e := result.FirstErr(); e != nil {
+		e := consumerretry.Do(ctx, p.logger, "order.outbox.publish", func(attemptCtx context.Context) error {
+			return p.client.ProduceSync(attemptCtx, &kgo.Record{Topic: event.Topic, Key: []byte(event.EventKey), Value: event.Payload}).FirstErr()
+		})
+		if e != nil {
 			p.db.Model(event).Updates(map[string]any{"attempts": gorm.Expr("attempts + 1"), "last_error": e.Error()})
 			continue
 		}

@@ -7,9 +7,9 @@ flowchart LR
     BFF -->|gRPC| Media[media-api]
     BFF -->|gRPC| Order[order-api]
     BFF -->|gRPC| Payment[payment-api]
-    Order -->|orders.created.v1| Kafka[Kafka]
-    Kafka -->|orders.created.v1| Inventory[inventory-api]
-    Inventory -->|inventory.reserved/rejected| Kafka
+Order -->|orders.created.v1| Kafka[Kafka]
+Kafka -->|orders.created.v1| Inventory[inventory-api]
+Inventory -->|stock decremented/rejected| Kafka
     Kafka -->|inventory.reserved.v1| Payment
     Payment -->|payments.succeeded/failed| Kafka
     Kafka -->|result events| Order
@@ -32,8 +32,15 @@ migrations, and direct table access are separated. The BFF is stateless and has 
 database; purchase authorization is checked through `order-api.HasPaidOrder`.
 
 `order-api` has no direct connection to media, inventory, or payment. It commits the
-order and `orders.created.v1` outbox record atomically. Inventory consumes that event
-and publishes a reservation result. Payment consumes only successful reservations and
+order and `orders.created.v1` outbox record atomically. Inventory consumes that event,
+decrements stock immediately, and publishes the result. Payment consumes only successful decrements and
 publishes its result. Order consumes both result streams to update state. A payment
 failure is also consumed by inventory to perform an idempotent release. Every consumer
 uses the order idempotency key, so Kafka redelivery does not duplicate stock or payment.
+
+Kafka record handling and offset commits use a 10-second timeout per attempt. Technical
+failures are retried up to six times with increasing delays of 500 ms, 1 s, 2 s, 4 s,
+and 5 s. A record is committed only after successful processing. If all attempts fail,
+the service shuts down so Kubernetes restarts it and Kafka redelivers the uncommitted
+record. The BFF's idempotent order RPC has a 10-second overall deadline and retries
+`UNAVAILABLE` up to three attempts with exponential backoff.

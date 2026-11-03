@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"gorm.io/gorm"
@@ -34,7 +35,11 @@ func (r *InventoryRepository) Update(row *model.Inventory) error { return r.db.S
 func (r *InventoryRepository) Delete(id uint) error              { return r.db.Delete(&model.Inventory{}, id).Error }
 
 func (r *InventoryRepository) Adjust(productID uint, amount int, reason, key string) (row *model.Inventory, replayed bool, err error) {
-	err = r.db.Transaction(func(tx *gorm.DB) error {
+	return r.AdjustContext(context.Background(), productID, amount, reason, key)
+}
+
+func (r *InventoryRepository) AdjustContext(ctx context.Context, productID uint, amount int, reason, key string) (row *model.Inventory, replayed bool, err error) {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var event model.Transaction
 		findErr := tx.Where("idempotency_key = ?", key).First(&event).Error
 		if findErr == nil {

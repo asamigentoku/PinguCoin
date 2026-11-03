@@ -57,7 +57,12 @@ func main() {
 	defer stop()
 	metrics.Init("inventory-api")
 	go metrics.Serve(ctx, metrics.Addr(), logger)
-	go consumer.Run(ctx)
+	go func() {
+		if err := consumer.Run(ctx); err != nil {
+			logger.Error("inventory consumer stopped after retries", logging.Err(err))
+			stop()
+		}
+	}()
 	health.Register(ctx, grpcServer, db, logger)
 	go func() { <-ctx.Done(); grpcServer.GracefulStop() }()
 	logger.Info("inventory-api listening", slog.String("port", cfg.Port))

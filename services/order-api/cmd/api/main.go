@@ -38,7 +38,7 @@ func main() {
 		logger.Error("migration failed", logging.Err(e))
 		os.Exit(1)
 	}
-	publisher, e := outbox.New(db, cfg.KafkaBrokers)
+	publisher, e := outbox.New(db, cfg.KafkaBrokers, logger)
 	if e != nil {
 		logger.Error("kafka client failed", logging.Err(e))
 		os.Exit(1)
@@ -63,7 +63,12 @@ func main() {
 	metrics.Init("order-api")
 	go metrics.Serve(ctx, metrics.Addr(), logger)
 	go publisher.Run(ctx)
-	go consumer.Run(ctx)
+	go func() {
+		if err := consumer.Run(ctx); err != nil {
+			logger.Error("order consumer stopped after retries", logging.Err(err))
+			stop()
+		}
+	}()
 	health.Register(ctx, grpcServer, db, logger)
 	go func() { <-ctx.Done(); grpcServer.GracefulStop() }()
 	logger.Info("order-api listening", slog.String("port", cfg.Port))

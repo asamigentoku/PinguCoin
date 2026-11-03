@@ -3,10 +3,12 @@ package eventconsumer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"github.com/asamigentoku/PinguCoin/pkg/consumerretry"
 	"github.com/asamigentoku/PinguCoin/pkg/orderflow"
 	"github.com/asamigentoku/PinguCoin/services/order-api/internal/repository"
 )
@@ -32,37 +34,44 @@ func (c *Consumer) Close() {
 		c.client.Close()
 	}
 }
-func (c *Consumer) Run(ctx context.Context) {
+func (c *Consumer) Run(ctx context.Context) error {
 	if c.client == nil {
-		return
+		return nil
 	}
 	for ctx.Err() == nil {
 		fetches := c.client.PollFetches(ctx)
-		fetches.EachRecord(func(record *kgo.Record) {
-			if err := c.handle(record); err != nil {
-				c.logger.Error("order event failed", "topic", record.Topic, "error", err)
-				return
+		for _, fetchErr := range fetches.Errors() {
+			c.logger.Error("order event fetch failed", "topic", fetchErr.Topic, "partition", fetchErr.Partition, "error", fetchErr.Err)
+		}
+		for _, record := range fetches.Records() {
+			if err := consumerretry.Do(ctx, c.logger, "order.handle", func(attemptCtx context.Context) error {
+				return c.handle(attemptCtx, record)
+			}); err != nil {
+				return fmt.Errorf("order event handling exhausted: %w", err)
 			}
-			if err := c.client.CommitRecords(ctx, record); err != nil {
-				c.logger.Error("order event commit failed", "error", err)
+			if err := consumerretry.Do(ctx, c.logger, "order.commit", func(attemptCtx context.Context) error {
+				return c.client.CommitRecords(attemptCtx, record)
+			}); err != nil {
+				return fmt.Errorf("order offset commit exhausted: %w", err)
 			}
-		})
+		}
 	}
+	return nil
 }
-func (c *Consumer) handle(record *kgo.Record) error {
+func (c *Consumer) handle(ctx context.Context, record *kgo.Record) error {
 	switch record.Topic {
 	case orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected:
 		var event orderflow.InventoryResult
 		if err := json.Unmarshal(record.Value, &event); err != nil {
 			return err
 		}
-		return c.repo.ApplyInventoryResult(event.OrderID, record.Topic == orderflow.TopicInventoryReserved, event.Reason)
+		return c.repo.ApplyInventoryResult(ctx, event.OrderID, record.Topic == orderflow.TopicInventoryReserved, event.Reason)
 	case orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed:
 		var event orderflow.PaymentResult
 		if err := json.Unmarshal(record.Value, &event); err != nil {
 			return err
 		}
-		return c.repo.ApplyPaymentResult(event.OrderID, event.PaymentID, record.Topic == orderflow.TopicPaymentSucceeded, event.Reason)
+		return c.repo.ApplyPaymentResult(ctx, event.OrderID, event.PaymentID, record.Topic == orderflow.TopicPaymentSucceeded, event.Reason)
 	}
 	return nil
 }
