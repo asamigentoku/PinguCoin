@@ -61,25 +61,9 @@ kubectl get secrets -n pingucoin
 
 `inventory-api` と `order-api` はminikubeマニフェスト内のローカル設定を使うため、`.env` とSecretの登録は不要です。
 
-## 4. minikube内のDockerを使用する
+## 4. バックエンドイメージをビルドする
 
-以降の `docker build` で作成したイメージをminikubeから直接参照できるように、現在のPowerShellをminikube内のDockerへ接続します。
-
-```powershell
-minikube -p minikube docker-env --shell powershell | Invoke-Expression
-```
-
-接続先を確認します。
-
-```powershell
-docker info
-```
-
-この設定は現在のPowerShellだけに適用されます。別のPowerShellを開いた場合は、同じ `minikube docker-env` コマンドをもう一度実行してください。
-
-## 5. バックエンドイメージをビルドする
-
-BFFと4つのAPIを順番にビルドします。最後の `.` はリポジトリのルートをビルドコンテキストとして渡すために必要です。
+Docker Desktop上で、BFFと4つのAPIを順番にビルドします。最後の `.` はリポジトリのルートをビルドコンテキストとして渡すために必要です。
 
 ```powershell
 docker build -t pingucoin/media-api:dev -f services/media-api/Dockerfile .
@@ -89,7 +73,25 @@ docker build -t pingucoin/order-api:dev -f services/order-api/Dockerfile .
 docker build -t pingucoin/bff:dev -f services/bff/Dockerfile .
 ```
 
-5つのイメージがminikube内に作成されたことを確認します。
+Docker Desktopに5つのイメージが作成されたことを確認します。
+
+```powershell
+docker images --filter "reference=pingucoin/*:dev"
+```
+
+## 5. イメージをminikubeへ取り込む
+
+`docker build` の出力に `docker:desktop-linux` と表示される場合、イメージはDocker Desktopにあり、minikubeからは直接参照できません。ビルドした5つのイメージをminikubeへ明示的にロードします。
+
+```powershell
+minikube image load pingucoin/media-api:dev
+minikube image load pingucoin/inventory-api:dev
+minikube image load pingucoin/payment-api:dev
+minikube image load pingucoin/order-api:dev
+minikube image load pingucoin/bff:dev
+```
+
+5つのイメージがminikube内に存在することを確認します。
 
 ```powershell
 minikube image ls | Select-String -Pattern "pingucoin/"
@@ -184,7 +186,7 @@ Podが `Pending`、`CrashLoopBackOff`、`ImagePullBackOff` になった場合は
 kubectl describe pod -n pingucoin <pod-name>
 ```
 
-`ErrImageNeverPull` の場合は、対象のバックエンドイメージがminikube内にありません。手順4の `minikube docker-env` を現在のPowerShellで実行してから、手順5の `docker build` をやり直します。
+`ErrImageNeverPull` の場合は、対象のバックエンドイメージがminikube内にありません。手順5の `minikube image load` とイメージ一覧の確認をやり直します。
 
 コードを変更してイメージを再ビルドした場合は、対象Deploymentを再起動します。
 
