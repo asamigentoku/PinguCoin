@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { purchase } from "@/app/purchases/actions";
 import { formatPrice } from "@/lib/format";
+import type { PaymentMethod } from "@/lib/shop";
 import { useCart } from "../cart/cart-provider";
 
 export function CheckoutButton() {
@@ -13,6 +14,7 @@ export function CheckoutButton() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("point");
 
   function openConfirm() {
     setError("");
@@ -23,9 +25,10 @@ export function CheckoutButton() {
     setBusy(true);
     setError("");
     // 押すたびに新しい購入操作として扱う。処理中はボタンを無効にして二重クリックを防ぐ。
-    const result = await purchase(items.map((item) => ({ productId: item.id, quantity: item.quantity })), crypto.randomUUID());
+    const result = await purchase(items.map((item) => ({ productId: item.id, quantity: item.quantity })), paymentMethod, crypto.randomUUID());
     removeItems(result.purchased);
     setBusy(false);
+    if (result.actionUrl) { window.location.assign(result.actionUrl); return; }
     if (result.error) return setError(result.error);
     dialog.current?.close();
     closeCart();
@@ -53,7 +56,13 @@ export function CheckoutButton() {
           ))}
         </ul>
         <div className="confirm-total"><span>合計</span><strong>{formatPrice(total)}</strong></div>
-        <p className="confirm-note">保有ポイントから引き落とされます。購入後は、購入履歴からダウンロードできます。</p>
+        <fieldset className="payment-methods">
+          <legend>支払い方法</legend>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "point"} onChange={() => setPaymentMethod("point")} /> ポイント</label>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} /> カード（3Dセキュア）</label>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} /> 銀行振込（リダイレクト）</label>
+        </fieldset>
+        <p className="confirm-note">{paymentMethod === "point" ? "保有ポイントから引き落とされます。" : paymentMethod === "card" ? "カード会社の認証画面へ移動します。" : "振込確認画面へ移動します。"} 購入後は、購入履歴からダウンロードできます。</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="confirm-actions">
           <button className="button button-ghost" onClick={() => dialog.current?.close()} disabled={busy}>キャンセル</button>

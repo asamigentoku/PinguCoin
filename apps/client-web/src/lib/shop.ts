@@ -5,7 +5,10 @@ const base = (process.env.BFF_API_URL ?? "http://localhost:8082/api/v1").replace
 
 export type PointTransaction = { id: number; amount: number; type: string; reason: string; balance_after: number; created_at: string };
 export type PointSummary = { balance: number; transactions: PointTransaction[] };
-export type Order = { id: number; user_id: number; product_id: number; quantity: number; unit_price: number; total_amount: number; payment_id: number; status: string };
+export type ExternalPaymentMethod = "card" | "bank_transfer";
+export type PaymentMethod = "point" | ExternalPaymentMethod;
+export type Order = { id: number; user_id: number; product_id: number; quantity: number; unit_price: number; total_amount: number; payment_id: number; status: string; payment_method: PaymentMethod; currency: "POINT" | "JPY"; action_url?: string };
+export type Payment = { id: number; amount: number; currency: string; status: string; purpose: string; action_url?: string };
 
 // エラー時はbffが返す {reason, message} のmessageを、そのままErrorにする。
 // 一時的な失敗(つながらない、502/503)のときは、少し待って再試行する(retry: true の呼び出しだけ)。
@@ -38,13 +41,13 @@ export const getOrder = (id: number) => shopFetch<Order>(`/orders/${id}`, undefi
 // idempotencyKeyは1回の購入操作ごとに発行する。同じキーの再送は、在庫・決済・注文を新たに作らず、最初の結果を返す
 // (bff / orcan-api / payment-api のすべてで)。そのため、一時的な失敗のときの再試行(同じキーで送り直す)は、
 // 二重に課金されない。キーが付いていない書き込みは、再試行してはいけない。
-export const createOrder = (productId: number, quantity: number, idempotencyKey: string) =>
+export const createOrder = (productId: number, quantity: number, paymentMethod: PaymentMethod, idempotencyKey: string) =>
   shopFetch<Order>(
     "/orders",
     {
       method: "POST",
       headers: { "idempotency-key": idempotencyKey },
-      body: JSON.stringify({ product_id: productId, quantity, payment_method: "point" }),
+      body: JSON.stringify({ product_id: productId, quantity, payment_method: paymentMethod, currency: paymentMethod === "point" ? "POINT" : "JPY" }),
     },
     true,
   );
@@ -52,12 +55,15 @@ export const createOrder = (productId: number, quantity: number, idempotencyKey:
 export async function waitForOrder(order: Order): Promise<Order> {
   let current = order;
   for (let attempt = 0; attempt < 40; attempt++) {
-    if (["paid", "failed", "rejected", "compensation_required"].includes(current.status)) return current;
+    if (["paid", "failed", "rejected", "compensation_required", "payment_action_required"].includes(current.status)) return current;
     await new Promise((resolve) => setTimeout(resolve, 500));
     current = await getOrder(order.id);
   }
   throw new Error("注文処理がタイムアウトしました。購入履歴から状態を確認してください。");
 }
+
+export const createPointTopUp = (amount: number, paymentMethod: ExternalPaymentMethod, idempotencyKey: string) =>
+  shopFetch<Payment>("/points/topups", { method: "POST", headers: { "idempotency-key": idempotencyKey }, body: JSON.stringify({ amount, payment_method: paymentMethod }) }, true);
 
 const messages: Record<string, string> = {
   "insufficient points": "ポイントが足りません。",

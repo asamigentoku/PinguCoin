@@ -2,10 +2,12 @@
 .git
 .idea
 .vscode
+.cache
+**/.cache
 apps
 docs
 platform
-script
+scripts
 **/node_modules
 **/.env
 **/*_test.go

@@ -18,6 +18,9 @@ message Order {
   string idempotency_key = 9;
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
+  string payment_method = 12;
+  string currency = 13;
+  string action_url = 14;
 }
 
 service OrderService {
@@ -27,7 +30,7 @@ service OrderService {
   rpc HasPaidOrder(HasPaidOrderRequest) returns (HasPaidOrderResponse);
 }
 
-message CreateOrderRequest { uint64 user_id = 1; uint64 product_id = 2; int64 quantity = 3; string payment_method = 4; string idempotency_key = 5; int64 unit_price = 6; }
+message CreateOrderRequest { uint64 user_id = 1; uint64 product_id = 2; int64 quantity = 3; string payment_method = 4; string idempotency_key = 5; int64 unit_price = 6; string currency = 7; }
 message CreateOrderResponse { Order order = 1; bool replayed = 2; }
 message GetOrderRequest { uint64 id = 1; uint64 user_id = 2; }
 message GetOrderResponse { Order order = 1; }

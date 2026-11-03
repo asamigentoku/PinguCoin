@@ -75,7 +75,23 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/payment?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       KAFKA_BROKERS: kafka:29092
-    ports: ["8081:8081"]
+      MOCK_STRIPE_URL: http://mock-stripe:8090
+      WEBHOOK_PORT: 8086
+      WEBHOOK_SECRET: local-webhook-secret
+      PAYMENT_RETURN_URL: http://localhost:3000/purchases
+    ports: ["8081:8081", "8086:8086"]
+
+  mock-stripe:
+    restart: unless-stopped
+    build: {context: ../.., dockerfile: services/payment-api/Dockerfile.mock-stripe}
+    environment:
+      PORT: 8090
+      PUBLIC_URL: http://localhost:8090
+      PAYMENT_WEBHOOK_URL: http://payment-api:8086
+      WEBHOOK_SECRET: local-webhook-secret
+    ports: ["8090:8090"]
+    depends_on:
+      payment-api: {condition: service_started}
 
   order-api:
     <<: *api

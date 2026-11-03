@@ -12,7 +12,11 @@ Kafka -->|orders.created.v1| Inventory[inventory-api]
 Inventory -->|stock decremented/rejected| Kafka
     Kafka -->|inventory.reserved.v1| Payment
     Payment -->|payments.succeeded/failed| Kafka
+    Payment -->|payments.action-required.v1| Kafka
     Kafka -->|result events| Order
+    Payment -->|create/cancel/refund| Stripe[mock Stripe / provider]
+    Stripe -->|3DS redirect| Web
+    Stripe -->|signed webhook| Payment
     Media --> MediaDB[(media DB)]
     Inventory --> InventoryDB[(inventory DB)]
     Payment --> PaymentDB[(payment DB)]
@@ -37,6 +41,10 @@ decrements stock immediately, and publishes the result. Payment consumes only su
 publishes its result. Order consumes both result streams to update state. A payment
 failure is also consumed by inventory to perform an idempotent release. Every consumer
 uses the order idempotency key, so Kafka redelivery does not duplicate stock or payment.
+The order event carries both `payment_method` and `currency`; consumers never infer one
+from the other. Card payments remain `processing` until a signed, provider-event-id
+deduplicated webhook arrives. Point top-ups credit the point account in the same database
+transaction that completes the external payment.
 
 Kafka record handling and offset commits use a 10-second timeout per attempt. Technical
 failures are retried up to six times with increasing delays of 500 ms, 1 s, 2 s, 4 s,

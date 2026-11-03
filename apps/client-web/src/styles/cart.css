@@ -21,3 +21,6 @@
 .cart-total strong { font-size: 26px; font-weight: 900; }
 .checkout-button { width: 100%; }
 .cart-caption { margin-top: 12px; text-align: center; }
+.payment-methods { display: grid; gap: 10px; margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; }
+.payment-methods legend { padding: 0 6px; font-weight: 800; }
+.payment-methods label { display: flex; gap: 8px; align-items: center; font-weight: 700; }

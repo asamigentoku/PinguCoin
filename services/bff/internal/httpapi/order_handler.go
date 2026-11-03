@@ -12,14 +12,14 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
-	orcanpb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
-	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/orcanclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/paymentclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/repository"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/reqcontext"
+	orcanpb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
+	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 )
 
 // idempotencyKeyHeader はフロントエンドが二重注文防止のために発行する冪等性キーのヘッダ名。
@@ -50,17 +50,21 @@ type createOrderRequest struct {
 	ProductID     uint32 `json:"product_id"`
 	Quantity      int64  `json:"quantity"`
 	PaymentMethod string `json:"payment_method"`
+	Currency      string `json:"currency"`
 }
 
 type orderResponse struct {
-	ID          uint   `json:"id"`
-	UserID      uint   `json:"user_id"`
-	ProductID   uint   `json:"product_id"`
-	Quantity    int64  `json:"quantity"`
-	UnitPrice   int64  `json:"unit_price"`
-	TotalAmount int64  `json:"total_amount"`
-	PaymentID   uint   `json:"payment_id"`
-	Status      string `json:"status"`
+	ID            uint   `json:"id"`
+	UserID        uint   `json:"user_id"`
+	ProductID     uint   `json:"product_id"`
+	Quantity      int64  `json:"quantity"`
+	UnitPrice     int64  `json:"unit_price"`
+	TotalAmount   int64  `json:"total_amount"`
+	PaymentID     uint   `json:"payment_id"`
+	Status        string `json:"status"`
+	PaymentMethod string `json:"payment_method"`
+	Currency      string `json:"currency"`
+	ActionURL     string `json:"action_url,omitempty"`
 }
 
 func toOrderResponse(order *model.Order) orderResponse {
@@ -127,6 +131,17 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 	if request.PaymentMethod == "" {
 		request.PaymentMethod = "point"
 	}
+	if request.PaymentMethod != "point" && request.PaymentMethod != "card" && request.PaymentMethod != "credit_card" && request.PaymentMethod != "bank_transfer" {
+		writeError(w, r, apperr.InvalidArgument("unsupported payment_method"))
+		return
+	}
+	if request.Currency == "" {
+		if request.PaymentMethod == "point" {
+			request.Currency = "POINT"
+		} else {
+			request.Currency = "JPY"
+		}
+	}
 
 	productResponse, err := handler.orcan.Product.GetProduct(r.Context(), &orcanpb.GetProductRequest{Id: request.ProductID})
 	if err != nil {
@@ -158,7 +173,7 @@ func (handler *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request)
 		UserId:         uint32(claims.UserID),
 		ProductId:      request.ProductID,
 		Amount:         totalAmount,
-		Currency:       "POINT",
+		Currency:       request.Currency,
 		PaymentMethod:  request.PaymentMethod,
 		IdempotencyKey: idempotencyKey,
 	})
@@ -286,7 +301,7 @@ func orderStatusFromPayment(paymentStatus string) string {
 	switch paymentStatus {
 	case "succeeded":
 		return "paid"
-	case "pending":
+	case "pending", "processing":
 		return "pending"
 	default:
 		return "failed"

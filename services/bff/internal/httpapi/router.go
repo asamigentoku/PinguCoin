@@ -56,6 +56,9 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 		mux.HandleFunc("GET "+APIVersionPrefix+"/orders", handler.ListOrders)
 		mux.HandleFunc("GET "+APIVersionPrefix+"/orders/{id}", handler.GetOrder)
 	}
-	mux.HandleFunc("GET "+APIVersionPrefix+"/points", NewPointHandler(payment).GetPoints)
+	points := NewPointHandler(payment)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/points", points.GetPoints)
+	mux.HandleFunc("POST "+APIVersionPrefix+"/points/topups", points.TopUpPoints)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/payments/{id}", points.GetPayment)
 	return metrics.HTTP(WithRequestID(WithAPIVersion(WithLogging(logger)(WithOptionalAuth(media)(metrics.Route(mux))))))
 }

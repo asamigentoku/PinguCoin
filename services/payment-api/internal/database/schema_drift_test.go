@@ -26,6 +26,9 @@ func modelSchema(db *gorm.DB) error {
 		&model.Refund{},
 		&model.PointAccount{},
 		&model.PointTransaction{},
+		&model.PaymentSource{},
+		&model.OutboxEvent{},
+		&model.ProviderEvent{},
 	)
 }
 

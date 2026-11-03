@@ -10,6 +10,9 @@ type Order struct {
 	UnitPrice      int64  `gorm:"not null"`
 	TotalAmount    int64  `gorm:"not null"`
 	PaymentID      uint   `gorm:"not null;default:0"`
+	PaymentMethod  string `gorm:"size:30;not null;default:'point'"`
+	Currency       string `gorm:"size:10;not null;default:'POINT'"`
+	ActionURL      string `gorm:"type:text"`
 	Status         string `gorm:"size:20;not null;default:'processing'"`
 	IdempotencyKey string `gorm:"size:255;not null;uniqueIndex"`
 	FailureReason  string `gorm:"size:255"`

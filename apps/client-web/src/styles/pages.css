@@ -22,8 +22,15 @@
 .contact-form input, .contact-form textarea { padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--snow); font-weight: 400; }
 .contact-form .button { justify-self: start; }
 .form-done { max-width: 560px; padding: 20px 24px; border-radius: 16px; background: var(--glacier); font-weight: 700; }
+.point-topup { display: grid; grid-template-columns: 1fr auto auto auto; gap: 16px; align-items: end; margin: 28px 0 42px; padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--snow); }
+.point-topup h2, .point-topup p { margin: 0; }
+.point-topup p { color: var(--muted); font-size: 13px; }
+.point-topup label { display: flex; gap: 8px; align-items: center; font-weight: 700; }
+.point-topup input, .point-topup select { width: 150px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--snow); }
+.point-topup .form-error { grid-column: 1 / -1; }
 
 @media (max-width: 700px) {
   .point-list > div { grid-template-columns: 1fr; gap: 6px; }
   .step-list li { padding-left: 76px; }
+  .point-topup { grid-template-columns: 1fr; align-items: stretch; }
 }

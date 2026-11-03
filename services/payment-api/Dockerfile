@@ -26,5 +26,5 @@ LABEL org.opencontainers.image.title="payment-api" \
       org.opencontainers.image.created="${BUILD_TIME}" \
       org.opencontainers.image.source="https://github.com/asamigentoku/PinguCoin"
 COPY --from=build /out/api /api
-EXPOSE 8081
+EXPOSE 8081 8086
 ENTRYPOINT ["/api"]

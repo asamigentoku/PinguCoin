@@ -16,12 +16,12 @@ var ErrIdempotencyConflict = errors.New("idempotency key belongs to a different 
 type Repository struct{ db *gorm.DB }
 
 func New(db *gorm.DB) *Repository { return &Repository{db: db} }
-func (r *Repository) CreateOrGet(candidate *model.Order, paymentMethod, topic string) (*model.Order, bool, error) {
+func (r *Repository) CreateOrGet(candidate *model.Order, topic string) (*model.Order, bool, error) {
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(candidate).Error; err != nil {
 			return err
 		}
-		payload, err := json.Marshal(orderflow.OrderCreated{OrderID: candidate.ID, UserID: candidate.UserID, ProductID: candidate.ProductID, Quantity: candidate.Quantity, UnitPrice: candidate.UnitPrice, TotalAmount: candidate.TotalAmount, PaymentMethod: paymentMethod, IdempotencyKey: candidate.IdempotencyKey})
+		payload, err := json.Marshal(orderflow.OrderCreated{OrderID: candidate.ID, UserID: candidate.UserID, ProductID: candidate.ProductID, Quantity: candidate.Quantity, UnitPrice: candidate.UnitPrice, TotalAmount: candidate.TotalAmount, PaymentMethod: candidate.PaymentMethod, Currency: candidate.Currency, IdempotencyKey: candidate.IdempotencyKey})
 		if err != nil {
 			return err
 		}
@@ -37,7 +37,7 @@ func (r *Repository) CreateOrGet(candidate *model.Order, paymentMethod, topic st
 	if e := r.db.Where("idempotency_key = ?", candidate.IdempotencyKey).First(&existing).Error; e != nil {
 		return nil, false, e
 	}
-	if existing.UserID != candidate.UserID || existing.ProductID != candidate.ProductID || existing.Quantity != candidate.Quantity {
+	if existing.UserID != candidate.UserID || existing.ProductID != candidate.ProductID || existing.Quantity != candidate.Quantity || existing.PaymentMethod != candidate.PaymentMethod || existing.Currency != candidate.Currency {
 		return nil, false, ErrIdempotencyConflict
 	}
 	return &existing, true, nil
@@ -56,7 +56,13 @@ func (r *Repository) ApplyPaymentResult(ctx context.Context, orderID, paymentID 
 	if !succeeded {
 		status = "failed"
 	}
-	return r.db.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"payment_pending", "pending"}).Updates(map[string]any{"status": status, "payment_id": paymentID, "failure_reason": reason}).Error
+	return r.db.WithContext(ctx).Model(&model.Order{}).Where("id = ? AND status IN ?", orderID, []string{"payment_pending", "payment_action_required", "pending"}).Updates(map[string]any{"status": status, "payment_id": paymentID, "failure_reason": reason, "action_url": ""}).Error
+}
+
+func (r *Repository) ApplyPaymentActionRequired(ctx context.Context, orderID, paymentID uint, actionURL string) error {
+	return r.db.WithContext(ctx).Model(&model.Order{}).
+		Where("id = ? AND status IN ?", orderID, []string{"payment_pending", "pending", "payment_action_required"}).
+		Updates(map[string]any{"status": "payment_action_required", "payment_id": paymentID, "action_url": actionURL}).Error
 }
 func (r *Repository) Find(id, user uint) (*model.Order, error) {
 	var row model.Order

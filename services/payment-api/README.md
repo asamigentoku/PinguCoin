@@ -1,5 +1,31 @@
 # payment-api
 
+## 現在の決済フロー
+
+`inventory.reserved.v1` を受信した Kafka consumer は、gRPC handler ではなく
+`PaymentUseCase.Create` を直接呼び出す。決済状態と `outbox_events` は同じ DB
+transaction で保存され、別の outbox publisher が `payments.succeeded.v1` または
+`payments.failed.v1` を Kafka へ at-least-once 配送する。
+
+- `point`: ポイント減算、決済、outbox を1つのDB transactionで確定する。
+- `card` / `credit_card`: `processing` を先に保存し、mock Stripeから返された
+  3DS URLを `payments.action-required.v1` で注文へ通知する。署名付きWebhookを
+  受信してから `succeeded` とoutboxを確定する。
+- mock Stripeにも注文の `idempotency_key` を渡すため、再試行で二重課金しない。
+- provider成功後にpayment-apiが停止した場合はreconcilerが `processing` を回収し、
+  同じ冪等キーでproviderとローカル状態を収束させる。
+
+Docker Composeではmock Stripeも自動起動する。単体で動かす場合は別ターミナルで起動する。
+
+```bash
+go run ./services/payment-api/cmd/mock-stripe
+```
+
+payment-apiは `MOCK_STRIPE_URL`（デフォルト `http://localhost:8090`）へ接続する。
+mock Stripeは `POST /webhook` 相当のpayment-api webhook port（既定8086）へ通知し、
+`WEBHOOK_SECRET` のHMAC署名で偽装イベントを拒否する。provider event IDはDBで一意に
+記録するためWebhookの再送でもポイント付与・注文確定は一度だけ行われる。
+
 決済ドメインを扱うAPI。Go + [gRPC](https://grpc.io/) + [GORM](https://gorm.io/) (PostgreSQL) 構成。
 proto定義は[buf](https://buf.build/)で管理し、このサービスの `proto/payment/v1` に置く(生成したGoのコードも同じ場所)。呼び出し側の `bff` も、この生成コードをそのまま import する。
 
@@ -7,7 +33,7 @@ proto定義は[buf](https://buf.build/)で管理し、このサービスの `pro
 
 | 機能 | 規格(RPC) | フロー |
 | --- | --- | --- |
-| 決済処理 | `PaymentService.CreatePayment` | リクエストを受けてその場で処理し `status: succeeded` の`Payment`を返す(現状は外部決済ゲートウェイ連携なし。将来カード決済等を繋ぐ場合は`status: pending`で返し、Webhookなどで確定させる形に拡張する想定) |
+| 決済処理 | `PaymentService.CreatePayment` | `point` はDB内で即時確定し、カードは3DS/redirectとWebhookで非同期確定する。`purpose=point_topup` は確定とポイント付与を同じtransactionで行う。Kafka経由の結果はtransactional outboxから配送する |
 | 履歴取得 | `PaymentService.GetPayment` / `ListPayments`(`user_id`で絞り込み) / `ListRefunds`(`payment_id`で絞り込み) | 決済・返金の記録をそのまま返す(参照のみ、副作用なし) |
 | キャンセル | `PaymentService.CancelPayment` | `status: pending`の決済のみキャンセル可。それ以外は`FAILED_PRECONDITION` |
 | 返金 | `PaymentService.RefundPayment` | `status: succeeded`/`partially_refunded`の決済に対して`amount`を指定して返金。累計返金額が決済額を超える場合は`INVALID_ARGUMENT`。全額一致で`status: refunded`、一部なら`status: partially_refunded`に更新 |

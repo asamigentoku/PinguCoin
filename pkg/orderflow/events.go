@@ -1,11 +1,12 @@
 package orderflow
 
 const (
-	TopicOrderCreated      = "orders.created.v1"
-	TopicInventoryReserved = "inventory.reserved.v1"
-	TopicInventoryRejected = "inventory.rejected.v1"
-	TopicPaymentSucceeded  = "payments.succeeded.v1"
-	TopicPaymentFailed     = "payments.failed.v1"
+	TopicOrderCreated          = "orders.created.v1"
+	TopicInventoryReserved     = "inventory.reserved.v1"
+	TopicInventoryRejected     = "inventory.rejected.v1"
+	TopicPaymentSucceeded      = "payments.succeeded.v1"
+	TopicPaymentFailed         = "payments.failed.v1"
+	TopicPaymentActionRequired = "payments.action-required.v1"
 )
 
 type OrderCreated struct {
@@ -16,6 +17,7 @@ type OrderCreated struct {
 	UnitPrice      int64  `json:"unit_price"`
 	TotalAmount    int64  `json:"total_amount"`
 	PaymentMethod  string `json:"payment_method"`
+	Currency       string `json:"currency"`
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
@@ -28,4 +30,5 @@ type PaymentResult struct {
 	OrderCreated
 	PaymentID uint   `json:"payment_id,omitempty"`
 	Reason    string `json:"reason,omitempty"`
+	ActionURL string `json:"action_url,omitempty"`
 }

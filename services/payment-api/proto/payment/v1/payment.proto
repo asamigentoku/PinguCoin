@@ -19,6 +19,8 @@ message Payment {
   string status = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
+  string purpose = 10;     // "purchase" / "point_topup"
+  string action_url = 11;  // 3DS/redirect が必要な間だけ設定
 }
 
 // Refund は決済に対する返金(全額 or 一部)を表す。1決済に対して複数件になり得る。
@@ -53,6 +55,7 @@ message CreatePaymentRequest {
   // idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
   // 作られない(最初に処理した結果をそのまま返す)。呼び出し元(bff)は必ず指定すること。
   string idempotency_key = 6;
+  string purpose = 7;
 }
 
 message CreatePaymentResponse {

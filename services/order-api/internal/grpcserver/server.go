@@ -38,10 +38,14 @@ func (s *Server) CreateOrder(ctx context.Context, in *pb.CreateOrderRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "unit_price must be greater than zero")
 	}
 	method := strings.TrimSpace(in.GetPaymentMethod())
-	if method == "" {
-		method = "point"
+	if method != "point" && method != "card" && method != "credit_card" && method != "bank_transfer" {
+		return nil, status.Error(codes.InvalidArgument, "unsupported payment_method")
 	}
-	order, replayed, err := s.repo.CreateOrGet(&model.Order{UserID: uint(in.GetUserId()), ProductID: uint(in.GetProductId()), Quantity: quantity, UnitPrice: in.GetUnitPrice(), TotalAmount: in.GetUnitPrice() * quantity, Status: "pending", IdempotencyKey: key}, method, s.topic)
+	currency := strings.ToUpper(strings.TrimSpace(in.GetCurrency()))
+	if (method == "point" && currency != "POINT") || (method != "point" && currency != "JPY") {
+		return nil, status.Error(codes.InvalidArgument, "currency does not match payment_method")
+	}
+	order, replayed, err := s.repo.CreateOrGet(&model.Order{UserID: uint(in.GetUserId()), ProductID: uint(in.GetProductId()), Quantity: quantity, UnitPrice: in.GetUnitPrice(), TotalAmount: in.GetUnitPrice() * quantity, PaymentMethod: method, Currency: currency, Status: "pending", IdempotencyKey: key}, s.topic)
 	if errors.Is(err, repository.ErrIdempotencyConflict) {
 		return nil, status.Error(codes.AlreadyExists, "idempotency key was already used for another order")
 	}
@@ -82,5 +86,5 @@ func (s *Server) HasPaidOrder(_ context.Context, in *pb.HasPaidOrderRequest) (*p
 	return &pb.HasPaidOrderResponse{Paid: paid}, nil
 }
 func toPB(row *model.Order) *pb.Order {
-	return &pb.Order{Id: uint64(row.ID), UserId: uint64(row.UserID), ProductId: uint64(row.ProductID), Quantity: row.Quantity, UnitPrice: row.UnitPrice, TotalAmount: row.TotalAmount, PaymentId: uint64(row.PaymentID), Status: row.Status, IdempotencyKey: row.IdempotencyKey, CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt)}
+	return &pb.Order{Id: uint64(row.ID), UserId: uint64(row.UserID), ProductId: uint64(row.ProductID), Quantity: row.Quantity, UnitPrice: row.UnitPrice, TotalAmount: row.TotalAmount, PaymentId: uint64(row.PaymentID), Status: row.Status, IdempotencyKey: row.IdempotencyKey, CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt), PaymentMethod: row.PaymentMethod, Currency: row.Currency, ActionUrl: row.ActionURL}
 }

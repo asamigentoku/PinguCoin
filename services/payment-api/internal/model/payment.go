@@ -9,6 +9,7 @@ import (
 // PaymentStatus は決済のステータス。
 const (
 	PaymentStatusPending           = "pending"
+	PaymentStatusProcessing        = "processing"
 	PaymentStatusSucceeded         = "succeeded"
 	PaymentStatusFailed            = "failed"
 	PaymentStatusCanceled          = "canceled"
@@ -20,6 +21,12 @@ const (
 // この方式で決済・返金するとポイント残高(PointAccount)が自動で増減する。
 const PaymentMethodPoint = "point"
 
+const (
+	PaymentMethodCard         = "card"
+	PaymentMethodCreditCard   = "credit_card"
+	PaymentMethodBankTransfer = "bank_transfer"
+)
+
 // Payment は1回の決済を表す。
 type Payment struct {
 	ID     uint `gorm:"primaryKey" json:"id"`
@@ -29,6 +36,7 @@ type Payment struct {
 	Amount        int64  `gorm:"not null" json:"amount"`
 	Currency      string `gorm:"size:10;not null" json:"currency"`
 	PaymentMethod string `gorm:"size:30;not null" json:"payment_method"`
+	Purpose       string `gorm:"size:30;not null;default:'purchase'" json:"purpose"`
 	Status        string `gorm:"size:20;not null;default:'pending'" json:"status"`
 	// IdempotencyKeyは呼び出し元(bff)が発行する冪等性キー。同じキーでの再呼び出しは
 	// 新たに決済(ポイント消費含む)を作らず、最初に作られたこのPaymentをそのまま返す。
@@ -37,6 +45,11 @@ type Payment struct {
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 }
+
+const (
+	PaymentPurposePurchase   = "purchase"
+	PaymentPurposePointTopUp = "point_topup"
+)
 
 func (Payment) TableName() string {
 	return "payments"

@@ -20,6 +20,10 @@ type Config struct {
 	// bff/media-api/payment-apiで同じ値を設定する。
 	InternalAPIToken string
 	KafkaBrokers     []string
+	MockStripeURL    string
+	WebhookPort      string
+	WebhookSecret    string
+	PaymentReturnURL string
 }
 
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
@@ -43,6 +47,10 @@ func Load() Config {
 
 		InternalAPIToken: getEnv("INTERNAL_API_TOKEN", ""),
 		KafkaBrokers:     brokers,
+		MockStripeURL:    getEnv("MOCK_STRIPE_URL", "http://localhost:8090"),
+		WebhookPort:      getEnv("WEBHOOK_PORT", "8086"),
+		WebhookSecret:    getEnv("WEBHOOK_SECRET", "local-webhook-secret"),
+		PaymentReturnURL: getEnv("PAYMENT_RETURN_URL", "http://localhost:3000/purchases"),
 	}
 }
 

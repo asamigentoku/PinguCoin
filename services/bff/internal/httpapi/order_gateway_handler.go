@@ -2,12 +2,12 @@ package httpapi
 
 import (
 	"encoding/json"
-	mediapb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
-	pb "github.com/asamigentoku/PinguCoin/services/order-api/proto/order/v1"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/orcanclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/orderclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/reqcontext"
+	mediapb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
+	pb "github.com/asamigentoku/PinguCoin/services/order-api/proto/order/v1"
 	"net/http"
 	"strconv"
 	"strings"
@@ -42,7 +42,20 @@ func (h *OrderGatewayHandler) CreateOrder(w http.ResponseWriter, r *http.Request
 		writeError(w, r, apperr.FromGRPC(e))
 		return
 	}
-	response, e := h.client.Order.CreateOrder(r.Context(), &pb.CreateOrderRequest{UserId: uint64(claims.UserID), ProductId: uint64(body.ProductID), Quantity: body.Quantity, PaymentMethod: body.PaymentMethod, IdempotencyKey: key, UnitPrice: productResponse.GetProduct().GetPrice()})
+	method := strings.TrimSpace(body.PaymentMethod)
+	if method != "point" && method != "card" && method != "credit_card" && method != "bank_transfer" {
+		writeError(w, r, apperr.InvalidArgument("unsupported payment_method"))
+		return
+	}
+	currency := strings.ToUpper(strings.TrimSpace(body.Currency))
+	if currency == "" {
+		if method == "point" {
+			currency = "POINT"
+		} else {
+			currency = "JPY"
+		}
+	}
+	response, e := h.client.Order.CreateOrder(r.Context(), &pb.CreateOrderRequest{UserId: uint64(claims.UserID), ProductId: uint64(body.ProductID), Quantity: body.Quantity, PaymentMethod: method, Currency: currency, IdempotencyKey: key, UnitPrice: productResponse.GetProduct().GetPrice()})
 	if e != nil {
 		writeError(w, r, apperr.FromGRPC(e))
 		return
@@ -89,5 +102,5 @@ func (h *OrderGatewayHandler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, gatewayOrder(response.GetOrder()))
 }
 func gatewayOrder(order *pb.Order) orderResponse {
-	return orderResponse{ID: uint(order.GetId()), UserID: uint(order.GetUserId()), ProductID: uint(order.GetProductId()), Quantity: order.GetQuantity(), UnitPrice: order.GetUnitPrice(), TotalAmount: order.GetTotalAmount(), PaymentID: uint(order.GetPaymentId()), Status: order.GetStatus()}
+	return orderResponse{ID: uint(order.GetId()), UserID: uint(order.GetUserId()), ProductID: uint(order.GetProductId()), Quantity: order.GetQuantity(), UnitPrice: order.GetUnitPrice(), TotalAmount: order.GetTotalAmount(), PaymentID: uint(order.GetPaymentId()), Status: order.GetStatus(), PaymentMethod: order.GetPaymentMethod(), Currency: order.GetCurrency(), ActionURL: order.GetActionUrl()}
 }

@@ -36,6 +36,8 @@ type Payment struct {
 	Status        string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Purpose       string                 `protobuf:"bytes,10,opt,name=purpose,proto3" json:"purpose,omitempty"`                      // "purchase" / "point_topup"
+	ActionUrl     string                 `protobuf:"bytes,11,opt,name=action_url,json=actionUrl,proto3" json:"action_url,omitempty"` // 3DS/redirect が必要な間だけ設定
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -131,6 +133,20 @@ func (x *Payment) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Payment) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
+	}
+	return ""
+}
+
+func (x *Payment) GetActionUrl() string {
+	if x != nil {
+		return x.ActionUrl
+	}
+	return ""
 }
 
 // Refund は決済に対する返金(全額 or 一部)を表す。1決済に対して複数件になり得る。
@@ -236,6 +252,7 @@ type CreatePaymentRequest struct {
 	// idempotency_key が同じリクエストを再送しても決済(ポイント消費含む)は二重に
 	// 作られない(最初に処理した結果をそのまま返す)。呼び出し元(bff)は必ず指定すること。
 	IdempotencyKey string `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Purpose        string `protobuf:"bytes,7,opt,name=purpose,proto3" json:"purpose,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -308,6 +325,13 @@ func (x *CreatePaymentRequest) GetPaymentMethod() string {
 func (x *CreatePaymentRequest) GetIdempotencyKey() string {
 	if x != nil {
 		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CreatePaymentRequest) GetPurpose() string {
+	if x != nil {
+		return x.Purpose
 	}
 	return ""
 }
@@ -837,7 +861,7 @@ var File_payment_v1_payment_proto protoreflect.FileDescriptor
 const file_payment_v1_payment_proto_rawDesc = "" +
 	"\n" +
 	"\x18payment/v1/payment.proto\x12\n" +
-	"payment.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x02\n" +
+	"payment.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf3\x02\n" +
 	"\aPayment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\rR\x06userId\x12\x1d\n" +
@@ -850,7 +874,11 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf5\x01\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x18\n" +
+	"\apurpose\x18\n" +
+	" \x01(\tR\apurpose\x12\x1d\n" +
+	"\n" +
+	"action_url\x18\v \x01(\tR\tactionUrl\"\xf5\x01\n" +
 	"\x06Refund\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x1d\n" +
 	"\n" +
@@ -861,7 +889,7 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd2\x01\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xec\x01\n" +
 	"\x14CreatePaymentRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x1d\n" +
 	"\n" +
@@ -869,7 +897,8 @@ const file_payment_v1_payment_proto_rawDesc = "" +
 	"\x06amount\x18\x03 \x01(\x03R\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12%\n" +
 	"\x0epayment_method\x18\x05 \x01(\tR\rpaymentMethod\x12'\n" +
-	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"F\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\x12\x18\n" +
+	"\apurpose\x18\a \x01(\tR\apurpose\"F\n" +
 	"\x15CreatePaymentResponse\x12-\n" +
 	"\apayment\x18\x01 \x01(\v2\x13.payment.v1.PaymentR\apayment\"#\n" +
 	"\x11GetPaymentRequest\x12\x0e\n" +

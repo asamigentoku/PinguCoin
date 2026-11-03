@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -13,7 +14,9 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/application"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/model"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/paymentmethod"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 )
@@ -28,16 +31,19 @@ type PaymentServer struct {
 	payments *repository.PaymentRepository
 	refunds  *repository.RefundRepository
 	points   *repository.PointRepository
+	create   *application.PaymentUseCase
 }
 
 func NewPaymentServer(db *gorm.DB, payments *repository.PaymentRepository, refunds *repository.RefundRepository, points *repository.PointRepository) *PaymentServer {
-	return &PaymentServer{db: db, payments: payments, refunds: refunds, points: points}
+	return NewPaymentServerWithUseCase(db, payments, refunds, points, application.NewPaymentUseCase(db, paymentmethod.InMemoryStripe{}))
+}
+
+func NewPaymentServerWithUseCase(db *gorm.DB, payments *repository.PaymentRepository, refunds *repository.RefundRepository, points *repository.PointRepository, create *application.PaymentUseCase) *PaymentServer {
+	return &PaymentServer{db: db, payments: payments, refunds: refunds, points: points, create: create}
 }
 
 // CreatePayment は決済処理そのもの。
-// 現時点では外部決済ゲートウェイとの連携は実装しておらず、その場で成功として処理する
-// (ポイント決済など即時確定の決済を想定)。将来カード決済等の非同期ゲートウェイを繋ぐ場合は、
-// ここで status を "pending" のまま返し、Webhook等で確定させる形に拡張する。
+// pointはDB内で即時確定し、card/credit_cardはPaymentUseCaseからmock Stripeを呼び出す。
 func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.CreatePaymentRequest) (*pb.CreatePaymentResponse, error) {
 	replayed := false
 	response, err := server.createPayment(ctx, request, &replayed)
@@ -64,6 +70,26 @@ func (server *PaymentServer) CreatePayment(ctx context.Context, request *pb.Crea
 
 // createPayment は CreatePayment の本体。replayed には、同じ冪等性キーの再送で、最初の結果を返したかどうかを書き込む(メトリクス用)。
 func (server *PaymentServer) createPayment(ctx context.Context, request *pb.CreatePaymentRequest, replayed *bool) (*pb.CreatePaymentResponse, error) {
+	if server.create != nil {
+		result, err := server.create.Create(ctx, application.CreatePaymentCommand{UserID: uint(request.GetUserId()), ProductID: uint(request.GetProductId()), Amount: request.GetAmount(), Currency: request.GetCurrency(), PaymentMethod: request.GetPaymentMethod(), IdempotencyKey: request.GetIdempotencyKey(), Purpose: request.GetPurpose()})
+		if err != nil {
+			return nil, apperr.Internal(err)
+		}
+		*replayed = result.Replayed
+		if result.Rejected != nil {
+			switch {
+			case errors.Is(result.Rejected, application.ErrInvalid), errors.Is(result.Rejected, application.ErrUnsupportedMethod):
+				return nil, apperr.InvalidArgument(result.Rejected.Error())
+			case errors.Is(result.Rejected, application.ErrInsufficientPoints):
+				return nil, apperr.FailedPrecondition(result.Rejected.Error())
+			default:
+				return nil, apperr.FailedPrecondition(result.Rejected.Error())
+			}
+		}
+		response := toProtoPayment(result.Payment)
+		response.ActionUrl = result.ActionURL
+		return &pb.CreatePaymentResponse{Payment: response}, nil
+	}
 	if request.GetUserId() == 0 {
 		return nil, apperr.InvalidArgument("user_id is required")
 	}
@@ -158,7 +184,11 @@ func (server *PaymentServer) GetPayment(ctx context.Context, request *pb.GetPaym
 	if err != nil {
 		return nil, mapFindError("payment", err)
 	}
-	return &pb.GetPaymentResponse{Payment: toProtoPayment(payment)}, nil
+	response := toProtoPayment(payment)
+	if source, sourceErr := repository.NewPaymentSourceRepository(server.db.WithContext(ctx)).FindByPaymentID(payment.ID); sourceErr == nil {
+		response.ActionUrl = source.ActionURL
+	}
+	return &pb.GetPaymentResponse{Payment: response}, nil
 }
 
 // ListPayments は決済履歴を返す。user_id を指定するとそのユーザーの履歴に絞り込む。
@@ -207,13 +237,21 @@ func (server *PaymentServer) CancelPayment(ctx context.Context, request *pb.Canc
 		return nil, mapFindError("payment", err)
 	}
 
-	if payment.Status != model.PaymentStatusPending {
+	if payment.Status != model.PaymentStatusPending && payment.Status != model.PaymentStatusProcessing {
 		return nil, apperr.FailedPrecondition("payment is not cancellable in status: " + payment.Status)
 	}
 
-	payment.Status = model.PaymentStatusCanceled
-	if err := server.payments.Update(payment); err != nil {
-		return nil, apperr.Internal(err)
+	if payment.PaymentMethod != model.PaymentMethodPoint {
+		if err := server.create.CancelExternal(ctx, payment); err != nil {
+			return nil, apperr.Internal(err)
+		}
+	} else {
+		payment.Status = model.PaymentStatusCanceled
+	}
+	if payment.PaymentMethod == model.PaymentMethodPoint {
+		if updateErr := server.payments.Update(payment); updateErr != nil {
+			return nil, apperr.Internal(updateErr)
+		}
 	}
 	return &pb.CancelPaymentResponse{Payment: toProtoPayment(payment)}, nil
 }
@@ -253,6 +291,12 @@ func (server *PaymentServer) refundPayment(ctx context.Context, request *pb.Refu
 	if request.GetAmount() > remaining {
 		return nil, apperr.InvalidArgument("refund amount exceeds refundable amount")
 	}
+	if payment.PaymentMethod != model.PaymentMethodPoint {
+		key := fmt.Sprintf("refund-%d-%d", payment.ID, alreadyRefunded+request.GetAmount())
+		if err := server.create.RefundExternal(ctx, payment, request.GetAmount(), key); err != nil {
+			return nil, apperr.Internal(err)
+		}
+	}
 
 	refund := &model.Refund{
 		PaymentID: payment.ID,
@@ -287,12 +331,13 @@ func (server *PaymentServer) refundPayment(ctx context.Context, request *pb.Refu
 		return &pb.RefundPaymentResponse{Refund: toProtoRefund(refund), Payment: toProtoPayment(payment)}, nil
 	}
 
-	if err := server.refunds.Create(refund); err != nil {
-		return nil, apperr.Internal(err)
-	}
-
-	payment.Status = newStatus
-	if err := server.payments.Update(payment); err != nil {
+	if err := server.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := server.refunds.WithTx(tx).Create(refund); err != nil {
+			return err
+		}
+		payment.Status = newStatus
+		return server.payments.WithTx(tx).Update(payment)
+	}); err != nil {
 		return nil, apperr.Internal(err)
 	}
 
@@ -311,6 +356,7 @@ func toProtoPayment(payment *model.Payment) *pb.Payment {
 		Currency:      payment.Currency,
 		PaymentMethod: payment.PaymentMethod,
 		Status:        payment.Status,
+		Purpose:       payment.Purpose,
 		CreatedAt:     timestamppb.New(payment.CreatedAt),
 		UpdatedAt:     timestamppb.New(payment.UpdatedAt),
 	}

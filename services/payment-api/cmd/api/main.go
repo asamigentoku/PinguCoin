@@ -4,9 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -18,11 +20,15 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/pkg/version"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/application"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/eventconsumer"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/grpcserver"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/outbox"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/paymentmethod"
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/repository"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/webhook"
 	pb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 )
 
@@ -73,12 +79,14 @@ func main() {
 	)
 
 	pointRepo := repository.NewPointRepository(db)
+	createPayment := application.NewPaymentUseCase(db, paymentmethod.NewStripe(cfg.MockStripeURL), cfg.PaymentReturnURL)
 
-	paymentServer := grpcserver.NewPaymentServer(
+	paymentServer := grpcserver.NewPaymentServerWithUseCase(
 		db,
 		repository.NewPaymentRepository(db),
 		repository.NewRefundRepository(db),
 		pointRepo,
+		createPayment,
 	)
 	pb.RegisterPaymentServiceServer(server, paymentServer)
 	pb.RegisterPointServiceServer(server, grpcserver.NewPointServer(pointRepo))
@@ -88,18 +96,57 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
-	consumer, err := eventconsumer.New(cfg.KafkaBrokers, paymentServer, logger)
+	consumer, err := eventconsumer.New(cfg.KafkaBrokers, createPayment, logger)
 	if err != nil {
 		logger.Error("kafka consumer failed", logging.Err(err))
 		os.Exit(1)
 	}
 	defer consumer.Close()
+	publisher, err := outbox.New(cfg.KafkaBrokers, repository.NewOutboxRepository(db), logger)
+	if err != nil {
+		logger.Error("outbox publisher failed", logging.Err(err))
+		os.Exit(1)
+	}
+	defer publisher.Close()
 	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
 	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
+	webhookServer := &http.Server{Addr: ":" + cfg.WebhookPort, Handler: webhook.New(createPayment, cfg.WebhookSecret), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second}
+	go func() {
+		if err := webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("webhook server stopped", logging.Err(err))
+			stopSignals()
+		}
+	}()
+	go func() {
+		<-shutdownCtx.Done()
+		closeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = webhookServer.Shutdown(closeCtx)
+	}()
 	go func() {
 		if err := consumer.Run(shutdownCtx); err != nil {
 			logger.Error("payment consumer stopped after retries", logging.Err(err))
 			stopSignals()
+		}
+	}()
+	go func() {
+		if err := publisher.Run(shutdownCtx); err != nil {
+			logger.Error("outbox publisher stopped", logging.Err(err))
+			stopSignals()
+		}
+	}()
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-shutdownCtx.Done():
+				return
+			case <-ticker.C:
+				if err := createPayment.ReconcileProcessing(shutdownCtx, time.Minute); err != nil {
+					logger.Error("payment reconciliation failed", logging.Err(err))
+				}
+			}
 		}
 	}()
 	health.Register(shutdownCtx, server, db, logger)

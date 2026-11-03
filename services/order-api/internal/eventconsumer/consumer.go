@@ -23,7 +23,7 @@ func New(brokers []string, repo *repository.Repository, logger *slog.Logger) (*C
 	if len(brokers) == 0 {
 		return &Consumer{repo: repo, logger: logger}, nil
 	}
-	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("order-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected, orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed), kgo.DisableAutoCommit())
+	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("order-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected, orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed, orderflow.TopicPaymentActionRequired), kgo.DisableAutoCommit())
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +66,13 @@ func (c *Consumer) handle(ctx context.Context, record *kgo.Record) error {
 			return err
 		}
 		return c.repo.ApplyInventoryResult(ctx, event.OrderID, record.Topic == orderflow.TopicInventoryReserved, event.Reason)
-	case orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed:
+	case orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed, orderflow.TopicPaymentActionRequired:
 		var event orderflow.PaymentResult
 		if err := json.Unmarshal(record.Value, &event); err != nil {
 			return err
+		}
+		if record.Topic == orderflow.TopicPaymentActionRequired {
+			return c.repo.ApplyPaymentActionRequired(ctx, event.OrderID, event.PaymentID, event.ActionURL)
 		}
 		return c.repo.ApplyPaymentResult(ctx, event.OrderID, event.PaymentID, record.Topic == orderflow.TopicPaymentSucceeded, event.Reason)
 	}

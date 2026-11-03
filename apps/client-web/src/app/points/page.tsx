@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { SignInRequired } from "@/components/sell/sign-in-required";
 import { formatPoints } from "@/lib/points";
 import { getPoints, type PointSummary } from "@/lib/shop";
+import { PointTopUpForm } from "@/components/points/point-topup-form";
 
 export const metadata: Metadata = { title: "ポイントをためる" };
 
@@ -35,6 +36,7 @@ export default async function PointsPage() {
               <div><small>保有ポイント</small><strong>{formatPoints(points.balance)}<span> pt</span></strong></div>
               <Link className="button button-coin" href="/products">作品を探す</Link>
             </div>
+            <PointTopUpForm />
             <h2 className="points-heading">ポイントの履歴</h2>
             <ul className="points-history">
               {points.transactions.map((transaction) => (
