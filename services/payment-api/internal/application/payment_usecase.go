@@ -64,20 +64,20 @@ func (u *PaymentUseCase) Create(ctx context.Context, cmd CreatePaymentCommand) (
 	if cmd.Purpose == "" {
 		cmd.Purpose = model.PaymentPurposePurchase
 	}
-	db := u.db.WithContext(ctx)
 	if err := validate(cmd); err != nil {
 		result := &CreatePaymentResult{Rejected: err}
 		// Kafka起点の注文は、入力不備でも失敗イベントを返して注文を
 		// payment_pendingのまま放置しない。最低限永続化できる項目がある場合だけ記録する。
-		if cmd.Order != nil && cmd.UserID != 0 && cmd.ProductID != 0 && cmd.Amount > 0 && cmd.IdempotencyKey != "" {
+		if u.db != nil && cmd.Order != nil && cmd.UserID != 0 && cmd.ProductID != 0 && cmd.Amount > 0 && cmd.IdempotencyKey != "" {
 			var recordErr error
-			result.Payment, recordErr = u.recordRejected(db, cmd, err)
+			result.Payment, recordErr = u.recordRejected(u.db.WithContext(ctx), cmd, err)
 			if recordErr != nil {
 				return nil, recordErr
 			}
 		}
 		return result, nil
 	}
+	db := u.db.WithContext(ctx)
 	if existing, err := u.payments.WithTx(db).FindByIdempotencyKey(cmd.IdempotencyKey); err == nil {
 		return u.replay(db, existing), nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {

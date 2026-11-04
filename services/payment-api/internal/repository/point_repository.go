@@ -2,15 +2,19 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/model"
+	"github.com/asamigentoku/PinguCoin/services/payment-api/internal/pointchain"
 )
 
 // ErrInsufficientPoints はポイント残高が消費要求額に満たない場合に返る。
 var ErrInsufficientPoints = errors.New("insufficient points")
+
+var ErrPointChainIntegrity = errors.New("point transaction hash chain integrity violation")
 
 type PointRepository struct {
 	db *gorm.DB
@@ -39,6 +43,9 @@ func (repo *PointRepository) GetAccount(userID uint) (*model.PointAccount, error
 
 // ListTransactions はポイント増減履歴を返す。userIDを指定するとそのユーザーに絞り込む。
 func (repo *PointRepository) ListTransactions(userID uint) ([]model.PointTransaction, error) {
+	if err := repo.VerifyChain(userID); err != nil {
+		return nil, err
+	}
 	var transactions []model.PointTransaction
 	query := repo.db.Order("id desc")
 	if userID != 0 {
@@ -68,6 +75,9 @@ func (repo *PointRepository) Adjust(userID uint, amount int64, txType, reason st
 	case err != nil:
 		return nil, err
 	}
+	if err := repo.VerifyChain(userID); err != nil {
+		return nil, err
+	}
 
 	newBalance := account.Balance + amount
 	if newBalance < 0 {
@@ -86,10 +96,64 @@ func (repo *PointRepository) Adjust(userID uint, amount int64, txType, reason st
 		Reason:       reason,
 		BalanceAfter: newBalance,
 	}
+	var previous model.PointTransaction
+	err = repo.db.Where("user_id = ?", userID).Order("chain_sequence DESC").First(&previous).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		transaction.ChainSequence = 1
+		transaction.PreviousHash = pointchain.GenesisHash
+	case err != nil:
+		return nil, err
+	default:
+		transaction.ChainSequence = previous.ChainSequence + 1
+		transaction.PreviousHash = previous.TransactionHash
+	}
+	transaction.TransactionHash = pointchain.Hash(transaction)
 	if err := repo.db.Create(transaction).Error; err != nil {
 		return nil, err
 	}
 	return transaction, nil
+}
+
+// VerifyChain recalculates the selected users' complete point ledgers.
+// A zero userID verifies every user's chain.
+func (repo *PointRepository) VerifyChain(userID uint) error {
+	var transactions []model.PointTransaction
+	query := repo.db.Order("user_id ASC, chain_sequence ASC")
+	if userID != 0 {
+		query = query.Where("user_id = ?", userID)
+	}
+	if err := query.Find(&transactions).Error; err != nil {
+		return err
+	}
+	if err := pointchain.Verify(transactions); err != nil {
+		return fmt.Errorf("%w: %v", ErrPointChainIntegrity, err)
+	}
+	latestBalances := make(map[uint]int64)
+	for i := range transactions {
+		latestBalances[transactions[i].UserID] = transactions[i].BalanceAfter
+	}
+	var accounts []model.PointAccount
+	accountsQuery := repo.db.Order("user_id ASC")
+	if userID != 0 {
+		accountsQuery = accountsQuery.Where("user_id = ?", userID)
+	}
+	if err := accountsQuery.Find(&accounts).Error; err != nil {
+		return err
+	}
+	accountBalances := make(map[uint]int64, len(accounts))
+	for i := range accounts {
+		accountBalances[accounts[i].UserID] = accounts[i].Balance
+		if accounts[i].Balance != latestBalances[accounts[i].UserID] {
+			return fmt.Errorf("%w: user %d account balance does not match the ledger", ErrPointChainIntegrity, accounts[i].UserID)
+		}
+	}
+	for ledgerUser := range latestBalances {
+		if _, exists := accountBalances[ledgerUser]; !exists {
+			return fmt.Errorf("%w: user %d account is missing", ErrPointChainIntegrity, ledgerUser)
+		}
+	}
+	return nil
 }
 
 // AdjustAtomic はポイント増減だけで完結する操作(手動付与/消費)向けに、

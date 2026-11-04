@@ -138,13 +138,16 @@ func toProtoPointAccount(account *model.PointAccount) *pb.PointAccount {
 
 func toProtoPointTransaction(transaction *model.PointTransaction) *pb.PointTransaction {
 	protoTransaction := &pb.PointTransaction{
-		Id:           uint32(transaction.ID),
-		UserId:       uint32(transaction.UserID),
-		Amount:       transaction.Amount,
-		Type:         transaction.Type,
-		Reason:       transaction.Reason,
-		BalanceAfter: transaction.BalanceAfter,
-		CreatedAt:    timestamppb.New(transaction.CreatedAt),
+		Id:              uint32(transaction.ID),
+		UserId:          uint32(transaction.UserID),
+		Amount:          transaction.Amount,
+		Type:            transaction.Type,
+		Reason:          transaction.Reason,
+		BalanceAfter:    transaction.BalanceAfter,
+		CreatedAt:       timestamppb.New(transaction.CreatedAt),
+		ChainSequence:   transaction.ChainSequence,
+		PreviousHash:    transaction.PreviousHash,
+		TransactionHash: transaction.TransactionHash,
 	}
 	if transaction.PaymentID != nil {
 		paymentID := uint32(*transaction.PaymentID)

@@ -24,6 +24,9 @@ message PointTransaction {
   string reason = 6;
   int64 balance_after = 7;
   google.protobuf.Timestamp created_at = 8;
+  uint64 chain_sequence = 9;
+  string previous_hash = 10;
+  string transaction_hash = 11;
 }
 
 service PointService {

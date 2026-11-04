@@ -91,12 +91,15 @@ type PointTransaction struct {
 	Amount int64                  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"` // 正の値=付与、負の値=消費
 	Type   string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`      // "credit" / "debit" / "payment" / "refund"
 	// Payment(決済)に紐づく増減(point払い/その返金)の場合のみ設定される。
-	PaymentId     *uint32                `protobuf:"varint,5,opt,name=payment_id,json=paymentId,proto3,oneof" json:"payment_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
-	BalanceAfter  int64                  `protobuf:"varint,7,opt,name=balance_after,json=balanceAfter,proto3" json:"balance_after,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	PaymentId       *uint32                `protobuf:"varint,5,opt,name=payment_id,json=paymentId,proto3,oneof" json:"payment_id,omitempty"`
+	Reason          string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	BalanceAfter    int64                  `protobuf:"varint,7,opt,name=balance_after,json=balanceAfter,proto3" json:"balance_after,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ChainSequence   uint64                 `protobuf:"varint,9,opt,name=chain_sequence,json=chainSequence,proto3" json:"chain_sequence,omitempty"`
+	PreviousHash    string                 `protobuf:"bytes,10,opt,name=previous_hash,json=previousHash,proto3" json:"previous_hash,omitempty"`
+	TransactionHash string                 `protobuf:"bytes,11,opt,name=transaction_hash,json=transactionHash,proto3" json:"transaction_hash,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PointTransaction) Reset() {
@@ -183,6 +186,27 @@ func (x *PointTransaction) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *PointTransaction) GetChainSequence() uint64 {
+	if x != nil {
+		return x.ChainSequence
+	}
+	return 0
+}
+
+func (x *PointTransaction) GetPreviousHash() string {
+	if x != nil {
+		return x.PreviousHash
+	}
+	return ""
+}
+
+func (x *PointTransaction) GetTransactionHash() string {
+	if x != nil {
+		return x.TransactionHash
+	}
+	return ""
 }
 
 type GetPointAccountRequest struct {
@@ -595,7 +619,7 @@ const file_payment_v1_point_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\rR\x06userId\x12\x18\n" +
 	"\abalance\x18\x02 \x01(\x03R\abalance\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x92\x02\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x89\x03\n" +
 	"\x10PointTransaction\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\rR\x06userId\x12\x16\n" +
@@ -606,7 +630,11 @@ const file_payment_v1_point_proto_rawDesc = "" +
 	"\x06reason\x18\x06 \x01(\tR\x06reason\x12#\n" +
 	"\rbalance_after\x18\a \x01(\x03R\fbalanceAfter\x129\n" +
 	"\n" +
-	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\r\n" +
+	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12%\n" +
+	"\x0echain_sequence\x18\t \x01(\x04R\rchainSequence\x12#\n" +
+	"\rprevious_hash\x18\n" +
+	" \x01(\tR\fpreviousHash\x12)\n" +
+	"\x10transaction_hash\x18\v \x01(\tR\x0ftransactionHashB\r\n" +
 	"\v_payment_id\"1\n" +
 	"\x16GetPointAccountRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\rR\x06userId\"M\n" +

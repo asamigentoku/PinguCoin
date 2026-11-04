@@ -3,7 +3,7 @@ import { HttpStatusError, withRetry } from "./retry";
 
 const base = (process.env.BFF_API_URL ?? "http://localhost:8082/api/v1").replace(/\/$/, "");
 
-export type PointTransaction = { id: number; amount: number; type: string; reason: string; balance_after: number; created_at: string };
+export type PointTransaction = { id: number; amount: number; type: string; reason: string; balance_after: number; created_at: string; chain_sequence: number; previous_hash: string; transaction_hash: string };
 export type PointSummary = { balance: number; transactions: PointTransaction[] };
 export type ExternalPaymentMethod = "card" | "bank_transfer";
 export type PaymentMethod = "point" | ExternalPaymentMethod;

@@ -94,12 +94,15 @@ func NewPointHandler(payment *paymentclient.Client) *PointHandler {
 }
 
 type pointTransactionResponse struct {
-	ID           uint32 `json:"id"`
-	Amount       int64  `json:"amount"`
-	Type         string `json:"type"`
-	Reason       string `json:"reason"`
-	BalanceAfter int64  `json:"balance_after"`
-	CreatedAt    string `json:"created_at"`
+	ID              uint32 `json:"id"`
+	Amount          int64  `json:"amount"`
+	Type            string `json:"type"`
+	Reason          string `json:"reason"`
+	BalanceAfter    int64  `json:"balance_after"`
+	CreatedAt       string `json:"created_at"`
+	ChainSequence   uint64 `json:"chain_sequence"`
+	PreviousHash    string `json:"previous_hash"`
+	TransactionHash string `json:"transaction_hash"`
 }
 
 type pointsResponse struct {
@@ -144,6 +147,7 @@ func (handler *PointHandler) GetPoints(w http.ResponseWriter, r *http.Request) {
 		response.Transactions = append(response.Transactions, pointTransactionResponse{
 			ID: transaction.GetId(), Amount: transaction.GetAmount(), Type: transaction.GetType(), Reason: transaction.GetReason(),
 			BalanceAfter: transaction.GetBalanceAfter(), CreatedAt: transaction.GetCreatedAt().AsTime().Format("2006-01-02T15:04:05Z07:00"),
+			ChainSequence: transaction.GetChainSequence(), PreviousHash: transaction.GetPreviousHash(), TransactionHash: transaction.GetTransactionHash(),
 		})
 	}
 	// 履歴は payment-api が新しい順(id降順)で返すので、並べ替えずにそのまま返す。
