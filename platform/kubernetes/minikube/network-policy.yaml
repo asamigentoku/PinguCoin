@@ -126,5 +126,5 @@ spec:
     - from:
         - podSelector:
             matchExpressions:
-              - {key: app, operator: In, values: [inventory-api, payment-api, order-api]}
+              - {key: app, operator: In, values: [inventory-api, payment-api, order-api, kafka-topic-init]}
       ports: [{port: 9092}]

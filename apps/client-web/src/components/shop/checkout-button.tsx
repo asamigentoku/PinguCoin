@@ -59,10 +59,10 @@ export function CheckoutButton() {
         <fieldset className="payment-methods">
           <legend>支払い方法</legend>
           <label><input type="radio" name="payment-method" checked={paymentMethod === "point"} onChange={() => setPaymentMethod("point")} /> ポイント</label>
-          <label><input type="radio" name="payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} /> カード（3Dセキュア）</label>
-          <label><input type="radio" name="payment-method" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} /> 銀行振込（リダイレクト）</label>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} /> カード</label>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} /> 銀行振込</label>
         </fieldset>
-        <p className="confirm-note">{paymentMethod === "point" ? "保有ポイントから引き落とされます。" : paymentMethod === "card" ? "カード会社の認証画面へ移動します。" : "振込確認画面へ移動します。"} 購入後は、購入履歴からダウンロードできます。</p>
+        <p className="confirm-note">{paymentMethod === "point" ? "保有ポイントから引き落とされます。" : "開発用のモック決済で処理します。"} 購入後は、購入履歴からダウンロードできます。</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="confirm-actions">
           <button className="button button-ghost" onClick={() => dialog.current?.close()} disabled={busy}>キャンセル</button>

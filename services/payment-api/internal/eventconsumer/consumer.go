@@ -26,7 +26,7 @@ func New(brokers []string, payments paymentCreator, logger *slog.Logger) (*Consu
 	if len(brokers) == 0 {
 		return &Consumer{payments: payments, logger: logger}, nil
 	}
-	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("payment-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved), kgo.DisableAutoCommit())
+	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("payment-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.DisableAutoCommit())
 	if err != nil {
 		return nil, err
 	}

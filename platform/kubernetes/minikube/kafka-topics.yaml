@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-init
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels: {app: kafka-topic-init}
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      containers:
+        - name: create-topics
+          image: apache/kafka:4.1.0
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 2; done
+              for topic in \
+                orders.created.v1 \
+                inventory.reserved.v1 \
+                inventory.rejected.v1 \
+                payments.action-required.v1 \
+                payments.succeeded.v1 \
+                payments.failed.v1; do
+                /opt/kafka/bin/kafka-topics.sh \
+                  --bootstrap-server kafka:9092 \
+                  --create --if-not-exists \
+                  --topic "$topic" --partitions 1 --replication-factor 1
+              done

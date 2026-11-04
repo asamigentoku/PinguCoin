@@ -78,6 +78,7 @@ services:
       MOCK_STRIPE_URL: http://mock-stripe:8090
       WEBHOOK_PORT: 8086
       WEBHOOK_SECRET: local-webhook-secret
+      MOCK_STRIPE_AUTO_CONFIRM: "true"
       PAYMENT_RETURN_URL: http://localhost:3000/purchases
     ports: ["8081:8081", "8086:8086"]
 

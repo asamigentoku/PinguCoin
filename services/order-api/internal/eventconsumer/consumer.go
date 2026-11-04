@@ -23,7 +23,7 @@ func New(brokers []string, repo *repository.Repository, logger *slog.Logger) (*C
 	if len(brokers) == 0 {
 		return &Consumer{repo: repo, logger: logger}, nil
 	}
-	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("order-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected, orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed, orderflow.TopicPaymentActionRequired), kgo.DisableAutoCommit())
+	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("order-api-v1"), kgo.ConsumeTopics(orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected, orderflow.TopicPaymentSucceeded, orderflow.TopicPaymentFailed, orderflow.TopicPaymentActionRequired), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.DisableAutoCommit())
 	if err != nil {
 		return nil, err
 	}

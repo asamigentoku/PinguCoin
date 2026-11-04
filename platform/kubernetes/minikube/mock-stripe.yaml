@@ -25,6 +25,8 @@ spec:
             - {name: PUBLIC_URL, value: "http://localhost:8090"}
             - {name: PAYMENT_WEBHOOK_URL, value: "http://payment-api:8086"}
             - {name: WEBHOOK_SECRET, value: local-webhook-secret}
+            # UIへ遷移せず、バックエンド内だけで決済成功を再現する。
+            - {name: MOCK_STRIPE_AUTO_CONFIRM, value: "true"}
           readinessProbe:
             tcpSocket: {port: http}
             periodSeconds: 3

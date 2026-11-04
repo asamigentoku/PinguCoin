@@ -30,10 +30,11 @@ type store struct {
 	webhookURL    string
 	webhookSecret string
 	publicURL     string
+	autoConfirm   bool
 }
 
 func main() {
-	s := &store{byKey: map[string]*paymentmethod.ChargeResult{}, byID: map[string]*paymentmethod.ChargeResult{}, amounts: map[string]int64{}, refunded: map[string]int64{}, refundsByKey: map[string]paymentmethod.RefundResult{}, returnURLs: map[string]string{}, methods: map[string]string{}, webhookURL: os.Getenv("PAYMENT_WEBHOOK_URL"), webhookSecret: os.Getenv("WEBHOOK_SECRET"), publicURL: strings.TrimRight(os.Getenv("PUBLIC_URL"), "/")}
+	s := &store{byKey: map[string]*paymentmethod.ChargeResult{}, byID: map[string]*paymentmethod.ChargeResult{}, amounts: map[string]int64{}, refunded: map[string]int64{}, refundsByKey: map[string]paymentmethod.RefundResult{}, returnURLs: map[string]string{}, methods: map[string]string{}, webhookURL: os.Getenv("PAYMENT_WEBHOOK_URL"), webhookSecret: os.Getenv("WEBHOOK_SECRET"), publicURL: strings.TrimRight(os.Getenv("PUBLIC_URL"), "/"), autoConfirm: strings.EqualFold(os.Getenv("MOCK_STRIPE_AUTO_CONFIRM"), "true")}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/payment_intents", s.create)
 	mux.HandleFunc("POST /v1/payment_intents/{id}/capture", s.capture)
@@ -63,11 +64,16 @@ func (s *store) create(w http.ResponseWriter, r *http.Request) {
 	}
 	s.nextID++
 	intent := &paymentmethod.ChargeResult{ID: fmt.Sprintf("pi_mock_%d", s.nextID), Status: "requires_action"}
+	if s.autoConfirm {
+		intent.Status = "succeeded"
+	}
 	base := s.publicURL
 	if base == "" {
 		base = "http://" + r.Host
 	}
-	intent.ActionURL = base + "/3ds/" + intent.ID
+	if !s.autoConfirm {
+		intent.ActionURL = base + "/3ds/" + intent.ID
+	}
 	s.byKey[request.IdempotencyKey], s.byID[intent.ID] = intent, intent
 	s.amounts[intent.ID], s.returnURLs[intent.ID] = request.Amount, request.ReturnURL
 	s.methods[intent.ID] = request.PaymentMethod

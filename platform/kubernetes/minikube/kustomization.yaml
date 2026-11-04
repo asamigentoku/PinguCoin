@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - config.yaml
   - local-infrastructure.yaml
+  - kafka-topics.yaml
   - mock-stripe.yaml
   - servers.yaml
   - domain-services.yaml

@@ -27,7 +27,7 @@
 .point-topup p { color: var(--muted); font-size: 13px; }
 .point-topup label { display: flex; gap: 8px; align-items: center; font-weight: 700; }
 .point-topup input, .point-topup select { width: 150px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--snow); }
-.point-topup .form-error { grid-column: 1 / -1; }
+.point-topup .form-error, .point-topup .form-done { grid-column: 1 / -1; }
 
 @media (max-width: 700px) {
   .point-list > div { grid-template-columns: 1fr; gap: 6px; }

@@ -156,11 +156,7 @@ kubectl get services -n pingucoin
 kubectl -n pingucoin port-forward service/bff 8082:8082
 ```
 
-カードの3Dセキュア画面・銀行振込確認画面をブラウザから開けるよう、別のPowerShellでmock Stripeも公開します。
-
-```powershell
-kubectl -n pingucoin port-forward service/mock-stripe 8090:8090
-```
+Minikubeのmock Stripeはバックエンド内で決済を即時成功させるため、ブラウザ向けのport-forwardは不要です。
 
 このコマンドは起動したままにします。停止するときは `Ctrl+C` を押します。
 

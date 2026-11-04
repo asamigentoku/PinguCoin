@@ -44,8 +44,15 @@ foreach ($image in $images) {
     if ($LASTEXITCODE -ne 0) { throw "image load failed: $($image.Tag)" }
 }
 
+# Kafka Podが再作成されてローカルデータが空になった場合にもトピックを作り直す。
+& kubectl -n pingucoin delete job kafka-topic-init --ignore-not-found
+if ($LASTEXITCODE -ne 0) { throw "old kafka topic init job cleanup failed" }
+
 & kubectl apply -k platform/kubernetes/minikube
 if ($LASTEXITCODE -ne 0) { throw "manifest apply failed" }
+
+& kubectl -n pingucoin wait --for=condition=complete job/kafka-topic-init --timeout=3m
+if ($LASTEXITCODE -ne 0) { throw "kafka topic initialization failed" }
 
 # :dev のような同一タグを再ビルドしてもPod templateは変化しないため、
 # アプリケーションDeploymentを明示的に再起動して新しいローカルイメージを反映する。
@@ -64,5 +71,3 @@ foreach ($deployment in $deployments) {
 Write-Host "All backend components are running in minikube."
 Write-Host "To access the BFF, run:"
 Write-Host "  kubectl -n pingucoin port-forward service/bff 8082:8082"
-Write-Host "For mock 3DS/redirect pages, also run:"
-Write-Host "  kubectl -n pingucoin port-forward service/mock-stripe 8090:8090"
