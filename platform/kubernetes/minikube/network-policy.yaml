@@ -54,6 +54,29 @@ spec:
                 values: [bff]
       ports:
         - port: 8081
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mock-stripe
+      ports:
+        - port: 8086
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-payment-api-to-mock-stripe
+spec:
+  podSelector:
+    matchLabels:
+      app: mock-stripe
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: payment-api
+      ports:
+        - port: 8090
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

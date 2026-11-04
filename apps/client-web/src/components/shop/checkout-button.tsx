@@ -39,7 +39,7 @@ export function CheckoutButton() {
   return (
     <>
       <Show when="signed-in">
-        <button className="button button-primary checkout-button" onClick={openConfirm}>ポイントで購入する</button>
+        <button className="button button-primary checkout-button" onClick={openConfirm}>支払い方法を選んで購入</button>
       </Show>
       <Show when="signed-out">
         <SignInButton><button className="button button-primary checkout-button">ログインして購入する</button></SignInButton>

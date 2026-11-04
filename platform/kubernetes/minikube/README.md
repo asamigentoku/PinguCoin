@@ -69,6 +69,7 @@ Docker Desktop上で、BFFと4つのAPIを順番にビルドします。最後�
 docker build -t pingucoin/media-api:dev -f services/media-api/Dockerfile .
 docker build -t pingucoin/inventory-api:dev -f services/inventory-api/Dockerfile .
 docker build -t pingucoin/payment-api:dev -f services/payment-api/Dockerfile .
+docker build -t pingucoin/mock-stripe:dev -f services/payment-api/Dockerfile.mock-stripe .
 docker build -t pingucoin/order-api:dev -f services/order-api/Dockerfile .
 docker build -t pingucoin/bff:dev -f services/bff/Dockerfile .
 ```
@@ -87,6 +88,7 @@ docker images --filter "reference=pingucoin/*:dev"
 minikube image load pingucoin/media-api:dev
 minikube image load pingucoin/inventory-api:dev
 minikube image load pingucoin/payment-api:dev
+minikube image load pingucoin/mock-stripe:dev
 minikube image load pingucoin/order-api:dev
 minikube image load pingucoin/bff:dev
 ```
@@ -102,6 +104,7 @@ minikube image ls | Select-String -Pattern "pingucoin/"
 - `pingucoin/media-api:dev`
 - `pingucoin/inventory-api:dev`
 - `pingucoin/payment-api:dev`
+- `pingucoin/mock-stripe:dev`
 - `pingucoin/order-api:dev`
 - `pingucoin/bff:dev`
 
@@ -151,6 +154,12 @@ kubectl get services -n pingucoin
 
 ```powershell
 kubectl -n pingucoin port-forward service/bff 8082:8082
+```
+
+カードの3Dセキュア画面・銀行振込確認画面をブラウザから開けるよう、別のPowerShellでmock Stripeも公開します。
+
+```powershell
+kubectl -n pingucoin port-forward service/mock-stripe 8090:8090
 ```
 
 このコマンドは起動したままにします。停止するときは `Ctrl+C` を押します。

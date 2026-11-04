@@ -27,24 +27,35 @@ foreach ($secretName in $requiredSecrets) {
     }
 }
 
-& minikube -p minikube docker-env --shell powershell | Invoke-Expression
-
 $images = @(
     @{ Tag = "pingucoin/media-api:dev"; File = "services/media-api/Dockerfile" },
     @{ Tag = "pingucoin/inventory-api:dev"; File = "services/inventory-api/Dockerfile" },
     @{ Tag = "pingucoin/payment-api:dev"; File = "services/payment-api/Dockerfile" },
+    @{ Tag = "pingucoin/mock-stripe:dev"; File = "services/payment-api/Dockerfile.mock-stripe" },
     @{ Tag = "pingucoin/order-api:dev"; File = "services/order-api/Dockerfile" },
     @{ Tag = "pingucoin/bff:dev"; File = "services/bff/Dockerfile" }
 )
 foreach ($image in $images) {
     & docker build -t $image.Tag -f $image.File .
     if ($LASTEXITCODE -ne 0) { throw "image build failed: $($image.Tag)" }
+    # containerd runtimeでも確実に反映されるよう、Docker Desktopでビルドした
+    # イメージを同名タグへ上書きロードする。
+    & minikube image load $image.Tag --daemon --overwrite
+    if ($LASTEXITCODE -ne 0) { throw "image load failed: $($image.Tag)" }
 }
 
 & kubectl apply -k platform/kubernetes/minikube
 if ($LASTEXITCODE -ne 0) { throw "manifest apply failed" }
 
-$deployments = @("postgres", "kafka", "media-api", "inventory-api", "payment-api", "order-api", "bff")
+# :dev のような同一タグを再ビルドしてもPod templateは変化しないため、
+# アプリケーションDeploymentを明示的に再起動して新しいローカルイメージを反映する。
+$imageDeployments = @("media-api", "inventory-api", "payment-api", "mock-stripe", "order-api", "bff")
+foreach ($deployment in $imageDeployments) {
+    & kubectl -n pingucoin rollout restart "deployment/$deployment"
+    if ($LASTEXITCODE -ne 0) { throw "rollout restart failed: $deployment" }
+}
+
+$deployments = @("postgres", "kafka", "media-api", "inventory-api", "payment-api", "mock-stripe", "order-api", "bff")
 foreach ($deployment in $deployments) {
     & kubectl -n pingucoin rollout status "deployment/$deployment" --timeout=5m
     if ($LASTEXITCODE -ne 0) { throw "rollout failed: $deployment" }
@@ -53,3 +64,5 @@ foreach ($deployment in $deployments) {
 Write-Host "All backend components are running in minikube."
 Write-Host "To access the BFF, run:"
 Write-Host "  kubectl -n pingucoin port-forward service/bff 8082:8082"
+Write-Host "For mock 3DS/redirect pages, also run:"
+Write-Host "  kubectl -n pingucoin port-forward service/mock-stripe 8090:8090"

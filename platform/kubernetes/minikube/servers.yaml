@@ -143,8 +143,12 @@ spec:
   selector:
     app: payment-api
   ports:
-    - port: 8081
+    - name: api
+      port: 8081
       targetPort: api
+    - name: webhook
+      port: 8086
+      targetPort: webhook
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -199,6 +203,8 @@ spec:
             # メトリクス(/metrics)。API のポートとは別。Prometheus だけが取る(NetworkPolicy)。Service には出さない。
             - name: metrics
               containerPort: 9090
+            - name: webhook
+              containerPort: 8086
           envFrom:
             - secretRef:
                 name: payment-api-env
@@ -209,6 +215,10 @@ spec:
               value: "8081"
             - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/payment?sslmode=disable"}
             - {name: INTERNAL_API_TOKEN, value: local-internal-token}
+            - {name: MOCK_STRIPE_URL, value: "http://mock-stripe:8090"}
+            - {name: WEBHOOK_PORT, value: "8086"}
+            - {name: WEBHOOK_SECRET, value: local-webhook-secret}
+            - {name: PAYMENT_RETURN_URL, value: "http://localhost:3000/purchases"}
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:

@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-stripe
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mock-stripe}
+  template:
+    metadata:
+      labels: {app: mock-stripe}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mock-stripe
+          image: pingucoin/mock-stripe:dev
+          imagePullPolicy: Never
+          ports:
+            - {name: http, containerPort: 8090}
+          env:
+            - {name: PORT, value: "8090"}
+            - {name: PUBLIC_URL, value: "http://localhost:8090"}
+            - {name: PAYMENT_WEBHOOK_URL, value: "http://payment-api:8086"}
+            - {name: WEBHOOK_SECRET, value: local-webhook-secret}
+          readinessProbe:
+            tcpSocket: {port: http}
+            periodSeconds: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-stripe
+spec:
+  selector: {app: mock-stripe}
+  ports:
+    - {name: http, port: 8090, targetPort: http}
