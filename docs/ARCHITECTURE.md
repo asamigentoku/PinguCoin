@@ -2,8 +2,9 @@
 
 ```mermaid
 flowchart LR
-    Web[client-web / Next.js] --> Clerk[Clerk]
-    Clerk -->|authenticated request| BFF[bff / BFF]
+    Web[client-web / Next.js] <-->|authentication| Clerk[Clerk]
+    Web -->|REST / localhost:8082| Nginx[nginx / reverse proxy]
+    Nginx -->|REST / Compose network| BFF[bff / BFF]
     BFF -->|gRPC| Media[media-api]
     BFF -->|gRPC| Order[order-api]
     BFF -->|gRPC| Payment[payment-api]
@@ -25,7 +26,8 @@ Inventory -->|stock decremented/rejected| Kafka
     Media <-->|signed URL| Blob
 ```
 
-`bff` is the only public application API. It resolves the current product price
+nginx is the public application API entry point and the `bff` is reachable only inside
+the Compose network in local development. The BFF resolves the current product price
 from `media-api` and sends the immutable price snapshot to `order-api`. Product and
 asset ownership lives in `media-api`; stock mutations live in `inventory-api`; order
 state lives in `order-api`.
