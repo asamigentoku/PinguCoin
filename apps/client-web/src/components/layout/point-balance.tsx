@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { formatPoints } from "@/lib/points";
 import { getPoints } from "@/lib/shop";

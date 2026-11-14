@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useTransition } from "react";
 import { deleteListing, setListingStatus } from "@/app/sell/actions";
 import { categoryName } from "@/lib/categories";

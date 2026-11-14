@@ -35,6 +35,7 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products", catalog.ListProducts)
 	mux.HandleFunc("POST "+APIVersionPrefix+"/products", catalog.CreateProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}", catalog.GetProduct)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/exchange-rates", NewExchangeRateHandler(media).Get)
 	mux.HandleFunc("PATCH "+APIVersionPrefix+"/products/{id}", catalog.UpdateProduct)
 	mux.HandleFunc("DELETE "+APIVersionPrefix+"/products/{id}", catalog.DeleteProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}/assets", catalog.ListAssets)

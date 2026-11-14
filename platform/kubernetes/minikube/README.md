@@ -153,7 +153,7 @@ kubectl get services -n pingucoin
 新しいPowerShellを開き、BFFを `localhost:8082` へport-forwardします。
 
 ```powershell
-kubectl -n pingucoin port-forward service/bff 8082:8082
+kubectl -n pingucoin port-forward service/nginx 8082:8082
 ```
 
 Minikubeのmock Stripeはバックエンド内で決済を即時成功させるため、ブラウザ向けのport-forwardは不要です。

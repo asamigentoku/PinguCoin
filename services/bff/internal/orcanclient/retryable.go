@@ -15,6 +15,7 @@ import (
 //
 //	Create* / Update* / Delete* / Confirm*(商品・カテゴリー・詳細・在庫・出品・アセットの作成・更新・削除・確定)
 var RetryableMethods = []string{
+	pb.ExchangeRateService_GetExchangeRates_FullMethodName,
 	// 商品
 	pb.ProductService_ListProducts_FullMethodName,
 	pb.ProductService_GetProduct_FullMethodName,

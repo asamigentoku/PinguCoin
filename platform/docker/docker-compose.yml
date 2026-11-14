@@ -52,6 +52,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/media?sslmode=disable
       INTERNAL_API_TOKEN: local-internal-token
       AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+      TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
     ports: ["8080:8080"]
     depends_on:
       postgres: {condition: service_healthy}

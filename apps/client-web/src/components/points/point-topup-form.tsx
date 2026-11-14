@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { topUpPoints } from "@/app/points/actions";
 import type { ExternalPaymentMethod } from "@/lib/shop";
 

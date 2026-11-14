@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { isActivePath, mainNav, type NavGroup } from "@/lib/navigation";
 
 function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string }) {
+  const t = useTranslations("Navigation");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const active = group.children.some((child) => isActivePath(pathname, child.href));
@@ -31,7 +32,7 @@ function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string })
       {open && (
         <div className="nav-menu">
           {group.children.map((child) => (
-            <Link key={child.href} href={child.href} aria-current={isActivePath(pathname, child.href) ? "page" : undefined} onClick={() => setOpen(false)}>{child.label}</Link>
+            <Link key={child.href} href={child.href} aria-current={isActivePath(pathname, child.href) ? "page" : undefined} onClick={() => setOpen(false)}>{t(child.labelKey)}</Link>
           ))}
         </div>
       )}
@@ -40,6 +41,7 @@ function NavDropdown({ group, pathname }: { group: NavGroup; pathname: string })
 }
 
 export function MainNav() {
+  const t = useTranslations("Navigation");
   const pathname = usePathname();
   return (
     <nav className="main-nav" aria-label="メインメニュー">
@@ -48,7 +50,7 @@ export function MainNav() {
         const active = isActivePath(pathname, item.href);
         return (
           <Link key={item.href} href={item.href} className={active ? "is-active" : undefined} aria-current={active ? "page" : undefined}>
-            {item.label}
+            {t(item.labelKey)}
           </Link>
         );
       })}

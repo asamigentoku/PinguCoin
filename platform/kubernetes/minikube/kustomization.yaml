@@ -8,6 +8,7 @@ resources:
   - kafka-topics.yaml
   - mock-stripe.yaml
   - servers.yaml
+  - nginx.yaml
   - domain-services.yaml
   - autoscaling.yaml
   - network-policy.yaml

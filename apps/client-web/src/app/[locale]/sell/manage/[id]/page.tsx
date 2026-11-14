@@ -8,7 +8,7 @@ import { getMyProduct, getProductFiles } from "@/lib/seller";
 
 export const metadata: Metadata = { title: "出品を編集する" };
 
-export default async function EditListingPage({ params }: PageProps<"/sell/manage/[id]">) {
+export default async function EditListingPage({ params }: PageProps<"/[locale]/sell/manage/[id]">) {
   const { userId } = await auth();
   if (!userId) return <SignInRequired title="出品を編集する" />;
   const id = Number((await params).id);

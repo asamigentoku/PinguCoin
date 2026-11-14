@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 
 export function EmptyState({ title, body, href, action }: { title: string; body: string; href?: string; action?: string }) {
   return (

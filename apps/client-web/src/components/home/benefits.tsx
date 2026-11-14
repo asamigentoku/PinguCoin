@@ -1,13 +1,7 @@
-const benefits = [
-  { title: "すぐに受け取れる", body: "決済が終わったらそのままダウンロード。待ち時間はありません。" },
-  { title: "安心して購入できる", body: "安全な決済と購入履歴で、買った作品をあとから見返せます。" },
-  { title: "つくり手に届く", body: "購入代金は作品を生み出したクリエイターへ直接還元されます。" },
-];
+import { useTranslations } from "next-intl";
 
 export function Benefits() {
-  return (
-    <section className="home-section shell" aria-label="PinguCoinの特長">
-      <div className="benefits">{benefits.map((b) => <div key={b.title}><strong>{b.title}</strong><p>{b.body}</p></div>)}</div>
-    </section>
-  );
+  const t = useTranslations("Home");
+  const benefits = [1, 2, 3].map((number) => [t(`benefit${number}Title`), t(`benefit${number}Body`)]);
+  return <section className="home-section shell" aria-label="Benefits"><div className="benefits">{benefits.map(([title, body]) => <div key={title}><strong>{title}</strong><p>{body}</p></div>)}</div></section>;
 }
