@@ -104,6 +104,9 @@ spec:
         - podSelector:
             matchLabels:
               app: nginx
+        - podSelector:
+            matchLabels:
+              app: media-api
       ports:
         - port: 8082
 ---

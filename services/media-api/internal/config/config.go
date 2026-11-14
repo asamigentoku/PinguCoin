@@ -29,9 +29,10 @@ type Config struct {
 	// 共有コンテナ名。匿名アクセス不可(閲覧には都度署名付きURLが必要)。
 	AzureStoragePrivateContainer string
 	// AppEnv はBlobパスに使う環境名("develop"/"staging"/"production"等)。
-	AppEnv            string
-	TwelveDataAPIKey  string
-	TwelveDataBaseURL string
+	AppEnv                 string
+	TwelveDataAPIKey       string
+	TwelveDataBaseURL      string
+	ExchangeRatePublishURL string
 }
 
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
@@ -59,6 +60,7 @@ func Load() Config {
 		AppEnv:                       getEnv("APP_ENV", "develop"),
 		TwelveDataAPIKey:             getEnv("TWELVE_DATA_API_KEY", ""),
 		TwelveDataBaseURL:            getEnv("TWELVE_DATA_BASE_URL", "https://api.twelvedata.com"),
+		ExchangeRatePublishURL:       getEnv("EXCHANGE_RATE_PUBLISH_URL", "http://bff:8082/internal/exchange-rates"),
 	}
 }
 

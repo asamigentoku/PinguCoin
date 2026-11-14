@@ -99,6 +99,9 @@ func main() {
 	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(detailRepo))
 	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServer(repository.NewProductListingRepository(db)))
 	forexService := forex.New(cfg.TwelveDataAPIKey, cfg.TwelveDataBaseURL, logger)
+	forexService.SetPublisher(func(ctx context.Context, snapshot forex.Snapshot) error {
+		return forex.PublishSnapshot(ctx, cfg.ExchangeRatePublishURL, cfg.InternalAPIToken, snapshot)
+	})
 	pb.RegisterExchangeRateServiceServer(server, grpcserver.NewExchangeRateServer(forexService))
 
 	pb.RegisterUserServiceServer(server, grpcserver.NewUserServer(repository.NewUserRepository(db)))

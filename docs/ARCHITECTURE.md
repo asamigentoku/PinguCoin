@@ -3,11 +3,12 @@
 ```mermaid
 flowchart LR
     Web[client-web / Next.js] <-->|authentication| Clerk[Clerk]
-    Web -->|REST / localhost:8082| Nginx[nginx / reverse proxy + forex cache]
+    Web -->|REST / localhost:8082| Nginx[nginx / CDN-style static cache]
     Nginx -->|REST / Compose network| BFF[bff / BFF]
-    BFF -->|3-minute cached exchange-rate response| Nginx
     BFF -->|gRPC| Media[media-api]
     Forex[Twelve Data / Forex API] -->|4 JPY pairs every 3 minutes| Media
+    Media -->|versioned JSON + latest manifest| Blob
+    BFF -->|static JSON on cache miss| Blob
     BFF -->|gRPC| Order[order-api]
     BFF -->|gRPC| Payment[payment-api]
 Order -->|orders.created.v1| Kafka[Kafka]
@@ -34,11 +35,14 @@ from `media-api` and sends the immutable price snapshot to `order-api`. Product 
 asset ownership lives in `media-api`; stock mutations live in `inventory-api`; order
 state lives in `order-api`.
 
-`media-api` refreshes USD/JPY, EUR/JPY, GBP/JPY, and CNY/JPY from Twelve Data
-at startup and every three minutes, retaining the last complete successful snapshot.
-The BFF reads that snapshot over gRPC and exposes `GET /api/v1/exchange-rates`.
-nginx caches successful responses for three minutes, and the product detail page refreshes
-the four reference prices on the same interval (using the existing 1 point = 1 JPY rule).
+`media-api` refreshes USD/JPY, EUR/JPY, GBP/JPY, and CNY/JPY from Twelve Data at startup
+and every three minutes, retaining the last complete successful snapshot. After a complete
+refresh it uploads an immutable file such as `exchange-rates/20261114120300.json` to the
+public Blob container and only then replaces `exchange-rates/latest.json`. The BFF exposes
+those static files at `/api/v1/exchange-rates/{file}` and does no exchange-rate calculation.
+nginx caches `latest.json` for one minute and timestamped snapshots for one year; stale
+responses remain usable during an origin failure. The storefront checks the manifest every
+three minutes and fetches the referenced snapshot (using the existing 1 point = 1 JPY rule).
 
 `client-web` uses locale-prefixed routes (`/ja`, `/en`, `/fr`, `/de`, and `/zh`) through
 `next-intl`. Browsing prices are shown as JPY, USD, EUR, EUR, and CNY respectively;

@@ -53,6 +53,7 @@ services:
       INTERNAL_API_TOKEN: local-internal-token
       AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
       TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+      EXCHANGE_RATE_PUBLISH_URL: http://bff:8082/internal/exchange-rates
     ports: ["8080:8080"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -120,10 +121,21 @@ services:
       ORDER_API_ADDR: order-api:8084
       INTERNAL_API_TOKEN: local-internal-token
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      EXCHANGE_RATE_DIRECTORY: /var/cache/nginx/exchange-rates
     expose: ["8082"]
+    volumes:
+      - exchange-rates:/var/cache/nginx/exchange-rates
     depends_on:
       media-api: {condition: service_started}
       order-api: {condition: service_started}
+      exchange-rates-init: {condition: service_completed_successfully}
+
+  exchange-rates-init:
+    image: alpine:3.21
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /data && chown 65532:65532 /data"]
+    volumes:
+      - exchange-rates:/data
 
   nginx:
     image: nginx:1.27.4-alpine
@@ -131,6 +143,7 @@ services:
     ports: ["8082:8082"]
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - exchange-rates:/var/cache/nginx/exchange-rates:ro
     depends_on:
       bff: {condition: service_started}
     healthcheck:
@@ -142,3 +155,4 @@ services:
 volumes:
   postgres-data:
   azurite-data:
+  exchange-rates:

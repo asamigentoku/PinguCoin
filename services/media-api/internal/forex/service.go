@@ -1,6 +1,7 @@
 package forex
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,6 +32,46 @@ type Service struct {
 	logger  *slog.Logger
 	mu      sync.RWMutex
 	latest  Snapshot
+	publish func(context.Context, Snapshot) error
+}
+
+// SetPublisher registers the static-snapshot publisher used after every complete refresh.
+// Publishing is best effort: a Blob outage must not discard the last in-memory snapshot.
+func (s *Service) SetPublisher(publish func(context.Context, Snapshot) error) {
+	s.publish = publish
+}
+
+// PublishSnapshot sends a completed snapshot to BFF, which writes it into the
+// directory shared with Nginx. The versioned JSON is committed before latest.json.
+func PublishSnapshot(ctx context.Context, publishURL, token string, snapshot Snapshot) error {
+	version := snapshot.UpdatedAt.UTC().Format("20060102150405")
+	snapshotJSON, err := json.Marshal(map[string]any{"base": "JPY", "rates": snapshot.Rates, "updatedAt": snapshot.UpdatedAt})
+	if err != nil {
+		return err
+	}
+	manifestJSON, err := json.Marshal(map[string]any{"version": version, "file": version + ".json", "updatedAt": snapshot.UpdatedAt})
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal(map[string]json.RawMessage{"snapshot": snapshotJSON, "manifest": manifestJSON})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, publishURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusCreated {
+		return fmt.Errorf("BFF snapshot publish returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }
 
 func New(apiKey, baseURL string, logger *slog.Logger) *Service {
@@ -78,9 +119,15 @@ func (s *Service) refresh(ctx context.Context) {
 		}
 		rates[currency] = rate
 	}
+	snapshot := Snapshot{Rates: rates, UpdatedAt: time.Now().UTC()}
 	s.mu.Lock()
-	s.latest = Snapshot{Rates: rates, UpdatedAt: time.Now().UTC()}
+	s.latest = snapshot
 	s.mu.Unlock()
+	if s.publish != nil {
+		if err := s.publish(ctx, snapshot); err != nil {
+			s.logger.Warn("failed to publish static exchange-rate snapshot", slog.Any("error", err))
+		}
+	}
 	keys := make([]string, 0, len(rates))
 	for key := range rates {
 		keys = append(keys, key)
