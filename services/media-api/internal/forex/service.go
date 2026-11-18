@@ -12,11 +12,15 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
-const RefreshInterval = 3 * time.Minute
+const (
+	RefreshInterval = 5 * time.Minute
+	PublishInterval = time.Second
+)
 
 var currencies = []string{"USD", "EUR", "GBP", "CNY"}
 
@@ -35,25 +39,23 @@ type Service struct {
 	publish func(context.Context, Snapshot) error
 }
 
-// SetPublisher registers the static-snapshot publisher used after every complete refresh.
-// Publishing is best effort: a Blob outage must not discard the last in-memory snapshot.
+// SetPublisher registers the periodic static-snapshot publisher. Publishing is
+// best effort: a storage outage must not discard the last in-memory snapshot.
 func (s *Service) SetPublisher(publish func(context.Context, Snapshot) error) {
 	s.publish = publish
 }
 
-// PublishSnapshot sends a completed snapshot to BFF, which writes it into the
-// directory shared with Nginx. The versioned JSON is committed before latest.json.
+// PublishSnapshot sends a completed snapshot to BFF under the next UTC-second
+// name so the current-second URL already exists when clients request it.
 func PublishSnapshot(ctx context.Context, publishURL, token string, snapshot Snapshot) error {
-	version := snapshot.UpdatedAt.UTC().Format("20060102150405")
+	// The filename identifies when this static file was generated. updatedAt
+	// continues to identify when the rates themselves were fetched upstream.
+	version := time.Now().UTC().Add(PublishInterval).Truncate(PublishInterval).Format("20060102150405")
 	snapshotJSON, err := json.Marshal(map[string]any{"base": "JPY", "rates": snapshot.Rates, "updatedAt": snapshot.UpdatedAt})
 	if err != nil {
 		return err
 	}
-	manifestJSON, err := json.Marshal(map[string]any{"version": version, "file": version + ".json", "updatedAt": snapshot.UpdatedAt})
-	if err != nil {
-		return err
-	}
-	body, err := json.Marshal(map[string]json.RawMessage{"snapshot": snapshotJSON, "manifest": manifestJSON})
+	body, err := json.Marshal(map[string]any{"version": version, "snapshot": json.RawMessage(snapshotJSON)})
 	if err != nil {
 		return err
 	}
@@ -79,19 +81,28 @@ func New(apiKey, baseURL string, logger *slog.Logger) *Service {
 }
 
 func (s *Service) Run(ctx context.Context) {
+	s.run(ctx, RefreshInterval, PublishInterval)
+}
+
+func (s *Service) run(ctx context.Context, refreshInterval, publishInterval time.Duration) {
 	if s.apiKey == "" {
 		s.logger.Warn("forex refresh disabled: TWELVE_DATA_API_KEY is empty")
 		return
 	}
 	s.refresh(ctx)
-	ticker := time.NewTicker(RefreshInterval)
-	defer ticker.Stop()
+	s.publishLatest(ctx)
+	refreshTicker := time.NewTicker(refreshInterval)
+	publishTicker := time.NewTicker(publishInterval)
+	defer refreshTicker.Stop()
+	defer publishTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-refreshTicker.C:
 			s.refresh(ctx)
+		case <-publishTicker.C:
+			s.publishLatest(ctx)
 		}
 	}
 }
@@ -110,24 +121,23 @@ func (s *Service) Snapshot() (Snapshot, error) {
 }
 
 func (s *Service) refresh(ctx context.Context) {
+	symbols := make([]string, 0, len(currencies))
+	for _, currency := range currencies {
+		symbols = append(symbols, currency+"/JPY")
+	}
+	prices, err := s.fetch(ctx, symbols)
+	if err != nil {
+		s.logger.Warn("failed to refresh exchange rates; keeping last good snapshot", slog.Any("symbols", symbols), slog.Any("error", err))
+		return
+	}
 	rates := make(map[string]float64, len(currencies))
 	for _, currency := range currencies {
-		rate, err := s.fetch(ctx, currency+"/JPY")
-		if err != nil {
-			s.logger.Warn("failed to refresh exchange rates; keeping last good snapshot", slog.String("symbol", currency+"/JPY"), slog.Any("error", err))
-			return
-		}
-		rates[currency] = rate
+		rates[currency] = prices[currency+"/JPY"]
 	}
 	snapshot := Snapshot{Rates: rates, UpdatedAt: time.Now().UTC()}
 	s.mu.Lock()
 	s.latest = snapshot
 	s.mu.Unlock()
-	if s.publish != nil {
-		if err := s.publish(ctx, snapshot); err != nil {
-			s.logger.Warn("failed to publish static exchange-rate snapshot", slog.Any("error", err))
-		}
-	}
 	keys := make([]string, 0, len(rates))
 	for key := range rates {
 		keys = append(keys, key)
@@ -136,41 +146,64 @@ func (s *Service) refresh(ctx context.Context) {
 	s.logger.Info("exchange rates refreshed", slog.Any("currencies", keys))
 }
 
-func (s *Service) fetch(ctx context.Context, symbol string) (float64, error) {
+func (s *Service) publishLatest(ctx context.Context) {
+	if s.publish == nil {
+		return
+	}
+	snapshot, err := s.Snapshot()
+	if err != nil {
+		s.logger.Warn("exchange-rate snapshot is not ready", slog.Any("error", err))
+		return
+	}
+	if err := s.publish(ctx, snapshot); err != nil {
+		s.logger.Warn("failed to publish static exchange-rate snapshot", slog.Any("error", err))
+	}
+}
+
+func (s *Service) fetch(ctx context.Context, symbols []string) (map[string]float64, error) {
 	endpoint, err := url.Parse(s.baseURL + "/price")
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	query := endpoint.Query()
-	query.Set("symbol", symbol)
+	query.Set("symbol", strings.Join(symbols, ","))
 	query.Set("apikey", s.apiKey)
 	endpoint.RawQuery = query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	response, err := s.client.Do(req)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("Twelve Data returned HTTP %d", response.StatusCode)
+		return nil, fmt.Errorf("Twelve Data returned HTTP %d", response.StatusCode)
 	}
-	var payload struct {
+	type pricePayload struct {
 		Price   string `json:"price"`
 		Status  string `json:"status"`
 		Message string `json:"message"`
 	}
+	var payload map[string]pricePayload
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-		return 0, err
+		return nil, err
 	}
-	if payload.Status == "error" {
-		return 0, fmt.Errorf("Twelve Data: %s", payload.Message)
+	rates := make(map[string]float64, len(symbols))
+	for _, symbol := range symbols {
+		price, ok := payload[symbol]
+		if !ok {
+			return nil, fmt.Errorf("Twelve Data response is missing %s", symbol)
+		}
+		if price.Status == "error" {
+			return nil, fmt.Errorf("Twelve Data %s: %s", symbol, price.Message)
+		}
+		rate, err := strconv.ParseFloat(price.Price, 64)
+		if err != nil || rate <= 0 || math.IsInf(rate, 0) || math.IsNaN(rate) {
+			return nil, fmt.Errorf("invalid %s rate %q", symbol, price.Price)
+		}
+		rates[symbol] = rate
 	}
-	rate, err := strconv.ParseFloat(payload.Price, 64)
-	if err != nil || rate <= 0 || math.IsInf(rate, 0) || math.IsNaN(rate) {
-		return 0, fmt.Errorf("invalid rate %q", payload.Price)
-	}
-	return rate, nil
+	return rates, nil
 }

@@ -14,6 +14,7 @@ import (
 )
 
 const APIVersionPrefix = "/api/v1"
+const APIVersionV2Prefix = "/api/v2"
 
 func NewRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository, ping func(context.Context) error) http.Handler {
 	return newRouter(logger, media, payment, nil, orderRepo, ping)
@@ -37,7 +38,8 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("POST "+APIVersionPrefix+"/products", catalog.CreateProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}", catalog.GetProduct)
 	exchangeRateDir := envOr("EXCHANGE_RATE_DIRECTORY", "/var/cache/nginx/exchange-rates")
-	mux.HandleFunc("GET "+APIVersionPrefix+"/exchange-rates/{file}", NewExchangeRateStaticHandler(exchangeRateDir).Get)
+	mux.HandleFunc("GET "+APIVersionPrefix+"/exchange-rates", NewExchangeRateLiveHandler(media.ExchangeRate).Get)
+	mux.HandleFunc("GET "+APIVersionV2Prefix+"/exchange-rates/{date}/{file}", NewExchangeRateStaticHandler(exchangeRateDir).Get)
 	mux.HandleFunc("PUT /internal/exchange-rates", NewExchangeRatePublishHandler(exchangeRateDir, envOr("INTERNAL_API_TOKEN", "")).Put)
 	mux.HandleFunc("PATCH "+APIVersionPrefix+"/products/{id}", catalog.UpdateProduct)
 	mux.HandleFunc("DELETE "+APIVersionPrefix+"/products/{id}", catalog.DeleteProduct)

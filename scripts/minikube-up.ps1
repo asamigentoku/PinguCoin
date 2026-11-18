@@ -33,7 +33,8 @@ $images = @(
     @{ Tag = "pingucoin/payment-api:dev"; File = "services/payment-api/Dockerfile" },
     @{ Tag = "pingucoin/mock-stripe:dev"; File = "services/payment-api/Dockerfile.mock-stripe" },
     @{ Tag = "pingucoin/order-api:dev"; File = "services/order-api/Dockerfile" },
-    @{ Tag = "pingucoin/bff:dev"; File = "services/bff/Dockerfile" }
+    @{ Tag = "pingucoin/bff:dev"; File = "services/bff/Dockerfile" },
+    @{ Tag = "pingucoin/nginx-metrics:dev"; File = "services/nginx-metrics/Dockerfile" }
 )
 foreach ($image in $images) {
     & docker build -t $image.Tag -f $image.File .

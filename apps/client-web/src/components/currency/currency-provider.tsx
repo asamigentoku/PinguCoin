@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-import type { ExchangeRateManifest, ExchangeRatePayload as Payload } from "@/lib/api";
+import type { ExchangeRatePayload as Payload } from "@/lib/api";
 const publicBffBase = (process.env.NEXT_PUBLIC_BFF_API_URL ?? "/api/v1").replace(/\/$/, "");
 type CurrencyState = { rates: Record<string, number>; updatedAt: string | null; failed: boolean };
 const CurrencyContext = createContext<CurrencyState>({ rates: {}, updatedAt: null, failed: false });
@@ -13,11 +13,7 @@ export function CurrencyProvider({ children, initialData }: { children: React.Re
 
   useEffect(() => {
     let active = true;
-    const refresh = () => fetch(`${publicBffBase}/exchange-rates/latest.json`)
-      .then((response) => response.ok ? response.json() as Promise<ExchangeRateManifest> : Promise.reject())
-      .then((manifest) => /^\d{14}\.json$/.test(manifest.file)
-        ? fetch(`${publicBffBase}/exchange-rates/${manifest.file}`)
-        : Promise.reject())
+    const refresh = () => fetch(`${publicBffBase}/exchange-rates`)
       .then((response) => response.ok ? response.json() as Promise<Payload> : Promise.reject())
       .then((payload) => { if (active) { setData(payload); setFailed(false); } })
       .catch(() => { if (active) setFailed(true); });

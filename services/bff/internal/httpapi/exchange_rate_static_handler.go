@@ -7,7 +7,7 @@ import (
 	"regexp"
 )
 
-var exchangeRateFilePattern = regexp.MustCompile(`^(latest|[0-9]{14})\.json$`)
+var exchangeRateFilePattern = regexp.MustCompile(`^[0-9]{14}\.json$`)
 
 type ExchangeRateStaticHandler struct {
 	directory string
@@ -18,22 +18,18 @@ func NewExchangeRateStaticHandler(directory string) *ExchangeRateStaticHandler {
 }
 
 func (h *ExchangeRateStaticHandler) Get(w http.ResponseWriter, r *http.Request) {
+	date := r.PathValue("date")
 	file := r.PathValue("file")
-	if !exchangeRateFilePattern.MatchString(file) {
+	if len(date) != 8 || !exchangeRateFilePattern.MatchString(file) || file[:8] != date {
 		http.NotFound(w, r)
 		return
 	}
-
-	path := filepath.Join(h.directory, file)
+	path := filepath.Join(h.directory, date, file)
 	if _, err := os.Stat(path); err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if file == "latest.json" {
-		w.Header().Set("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
-	} else {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	}
+	w.Header().Set("Cache-Control", "public, max-age=1")
 	http.ServeFile(w, r, path)
 }

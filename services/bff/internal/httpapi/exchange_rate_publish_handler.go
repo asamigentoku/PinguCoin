@@ -14,12 +14,7 @@ var snapshotVersionPattern = regexp.MustCompile(`^[0-9]{14}$`)
 
 type exchangeRatePublishRequest struct {
 	Snapshot json.RawMessage `json:"snapshot"`
-	Manifest json.RawMessage `json:"manifest"`
-}
-
-type exchangeRateManifest struct {
-	Version string `json:"version"`
-	File    string `json:"file"`
+	Version  string          `json:"version"`
 }
 
 type ExchangeRatePublishHandler struct {
@@ -42,13 +37,8 @@ func (h *ExchangeRatePublishHandler) Put(w http.ResponseWriter, r *http.Request)
 	}
 	var payload exchangeRatePublishRequest
 	decoder := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
-	if err := decoder.Decode(&payload); err != nil || len(payload.Snapshot) == 0 || len(payload.Manifest) == 0 {
+	if err := decoder.Decode(&payload); err != nil || len(payload.Snapshot) == 0 || !snapshotVersionPattern.MatchString(payload.Version) {
 		http.Error(w, "invalid publish payload", http.StatusBadRequest)
-		return
-	}
-	var manifest exchangeRateManifest
-	if err := json.Unmarshal(payload.Manifest, &manifest); err != nil || !snapshotVersionPattern.MatchString(manifest.Version) || manifest.File != manifest.Version+".json" {
-		http.Error(w, "invalid snapshot manifest", http.StatusBadRequest)
 		return
 	}
 	var snapshot map[string]json.RawMessage
@@ -61,12 +51,17 @@ func (h *ExchangeRatePublishHandler) Put(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "cannot create exchange-rate directory", http.StatusInternalServerError)
 		return
 	}
-	if err := writeAtomic(filepath.Join(h.directory, manifest.File), payload.Snapshot, 0644); err != nil {
+	dateDirectory := filepath.Join(h.directory, payload.Version[:8])
+	if err := os.MkdirAll(dateDirectory, 0755); err != nil {
+		http.Error(w, "cannot create dated exchange-rate directory", http.StatusInternalServerError)
+		return
+	}
+	if err := writeAtomic(filepath.Join(dateDirectory, payload.Version+".json"), payload.Snapshot, 0644); err != nil {
 		http.Error(w, "cannot write exchange-rate snapshot", http.StatusInternalServerError)
 		return
 	}
-	if err := writeAtomic(filepath.Join(h.directory, "latest.json"), payload.Manifest, 0644); err != nil {
-		http.Error(w, "cannot update exchange-rate manifest", http.StatusInternalServerError)
+	if err := os.Remove(filepath.Join(h.directory, "latest.json")); err != nil && !os.IsNotExist(err) {
+		http.Error(w, "cannot remove legacy exchange-rate manifest", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)

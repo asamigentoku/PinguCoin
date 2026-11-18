@@ -1,0 +1,114 @@
+{
+  "uid": "pingucoin-exchange-rate-cache",
+  "title": "PinguCoin / Exchange-rate cache comparison",
+  "description": "Compares the 1-second cached v1 dynamic response with the 1-second cached timestamped-file v2 response.",
+  "tags": ["pingucoin", "nginx", "cache"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "graphTooltip": 1,
+  "refresh": "10s",
+  "time": {"from": "now-15m", "to": "now"},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Response latency by version",
+      "description": "End-to-end latency measured at nginx. Both versions use the same entry point.",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le, version) (rate(pingucoin_nginx_exchange_rate_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{version}} p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, version) (rate(pingucoin_nginx_exchange_rate_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{version}} p95"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "v2 cache hit rate",
+      "description": "HIT requests divided by all v2 exchange-rate requests over the last 5 minutes.",
+      "gridPos": {"h": 9, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 70}, {"color": "green", "value": 90}]}
+        },
+        "overrides": []
+      },
+      "options": {"reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(increase(pingucoin_nginx_exchange_rate_requests_total{version=\"v2\",cache_status=\"HIT\"}[5m])) or vector(0)) / clamp_min(sum(increase(pingucoin_nginx_exchange_rate_requests_total{version=\"v2\"}[5m])), 1)",
+          "legendFormat": "v2 HIT"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "gauge",
+      "title": "v1 cache hit rate",
+      "description": "HIT requests divided by all dynamic v1 exchange-rate requests over the last 5 minutes.",
+      "gridPos": {"h": 9, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "options": {"reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(increase(pingucoin_nginx_exchange_rate_requests_total{version=\"v1\",cache_status=\"HIT\"}[5m])) or vector(0)) / clamp_min(sum(increase(pingucoin_nginx_exchange_rate_requests_total{version=\"v1\"}[5m])), 1)",
+          "legendFormat": "v1 HIT"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Requests by cache result",
+      "description": "Both versions report MISS, HIT, EXPIRED, STALE, and related nginx cache states.",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["sum"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (version, cache_status) (rate(pingucoin_nginx_exchange_rate_requests_total[$__rate_interval]))",
+          "legendFormat": "{{version}} {{cache_status}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Average response latency",
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (version) (rate(pingucoin_nginx_exchange_rate_request_duration_seconds_sum[$__rate_interval])) / sum by (version) (rate(pingucoin_nginx_exchange_rate_request_duration_seconds_count[$__rate_interval]))",
+          "legendFormat": "{{version}} average"
+        }
+      ]
+    }
+  ]
+}

@@ -13,11 +13,11 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/pkg/requestid"
-	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/apperr"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/orcanclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/paymentclient"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/reqcontext"
+	paymentpb "github.com/asamigentoku/PinguCoin/services/payment-api/proto/payment/v1"
 )
 
 func decode[T any](t *testing.T, recorder *httptest.ResponseRecorder) T {
@@ -251,7 +251,7 @@ func TestRequestIDMiddleware(t *testing.T) {
 func TestAPIVersionHeader(t *testing.T) {
 	handler := WithAPIVersion(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 
-	for path, want := range map[string]string{"/api/v1/orders": "v1", "/api/v1/graphql": "v1", "/healthz": "", "/version": "", "/": ""} {
+	for path, want := range map[string]string{"/api/v1/orders": "v1", "/api/v1/graphql": "v1", "/api/v2/exchange-rates/20261118/20261118120000.json": "v2", "/healthz": "", "/version": "", "/": ""} {
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, httptest.NewRequest("GET", path, nil))
 		if got := recorder.Header().Get("X-API-Version"); got != want {

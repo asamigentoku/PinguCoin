@@ -16,7 +16,9 @@ const APIVersion = "v1"
 // API と話しているかを、レスポンスから確認できる。ログ・調査でも使う)。
 func WithAPIVersion(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, APIVersionPrefix+"/") {
+		if strings.HasPrefix(r.URL.Path, APIVersionV2Prefix+"/") {
+			w.Header().Set("X-API-Version", "v2")
+		} else if strings.HasPrefix(r.URL.Path, APIVersionPrefix+"/") {
 			w.Header().Set("X-API-Version", APIVersion)
 		}
 		next.ServeHTTP(w, r)

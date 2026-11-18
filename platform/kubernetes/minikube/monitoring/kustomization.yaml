@@ -30,3 +30,4 @@ configMapGenerator:
       - dashboards/pingucoin-business.json
       - dashboards/pingucoin-kubernetes.json
       - dashboards/pingucoin-go-runtime.json
+      - dashboards/pingucoin-exchange-rate-cache.json
