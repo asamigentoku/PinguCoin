@@ -67,7 +67,7 @@ func Load() Config {
 		ExchangeRatePublishURL:       getEnv("EXCHANGE_RATE_PUBLISH_URL", "http://bff:8082/internal/exchange-rates"),
 		RedisEnabled:                 getBoolEnv("REDIS_ENABLED", false),
 		RedisAddr:                    getEnv("REDIS_ADDR", "redis:6379"),
-		RedisTTLSeconds:              getIntEnv("REDIS_TTL_SECONDS", 60),
+		RedisTTLSeconds:              getIntEnv("REDIS_TTL_SECONDS", 1800),
 	}
 }
 
