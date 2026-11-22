@@ -12,6 +12,21 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-nodeport-to-grafana
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports: [{port: 3000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-prometheus-to-api-metrics
 spec:
   podSelector:
