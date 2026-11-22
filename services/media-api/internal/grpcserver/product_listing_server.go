@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
@@ -17,11 +18,16 @@ import (
 // (例: 一度出品終了し、再度別条件で出品し直すケース)。
 type ProductListingServer struct {
 	pb.UnimplementedProductListingServiceServer
-	repo *repository.ProductListingRepository
+	repo  *repository.ProductListingRepository
+	cache cache.Cache
 }
 
 func NewProductListingServer(repo *repository.ProductListingRepository) *ProductListingServer {
-	return &ProductListingServer{repo: repo}
+	return NewProductListingServerWithCache(repo, cache.Noop{})
+}
+
+func NewProductListingServerWithCache(repo *repository.ProductListingRepository, c cache.Cache) *ProductListingServer {
+	return &ProductListingServer{repo: repo, cache: c}
 }
 
 // ListProductListings は出品情報の一覧を返す。product_id を指定するとその商品の出品だけに絞り込む。
@@ -77,6 +83,7 @@ func (server *ProductListingServer) CreateProductListing(ctx context.Context, re
 	if err := server.repo.Create(listing); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(listing.ProductID))
 	return &pb.CreateProductListingResponse{Listing: toProtoListing(listing)}, nil
 }
 
@@ -111,14 +118,20 @@ func (server *ProductListingServer) UpdateProductListing(ctx context.Context, re
 	if err := server.repo.Update(listing); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(listing.ProductID))
 	return &pb.UpdateProductListingResponse{Listing: toProtoListing(listing)}, nil
 }
 
 // DeleteProductListing はIDを指定して出品情報を削除する。
 func (server *ProductListingServer) DeleteProductListing(ctx context.Context, request *pb.DeleteProductListingRequest) (*pb.DeleteProductListingResponse, error) {
+	listing, err := server.repo.FindByID(uint(request.GetId()))
+	if err != nil {
+		return nil, mapFindError("product listing", err)
+	}
 	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(listing.ProductID))
 	return &pb.DeleteProductListingResponse{}, nil
 }
 

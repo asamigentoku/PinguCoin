@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
@@ -18,13 +19,19 @@ import (
 // 「Unimplementedエラーを返すデフォルト実装」で自動的に補われ、コンパイルが壊れない。
 type ProductCategoryServer struct {
 	pb.UnimplementedProductCategoryServiceServer
-	repo *repository.ProductCategoryRepository
+	repo     *repository.ProductCategoryRepository
+	cache    cache.Cache
+	cacheTTL int
 }
 
 // NewProductCategoryServer はDBアクセス用のrepositoryを注入してサーバーを作る。
 // main.go の pb.RegisterProductCategoryServiceServer(server, ...) でgRPCサーバー本体に登録される。
 func NewProductCategoryServer(repo *repository.ProductCategoryRepository) *ProductCategoryServer {
-	return &ProductCategoryServer{repo: repo}
+	return NewProductCategoryServerWithCache(repo, cache.Noop{}, 60)
+}
+
+func NewProductCategoryServerWithCache(repo *repository.ProductCategoryRepository, c cache.Cache, ttlSeconds int) *ProductCategoryServer {
+	return &ProductCategoryServer{repo: repo, cache: c, cacheTTL: ttlSeconds}
 }
 
 // 以下5つのメソッドが、クライアントから来た1つのRPC呼び出しに対応する処理。
@@ -35,15 +42,19 @@ func NewProductCategoryServer(repo *repository.ProductCategoryRepository) *Produ
 
 // ListProductCategories はカテゴリ一覧を返す(protoの ListProductCategories RPC の実装)。
 func (server *ProductCategoryServer) ListProductCategories(ctx context.Context, request *pb.ListProductCategoriesRequest) (*pb.ListProductCategoriesResponse, error) {
+	response := &pb.ListProductCategoriesResponse{}
+	if found, err := cacheGet(ctx, server.cache, "media:categories", response); err == nil && found {
+		return response, nil
+	}
 	categories, err := server.repo.FindAll()
 	if err != nil {
 		return nil, apperr.Internal(err)
 	}
 
-	response := &pb.ListProductCategoriesResponse{}
 	for i := range categories {
 		response.Categories = append(response.Categories, toProtoCategory(&categories[i]))
 	}
+	_ = cacheSet(ctx, server.cache, "media:categories", response, server.cacheTTL)
 	return response, nil
 }
 
@@ -77,6 +88,7 @@ func (server *ProductCategoryServer) CreateProductCategory(ctx context.Context, 
 	if err := server.repo.Create(category); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	_ = server.cache.Delete(ctx, "media:categories")
 	return &pb.CreateProductCategoryResponse{Category: toProtoCategory(category)}, nil
 }
 
@@ -104,6 +116,7 @@ func (server *ProductCategoryServer) UpdateProductCategory(ctx context.Context, 
 	if err := server.repo.Update(category); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	_ = server.cache.Delete(ctx, "media:categories")
 	return &pb.UpdateProductCategoryResponse{Category: toProtoCategory(category)}, nil
 }
 
@@ -112,6 +125,7 @@ func (server *ProductCategoryServer) DeleteProductCategory(ctx context.Context, 
 	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	_ = server.cache.Delete(ctx, "media:categories")
 	// レスポンスにデータが不要なRPCでも、protoの都合上「空のメッセージ」を返す必要がある。
 	return &pb.DeleteProductCategoryResponse{}, nil
 }

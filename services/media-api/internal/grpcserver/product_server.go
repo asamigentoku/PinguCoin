@@ -11,6 +11,7 @@ import (
 
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/storage"
@@ -22,13 +23,21 @@ import (
 // バリデーション → repository経由でDB操作 → model→pbに変換して返す。
 type ProductServer struct {
 	pb.UnimplementedProductServiceServer
-	repo       *repository.ProductRepository
-	detailRepo *repository.ProductDetailRepository
-	storage    *storage.BlobStorage
+	repo        *repository.ProductRepository
+	detailRepo  *repository.ProductDetailRepository
+	storage     *storage.BlobStorage
+	cache       cache.Cache
+	cacheTTL    int
+	assetRepo   *repository.ProductAssetRepository
+	listingRepo *repository.ProductListingRepository
 }
 
 func NewProductServer(repo *repository.ProductRepository, detailRepo *repository.ProductDetailRepository, blobStorage *storage.BlobStorage) *ProductServer {
-	return &ProductServer{repo: repo, detailRepo: detailRepo, storage: blobStorage}
+	return NewProductServerWithCache(repo, detailRepo, nil, nil, blobStorage, cache.Noop{}, 60)
+}
+
+func NewProductServerWithCache(repo *repository.ProductRepository, detailRepo *repository.ProductDetailRepository, assetRepo *repository.ProductAssetRepository, listingRepo *repository.ProductListingRepository, blobStorage *storage.BlobStorage, c cache.Cache, ttlSeconds int) *ProductServer {
+	return &ProductServer{repo: repo, detailRepo: detailRepo, assetRepo: assetRepo, listingRepo: listingRepo, storage: blobStorage, cache: c, cacheTTL: ttlSeconds}
 }
 
 // ListProducts は商品一覧を返す。user_id はproto側でoptionalなので、
@@ -52,11 +61,46 @@ func (server *ProductServer) ListProducts(ctx context.Context, request *pb.ListP
 }
 
 func (server *ProductServer) GetProduct(ctx context.Context, request *pb.GetProductRequest) (*pb.GetProductResponse, error) {
+	response := &pb.GetProductResponse{}
+	key := productCacheKey(request.GetId())
+	if found, err := cacheGet(ctx, server.cache, key, response); err == nil && found {
+		return response, nil
+	}
 	product, err := server.repo.FindByID(uint(request.GetId()))
 	if err != nil {
 		return nil, mapFindError("product", err)
 	}
-	return &pb.GetProductResponse{Product: toProtoProduct(product)}, nil
+	response.Product = toProtoProduct(product)
+	response.Category = toProtoCategory(&product.Category)
+	if server.detailRepo != nil {
+		details, e := server.detailRepo.FindAll(uint(request.GetId()))
+		if e != nil {
+			return nil, apperr.Internal(e)
+		}
+		for i := range details {
+			response.Details = append(response.Details, toProtoDetail(&details[i]))
+		}
+	}
+	if server.assetRepo != nil {
+		assets, e := server.assetRepo.FindAll(uint(request.GetId()), 0)
+		if e != nil {
+			return nil, apperr.Internal(e)
+		}
+		for i := range assets {
+			response.Assets = append(response.Assets, toProtoProductAsset(&assets[i]))
+		}
+	}
+	if server.listingRepo != nil {
+		listings, e := server.listingRepo.FindAll(uint(request.GetId()))
+		if e != nil {
+			return nil, apperr.Internal(e)
+		}
+		for i := range listings {
+			response.Listings = append(response.Listings, toProtoListing(&listings[i]))
+		}
+	}
+	_ = cacheSet(ctx, server.cache, key, response, server.cacheTTL)
+	return response, nil
 }
 
 func (server *ProductServer) CreateProduct(ctx context.Context, request *pb.CreateProductRequest) (*pb.CreateProductResponse, error) {
@@ -83,6 +127,7 @@ func (server *ProductServer) CreateProduct(ctx context.Context, request *pb.Crea
 	if err := server.repo.Create(product); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(product.ID))
 	metrics.RecordProductCreated() // メトリクス: 出品の数
 	return &pb.CreateProductResponse{Product: toProtoProduct(product)}, nil
 }
@@ -109,6 +154,7 @@ func (server *ProductServer) UpdateProduct(ctx context.Context, request *pb.Upda
 	if err := server.repo.Update(product); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(product.ID))
 	return &pb.UpdateProductResponse{Product: toProtoProduct(product)}, nil
 }
 
@@ -116,6 +162,7 @@ func (server *ProductServer) DeleteProduct(ctx context.Context, request *pb.Dele
 	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, request.GetId())
 	return &pb.DeleteProductResponse{}, nil
 }
 
@@ -181,6 +228,7 @@ func (server *ProductServer) ConfirmProductImageUpload(ctx context.Context, requ
 		if err := server.repo.Update(product); err != nil {
 			return nil, apperr.Internal(err)
 		}
+		invalidateProduct(ctx, server.cache, uint32(product.ID))
 		return &pb.ConfirmProductImageUploadResponse{Product: toProtoProduct(product)}, nil
 
 	case storage.ImageKindSub:
@@ -193,6 +241,7 @@ func (server *ProductServer) ConfirmProductImageUpload(ctx context.Context, requ
 		if err := server.detailRepo.Create(detail); err != nil {
 			return nil, apperr.Internal(err)
 		}
+		invalidateProduct(ctx, server.cache, uint32(product.ID))
 		return &pb.ConfirmProductImageUploadResponse{
 			Product:           toProtoProduct(product),
 			DetailId:          uint32(detail.ID),
@@ -246,6 +295,7 @@ func (server *ProductServer) DeleteProductImageUpload(ctx context.Context, reque
 			return nil, apperr.Internal(err)
 		}
 	}
+	invalidateProduct(ctx, server.cache, uint32(product.ID))
 
 	return &pb.DeleteProductImageUploadResponse{Product: toProtoProduct(product)}, nil
 }

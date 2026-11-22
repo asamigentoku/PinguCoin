@@ -3,7 +3,6 @@ kind: Service
 metadata:
   name: postgres
 spec:
-  type: NodePort
   selector: {app: postgres}
-  ports: [{name: postgres, port: 5432, targetPort: postgres, nodePort: 30432}]
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
 

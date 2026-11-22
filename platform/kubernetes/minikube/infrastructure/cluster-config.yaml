@@ -16,3 +16,6 @@ data:
   INVENTORY_API_ADDR: inventory-api:8083
   ORDER_API_ADDR: order-api:8084
   KAFKA_BROKERS: kafka:9092
+  REDIS_ENABLED: "true"
+  REDIS_ADDR: redis:6379
+  REDIS_TTL_SECONDS: "60"

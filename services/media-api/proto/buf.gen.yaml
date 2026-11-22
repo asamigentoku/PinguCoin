@@ -3,9 +3,9 @@
 # 生成したコードは .proto と同じフォルダに置き、media-api 自身も、呼び出す側(bff)も、同じ生成コードを import する。
 version: v2
 plugins:
-  - local: protoc-gen-go
+  - remote: buf.build/protocolbuffers/go:v1.36.6
     out: services/media-api/proto
     opt: paths=source_relative
-  - local: protoc-gen-go-grpc
+  - remote: buf.build/grpc/go:v1.5.1
     out: services/media-api/proto
     opt: paths=source_relative

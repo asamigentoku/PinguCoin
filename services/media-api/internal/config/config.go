@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 )
 
 // Config はアプリケーションの設定値を保持する。
@@ -33,6 +34,9 @@ type Config struct {
 	TwelveDataAPIKey       string
 	TwelveDataBaseURL      string
 	ExchangeRatePublishURL string
+	RedisEnabled           bool
+	RedisAddr              string
+	RedisTTLSeconds        int
 }
 
 // Load は環境変数から設定を読み込む。未設定の項目にはデフォルト値を使う。
@@ -61,6 +65,9 @@ func Load() Config {
 		TwelveDataAPIKey:             getEnv("TWELVE_DATA_API_KEY", ""),
 		TwelveDataBaseURL:            getEnv("TWELVE_DATA_BASE_URL", "https://api.twelvedata.com"),
 		ExchangeRatePublishURL:       getEnv("EXCHANGE_RATE_PUBLISH_URL", "http://bff:8082/internal/exchange-rates"),
+		RedisEnabled:                 getBoolEnv("REDIS_ENABLED", false),
+		RedisAddr:                    getEnv("REDIS_ADDR", "redis:6379"),
+		RedisTTLSeconds:              getIntEnv("REDIS_TTL_SECONDS", 60),
 	}
 }
 
@@ -69,4 +76,28 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getIntEnv(key string, fallback int) int {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(v)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }

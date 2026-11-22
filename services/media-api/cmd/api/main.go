@@ -18,6 +18,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/logging"
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/pkg/version"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/database"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/forex"
@@ -66,6 +67,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	var redisCache cache.Cache = cache.Noop{}
+	if cfg.RedisEnabled {
+		redisCache = cache.NewRedis(cfg.RedisAddr)
+		logger.Info("redis cache enabled", slog.String("addr", cfg.RedisAddr), slog.Int("ttl_seconds", cfg.RedisTTLSeconds))
+	} else {
+		logger.Info("redis cache disabled")
+	}
+
 	// gRPCはHTTPサーバーと同じくTCPソケットで待ち受ける。
 	listener, err := net.Listen("tcp", ":"+cfg.Port)
 	if err != nil {
@@ -93,11 +102,13 @@ func main() {
 	// 各実装(grpcserver.NewXxxServer)はDBアクセス用のrepositoryを注入されて動く。
 	productRepo := repository.NewProductRepository(db)
 	detailRepo := repository.NewProductDetailRepository(db)
-	pb.RegisterProductServiceServer(server, grpcserver.NewProductServer(productRepo, detailRepo, blobStorage))
-	pb.RegisterProductAssetServiceServer(server, grpcserver.NewProductAssetServer(repository.NewProductAssetRepository(db), productRepo, blobStorage))
-	pb.RegisterProductCategoryServiceServer(server, grpcserver.NewProductCategoryServer(repository.NewProductCategoryRepository(db)))
-	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(detailRepo))
-	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServer(repository.NewProductListingRepository(db)))
+	assetRepo := repository.NewProductAssetRepository(db)
+	listingRepo := repository.NewProductListingRepository(db)
+	pb.RegisterProductServiceServer(server, grpcserver.NewProductServerWithCache(productRepo, detailRepo, assetRepo, listingRepo, blobStorage, redisCache, cfg.RedisTTLSeconds))
+	pb.RegisterProductAssetServiceServer(server, grpcserver.NewProductAssetServerWithCache(assetRepo, productRepo, blobStorage, redisCache))
+	pb.RegisterProductCategoryServiceServer(server, grpcserver.NewProductCategoryServerWithCache(repository.NewProductCategoryRepository(db), redisCache, cfg.RedisTTLSeconds))
+	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServerWithCache(detailRepo, redisCache))
+	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServerWithCache(listingRepo, redisCache))
 	forexService := forex.New(cfg.TwelveDataAPIKey, cfg.TwelveDataBaseURL, logger)
 	forexService.SetPublisher(func(ctx context.Context, snapshot forex.Snapshot) error {
 		return forex.PublishSnapshot(ctx, cfg.ExchangeRatePublishURL, cfg.InternalAPIToken, snapshot)

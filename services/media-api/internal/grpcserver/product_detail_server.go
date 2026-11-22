@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	pb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
@@ -15,11 +16,16 @@ import (
 // 1商品(product_id)につき複数件の画像・詳細(ProductDetail)を持てる想定。
 type ProductDetailServer struct {
 	pb.UnimplementedProductDetailServiceServer
-	repo *repository.ProductDetailRepository
+	repo  *repository.ProductDetailRepository
+	cache cache.Cache
 }
 
 func NewProductDetailServer(repo *repository.ProductDetailRepository) *ProductDetailServer {
-	return &ProductDetailServer{repo: repo}
+	return NewProductDetailServerWithCache(repo, cache.Noop{})
+}
+
+func NewProductDetailServerWithCache(repo *repository.ProductDetailRepository, c cache.Cache) *ProductDetailServer {
+	return &ProductDetailServer{repo: repo, cache: c}
 }
 
 // ListProductDetails は詳細一覧を返す。product_id を指定するとその商品の詳細だけに絞り込む。
@@ -64,6 +70,7 @@ func (server *ProductDetailServer) CreateProductDetail(ctx context.Context, requ
 	if err := server.repo.Create(detail); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(detail.ProductID))
 	return &pb.CreateProductDetailResponse{Detail: toProtoDetail(detail)}, nil
 }
 
@@ -85,13 +92,19 @@ func (server *ProductDetailServer) UpdateProductDetail(ctx context.Context, requ
 	if err := server.repo.Update(detail); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(detail.ProductID))
 	return &pb.UpdateProductDetailResponse{Detail: toProtoDetail(detail)}, nil
 }
 
 func (server *ProductDetailServer) DeleteProductDetail(ctx context.Context, request *pb.DeleteProductDetailRequest) (*pb.DeleteProductDetailResponse, error) {
+	detail, err := server.repo.FindByID(uint(request.GetId()))
+	if err != nil {
+		return nil, mapFindError("product detail", err)
+	}
 	if err := server.repo.Delete(uint(request.GetId())); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(detail.ProductID))
 	return &pb.DeleteProductDetailResponse{}, nil
 }
 

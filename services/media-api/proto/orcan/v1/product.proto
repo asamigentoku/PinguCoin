@@ -3,6 +3,10 @@ syntax = "proto3";
 package orcan.v1;
 
 import "google/protobuf/timestamp.proto";
+import "orcan/v1/product_asset.proto";
+import "orcan/v1/product_category.proto";
+import "orcan/v1/product_detail.proto";
+import "orcan/v1/product_listing.proto";
 
 option go_package = "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1;orcanv1";
 
@@ -91,6 +95,10 @@ message GetProductRequest {
 
 message GetProductResponse {
   Product product = 1;
+  ProductCategory category = 2;
+  repeated ProductDetail details = 3;
+  repeated ProductAsset assets = 4;
+  repeated ProductListing listings = 5;
 }
 
 message CreateProductRequest {

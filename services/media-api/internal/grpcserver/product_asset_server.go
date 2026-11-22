@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/apperr"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/cache"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/model"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/storage"
@@ -21,10 +22,15 @@ type ProductAssetServer struct {
 	assets   *repository.ProductAssetRepository
 	products *repository.ProductRepository
 	storage  *storage.BlobStorage
+	cache    cache.Cache
 }
 
 func NewProductAssetServer(assets *repository.ProductAssetRepository, products *repository.ProductRepository, blobStorage *storage.BlobStorage) *ProductAssetServer {
-	return &ProductAssetServer{assets: assets, products: products, storage: blobStorage}
+	return NewProductAssetServerWithCache(assets, products, blobStorage, cache.Noop{})
+}
+
+func NewProductAssetServerWithCache(assets *repository.ProductAssetRepository, products *repository.ProductRepository, blobStorage *storage.BlobStorage, c cache.Cache) *ProductAssetServer {
+	return &ProductAssetServer{assets: assets, products: products, storage: blobStorage, cache: c}
 }
 
 func (server *ProductAssetServer) ListProductAssets(_ context.Context, request *pb.ListProductAssetsRequest) (*pb.ListProductAssetsResponse, error) {
@@ -75,7 +81,7 @@ func (server *ProductAssetServer) GetProductAssetUploadURL(ctx context.Context, 
 	}, nil
 }
 
-func (server *ProductAssetServer) ConfirmProductAssetUpload(_ context.Context, request *pb.ConfirmProductAssetUploadRequest) (*pb.ConfirmProductAssetUploadResponse, error) {
+func (server *ProductAssetServer) ConfirmProductAssetUpload(ctx context.Context, request *pb.ConfirmProductAssetUploadRequest) (*pb.ConfirmProductAssetUploadResponse, error) {
 	fileURL := strings.TrimSpace(request.GetFileUrl())
 	if fileURL == "" {
 		return nil, apperr.InvalidArgument("file_url is required")
@@ -116,6 +122,7 @@ func (server *ProductAssetServer) ConfirmProductAssetUpload(_ context.Context, r
 	if err := server.assets.Create(asset); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(asset.ProductID))
 	return &pb.ConfirmProductAssetUploadResponse{Asset: toProtoProductAsset(asset)}, nil
 }
 
@@ -137,6 +144,7 @@ func (server *ProductAssetServer) DeleteProductAsset(ctx context.Context, reques
 	if err := server.assets.Delete(asset.ID); err != nil {
 		return nil, apperr.Internal(err)
 	}
+	invalidateProduct(ctx, server.cache, uint32(asset.ProductID))
 	return &pb.DeleteProductAssetResponse{}, nil
 }
 
