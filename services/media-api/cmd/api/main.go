@@ -20,6 +20,7 @@ import (
 	"github.com/asamigentoku/PinguCoin/pkg/version"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/config"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/database"
+	"github.com/asamigentoku/PinguCoin/services/media-api/internal/forex"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/grpcserver"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/repository"
 	"github.com/asamigentoku/PinguCoin/services/media-api/internal/storage"
@@ -97,6 +98,11 @@ func main() {
 	pb.RegisterProductCategoryServiceServer(server, grpcserver.NewProductCategoryServer(repository.NewProductCategoryRepository(db)))
 	pb.RegisterProductDetailServiceServer(server, grpcserver.NewProductDetailServer(detailRepo))
 	pb.RegisterProductListingServiceServer(server, grpcserver.NewProductListingServer(repository.NewProductListingRepository(db)))
+	forexService := forex.New(cfg.TwelveDataAPIKey, cfg.TwelveDataBaseURL, logger)
+	forexService.SetPublisher(func(ctx context.Context, snapshot forex.Snapshot) error {
+		return forex.PublishSnapshot(ctx, cfg.ExchangeRatePublishURL, cfg.InternalAPIToken, snapshot)
+	})
+	pb.RegisterExchangeRateServiceServer(server, grpcserver.NewExchangeRateServer(forexService))
 
 	pb.RegisterUserServiceServer(server, grpcserver.NewUserServer(repository.NewUserRepository(db)))
 
@@ -107,6 +113,7 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	go forexService.Run(shutdownCtx)
 	// メトリクス(/metrics)。別のポートで待ち受け、クラスター内の Prometheus だけが取る(pkg/metrics)。
 	go metrics.Serve(shutdownCtx, metrics.Addr(), logger)
 	health.Register(shutdownCtx, server, db, logger)

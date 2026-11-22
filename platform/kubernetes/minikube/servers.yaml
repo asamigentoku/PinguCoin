@@ -65,6 +65,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        fsGroup: 65532
       containers:
         - name: media-api
           image: pingucoin/media-api:dev
@@ -87,6 +88,7 @@ spec:
               value: "8080"
             - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/media?sslmode=disable"}
             - {name: INTERNAL_API_TOKEN, value: local-internal-token}
+            - {name: EXCHANGE_RATE_PUBLISH_URL, value: "http://bff:8082/internal/exchange-rates"}
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:
@@ -319,6 +321,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        fsGroup: 65532
       containers:
         - name: bff
           image: pingucoin/bff:dev
@@ -339,7 +342,12 @@ spec:
           env:
             - name: PORT
               value: "8082"
+            - name: EXCHANGE_RATE_DIRECTORY
+              value: /var/cache/nginx/exchange-rates
             - {name: INTERNAL_API_TOKEN, value: local-internal-token}
+          volumeMounts:
+            - name: exchange-rates
+              mountPath: /var/cache/nginx/exchange-rates
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:
@@ -388,3 +396,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+      volumes:
+        - name: exchange-rates
+          persistentVolumeClaim:
+            claimName: exchange-rates

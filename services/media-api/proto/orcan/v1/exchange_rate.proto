@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package orcan.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1;orcanv1";
+
+service ExchangeRateService {
+  rpc GetExchangeRates(GetExchangeRatesRequest) returns (GetExchangeRatesResponse);
+}
+
+message GetExchangeRatesRequest {}
+
+message ExchangeRate {
+  string currency = 1;
+  double jpy_per_unit = 2;
+}
+
+message GetExchangeRatesResponse {
+  repeated ExchangeRate rates = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}

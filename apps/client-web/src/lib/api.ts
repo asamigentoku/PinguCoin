@@ -3,6 +3,7 @@ import type { Product } from "./types";
 
 export const bffBase = (process.env.BFF_API_URL ?? "http://localhost:8082/api/v1").replace(/\/$/, "");
 export type RestOptions = { retry?: boolean };
+export type ExchangeRatePayload = { base: "JPY"; rates: Record<string, number>; updatedAt: string };
 
 export async function bffFetch<T>(path: string, init: RequestInit = {}, token?: string, options: RestOptions = {}): Promise<T> {
   const send = async () => {
@@ -30,4 +31,13 @@ export async function getProducts(): Promise<Product[]> {
 export async function getProduct(id: number): Promise<Product | null> {
   try { return await bffFetch<Product>(`/products/${id}`, {}, undefined, { retry: true }); }
   catch (error) { if (error instanceof HttpStatusError && error.status === 404) return null; throw error; }
+}
+
+export async function getExchangeRates(): Promise<ExchangeRatePayload> {
+  const response = await fetch(`${bffBase}/exchange-rates`, {
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new HttpStatusError(response.status, "Exchange rates unavailable");
+  return response.json() as Promise<ExchangeRatePayload>;
 }

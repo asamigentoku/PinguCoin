@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
 	"github.com/asamigentoku/PinguCoin/services/bff/internal/orcanclient"
@@ -13,6 +14,7 @@ import (
 )
 
 const APIVersionPrefix = "/api/v1"
+const APIVersionV2Prefix = "/api/v2"
 
 func NewRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentclient.Client, orderRepo *repository.OrderRepository, ping func(context.Context) error) http.Handler {
 	return newRouter(logger, media, payment, nil, orderRepo, ping)
@@ -35,6 +37,10 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products", catalog.ListProducts)
 	mux.HandleFunc("POST "+APIVersionPrefix+"/products", catalog.CreateProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}", catalog.GetProduct)
+	exchangeRateDir := envOr("EXCHANGE_RATE_DIRECTORY", "/var/cache/nginx/exchange-rates")
+	mux.HandleFunc("GET "+APIVersionPrefix+"/exchange-rates", NewExchangeRateLiveHandler(media.ExchangeRate).Get)
+	mux.HandleFunc("GET "+APIVersionV2Prefix+"/exchange-rates/{date}/{file}", NewExchangeRateStaticHandler(exchangeRateDir).Get)
+	mux.HandleFunc("PUT /internal/exchange-rates", NewExchangeRatePublishHandler(exchangeRateDir, envOr("INTERNAL_API_TOKEN", "")).Put)
 	mux.HandleFunc("PATCH "+APIVersionPrefix+"/products/{id}", catalog.UpdateProduct)
 	mux.HandleFunc("DELETE "+APIVersionPrefix+"/products/{id}", catalog.DeleteProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}/assets", catalog.ListAssets)
@@ -61,4 +67,11 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("POST "+APIVersionPrefix+"/points/topups", points.TopUpPoints)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/payments/{id}", points.GetPayment)
 	return metrics.HTTP(WithRequestID(WithAPIVersion(WithLogging(logger)(WithOptionalAuth(media)(metrics.Route(mux))))))
+}
+
+func envOr(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }

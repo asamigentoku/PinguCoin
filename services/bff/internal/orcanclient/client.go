@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/asamigentoku/PinguCoin/pkg/metrics"
-	pb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
 	sharedgrpc "github.com/asamigentoku/PinguCoin/services/bff/internal/grpcclient"
+	pb "github.com/asamigentoku/PinguCoin/services/media-api/proto/orcan/v1"
 )
 
 // internalTokenMetadataKey はmedia-api側(interceptor.Auth)が検証するメタデータのキーと揃える。
@@ -18,11 +18,12 @@ const internalTokenMetadataKey = "x-internal-token"
 
 // Client はmedia-apiの各サービスへのgRPCクライアントをまとめて持つ。
 type Client struct {
-	conn      *grpc.ClientConn
-	Product   pb.ProductServiceClient
-	Asset     pb.ProductAssetServiceClient
-	Inventory pb.ProductInventoryServiceClient
-	User      pb.UserServiceClient
+	conn         *grpc.ClientConn
+	Product      pb.ProductServiceClient
+	Asset        pb.ProductAssetServiceClient
+	Inventory    pb.ProductInventoryServiceClient
+	User         pb.UserServiceClient
+	ExchangeRate pb.ExchangeRateServiceClient
 }
 
 // New はmedia-apiへのgRPCコネクションを1本張り、各サービスのクライアントを作る。
@@ -51,11 +52,12 @@ func New(addr, internalToken string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:      conn,
-		Product:   pb.NewProductServiceClient(conn),
-		Asset:     pb.NewProductAssetServiceClient(conn),
-		Inventory: pb.NewProductInventoryServiceClient(conn),
-		User:      pb.NewUserServiceClient(conn),
+		conn:         conn,
+		Product:      pb.NewProductServiceClient(conn),
+		Asset:        pb.NewProductAssetServiceClient(conn),
+		Inventory:    pb.NewProductInventoryServiceClient(conn),
+		User:         pb.NewUserServiceClient(conn),
+		ExchangeRate: pb.NewExchangeRateServiceClient(conn),
 	}, nil
 }
 

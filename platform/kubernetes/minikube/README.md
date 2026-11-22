@@ -72,6 +72,7 @@ docker build -t pingucoin/payment-api:dev -f services/payment-api/Dockerfile .
 docker build -t pingucoin/mock-stripe:dev -f services/payment-api/Dockerfile.mock-stripe .
 docker build -t pingucoin/order-api:dev -f services/order-api/Dockerfile .
 docker build -t pingucoin/bff:dev -f services/bff/Dockerfile .
+docker build -t pingucoin/nginx-metrics:dev -f services/nginx-metrics/Dockerfile .
 ```
 
 Docker Desktopに5つのイメージが作成されたことを確認します。
@@ -91,6 +92,7 @@ minikube image load pingucoin/payment-api:dev
 minikube image load pingucoin/mock-stripe:dev
 minikube image load pingucoin/order-api:dev
 minikube image load pingucoin/bff:dev
+minikube image load pingucoin/nginx-metrics:dev
 ```
 
 5つのイメージがminikube内に存在することを確認します。
@@ -107,6 +109,7 @@ minikube image ls | Select-String -Pattern "pingucoin/"
 - `pingucoin/mock-stripe:dev`
 - `pingucoin/order-api:dev`
 - `pingucoin/bff:dev`
+- `pingucoin/nginx-metrics:dev`
 
 ## 6. Kubernetesマニフェストを適用する
 
@@ -153,7 +156,7 @@ kubectl get services -n pingucoin
 新しいPowerShellを開き、BFFを `localhost:8082` へport-forwardします。
 
 ```powershell
-kubectl -n pingucoin port-forward service/bff 8082:8082
+kubectl -n pingucoin port-forward service/nginx 8082:8082
 ```
 
 Minikubeのmock Stripeはバックエンド内で決済を即時成功させるため、ブラウザ向けのport-forwardは不要です。

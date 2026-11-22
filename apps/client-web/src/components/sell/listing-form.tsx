@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { confirmMainImage, confirmProductFile, createListing, prepareUploads, removeProductFile, updateListing } from "@/app/sell/actions";
 import { categories } from "@/lib/categories";

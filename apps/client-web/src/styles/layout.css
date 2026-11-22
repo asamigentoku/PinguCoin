@@ -17,6 +17,15 @@
 .nav-menu a[aria-current="page"] { background: var(--ink); color: #fff; }
 
 .header-actions { display: flex; align-items: center; gap: 4px; }
+  .locale-switcher { position: relative; }
+  .locale-switcher summary { display: flex; align-items: center; gap: 7px; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--snow); color: var(--ink); font-size: 13px; font-weight: 800; white-space: nowrap; cursor: pointer; list-style: none; }
+  .locale-switcher summary::-webkit-details-marker { display: none; }
+  .locale-switcher[open] summary { background: var(--glacier); }
+  .locale-flag { display: block; width: 24px; height: 16px; flex: 0 0 auto; border: 1px solid rgba(16, 32, 45, 0.16); border-radius: 2px; box-shadow: 0 1px 2px rgba(16, 32, 45, 0.12); }
+  .locale-chevron { color: var(--muted); font-size: 10px; }
+  .locale-menu { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: 172px; margin: 0; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--snow); box-shadow: 0 14px 35px rgba(16, 32, 45, 0.16); list-style: none; }
+  .locale-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; text-align: left; cursor: pointer; }
+  .locale-menu button:hover, .locale-menu button[aria-current="true"] { background: var(--glacier); }
 
 .point-balance { display: inline-flex; align-items: center; gap: 8px; height: 38px; margin-right: 6px; padding: 0 14px 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--snow); font-size: 14px; font-weight: 800; white-space: nowrap; }
 .point-balance:hover { background: var(--glacier); }

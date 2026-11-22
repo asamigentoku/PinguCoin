@@ -1,73 +1,50 @@
 "use client";
 
 import { Show, SignInButton } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { purchase } from "@/app/purchases/actions";
-import { formatPrice } from "@/lib/format";
+import { useRouter } from "@/i18n/navigation";
+import { formatJPY } from "@/lib/format";
 import type { PaymentMethod } from "@/lib/shop";
 import { useCart } from "../cart/cart-provider";
 
 export function CheckoutButton() {
+  const locale = useLocale();
+  const t = useTranslations("Cart");
+  const priceT = useTranslations("Price");
   const router = useRouter();
   const { items, total, removeItems, closeCart } = useCart();
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("point");
-
-  function openConfirm() {
-    setError("");
-    dialog.current?.showModal();
-  }
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(locale === "ja" ? "point" : "card");
 
   async function confirmPurchase() {
-    setBusy(true);
-    setError("");
-    // 押すたびに新しい購入操作として扱う。処理中はボタンを無効にして二重クリックを防ぐ。
+    setBusy(true); setError("");
     const result = await purchase(items.map((item) => ({ productId: item.id, quantity: item.quantity })), paymentMethod, crypto.randomUUID());
-    removeItems(result.purchased);
-    setBusy(false);
+    removeItems(result.purchased); setBusy(false);
     if (result.actionUrl) { window.location.assign(result.actionUrl); return; }
     if (result.error) return setError(result.error);
-    dialog.current?.close();
-    closeCart();
-    router.push("/purchases");
-    router.refresh();
+    dialog.current?.close(); closeCart(); router.push("/purchases"); router.refresh();
   }
 
   return (
     <>
-      <Show when="signed-in">
-        <button className="button button-primary checkout-button" onClick={openConfirm}>支払い方法を選んで購入</button>
-      </Show>
-      <Show when="signed-out">
-        <SignInButton><button className="button button-primary checkout-button">ログインして購入する</button></SignInButton>
-      </Show>
-
-      <dialog ref={dialog} className="confirm-dialog" aria-labelledby="confirm-title" onCancel={(e) => busy && e.preventDefault()}>
-        <h2 id="confirm-title">この内容で購入しますか？</h2>
-        <ul className="confirm-items">
-          {items.map((item) => (
-            <li key={item.id}>
-              <span>{item.name}{item.quantity > 1 && ` × ${item.quantity}`}</span>
-              <strong>{formatPrice(item.price * item.quantity)}</strong>
-            </li>
-          ))}
-        </ul>
-        <div className="confirm-total"><span>合計</span><strong>{formatPrice(total)}</strong></div>
-        <fieldset className="payment-methods">
-          <legend>支払い方法</legend>
-          <label><input type="radio" name="payment-method" checked={paymentMethod === "point"} onChange={() => setPaymentMethod("point")} /> ポイント</label>
-          <label><input type="radio" name="payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} /> カード</label>
-          <label><input type="radio" name="payment-method" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} /> 銀行振込</label>
+      <Show when="signed-in"><button className="button button-primary checkout-button" onClick={() => { setError(""); dialog.current?.showModal(); }}>{t("checkout")}</button></Show>
+      <Show when="signed-out"><SignInButton><button className="button button-primary checkout-button">{t("checkout")}</button></SignInButton></Show>
+      <dialog ref={dialog} className="confirm-dialog" aria-labelledby="confirm-title" onCancel={(event) => busy && event.preventDefault()}>
+        <h2 id="confirm-title">{t("confirm")}</h2>
+        <ul className="confirm-items">{items.map((item) => <li key={item.id}><span>{item.name}{item.quantity > 1 && ` × ${item.quantity}`}</span><strong>{formatJPY(item.price * item.quantity)}</strong></li>)}</ul>
+        <div className="confirm-total"><span>{t("total")}</span><strong>{formatJPY(total)}</strong></div>
+        <p className="confirm-note">{priceT("settlement")}</p>
+        <fieldset className="payment-methods"><legend>{t("paymentMethod")}</legend>
+          {locale === "ja" && <label><input type="radio" name="payment-method" checked={paymentMethod === "point"} onChange={() => setPaymentMethod("point")} /> {t("points")}</label>}
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "card"} onChange={() => setPaymentMethod("card")} /> {t("card")}</label>
+          <label><input type="radio" name="payment-method" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} /> {t("bank")}</label>
         </fieldset>
-        <p className="confirm-note">{paymentMethod === "point" ? "保有ポイントから引き落とされます。" : "開発用のモック決済で処理します。"} 購入後は、購入履歴からダウンロードできます。</p>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="confirm-actions">
-          <button className="button button-ghost" onClick={() => dialog.current?.close()} disabled={busy}>キャンセル</button>
-          <button className="button button-coin" onClick={confirmPurchase} disabled={busy || items.length === 0}>{busy ? "購入しています…" : "購入を確定する"}</button>
-        </div>
+        <div className="confirm-actions"><button className="button button-ghost" onClick={() => dialog.current?.close()} disabled={busy}>{t("cancel")}</button><button className="button button-coin" onClick={confirmPurchase} disabled={busy || items.length === 0}>{busy ? t("processing") : t("purchase")}</button></div>
       </dialog>
     </>
   );

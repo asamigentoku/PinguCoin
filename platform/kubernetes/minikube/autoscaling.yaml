@@ -14,8 +14,10 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: media-api
+  # Keep two replicas for the v1 load test. Each replica owns an in-memory
+  # snapshot, so each one performs one batched upstream refresh every five minutes.
   minReplicas: 2
-  maxReplicas: 5
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource:
@@ -89,7 +91,7 @@ spec:
     kind: Deployment
     name: bff
   minReplicas: 2
-  maxReplicas: 5
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource:
