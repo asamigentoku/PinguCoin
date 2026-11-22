@@ -1,4 +1,4 @@
-# 通信の制限(NetworkPolicy)。
+﻿# 通信の制限(NetworkPolicy)。
 #
 # 1. まず、namespace内のPodへの入ってくる通信を、すべて拒否する。
 # 2. そのうえで、必要な通信だけ許可する。

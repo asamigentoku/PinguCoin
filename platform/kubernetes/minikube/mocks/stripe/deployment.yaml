@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-stripe
@@ -34,12 +34,4 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: ["ALL"]}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mock-stripe
-spec:
-  selector: {app: mock-stripe}
-  ports:
-    - {name: http, port: 8090, targetPort: http}
+

@@ -3,13 +3,12 @@ kind: Kustomization
 namespace: pingucoin
 resources:
   - namespace.yaml
-  - config.yaml
-  - local-infrastructure.yaml
-  - kafka-topics.yaml
-  - mock-stripe.yaml
-  - servers.yaml
-  - nginx.yaml
-  - domain-services.yaml
-  - autoscaling.yaml
-  - network-policy.yaml
+  - infrastructure
+  - apps/media
+  - apps/inventory
+  - apps/payment
+  - apps/order
+  - apps/gateway
+  - mocks/stripe
+  - networking
   - monitoring

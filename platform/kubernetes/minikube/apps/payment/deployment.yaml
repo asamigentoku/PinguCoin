@@ -1,0 +1,117 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+spec:
+  # 常に2つ以上動かし、1つ落ちてもサービスを止めない。HPA(autoscaling.yaml)が負荷に応じて増減させる。
+  replicas: 2
+  # ローリングアップデート: 新しいPodがReadyになってから古いPodを止める(maxUnavailable: 0)ので、
+  # デプロイ中もリクエストを受け付け続けられる。
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  # 過去のReplicaSetを残す数(ロールバック用: kubectl rollout undo)。
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      # このAPIはKubernetes APIを呼ばないので、ServiceAccountのトークンをPodに渡さない。
+      automountServiceAccountToken: false
+      # 終了の合図(SIGTERM)から強制終了(SIGKILL)までの猶予。
+      terminationGracePeriodSeconds: 30
+      # Podを別のノードに分散させ、1台のノードが落ちても全滅しないようにする。
+      # minikubeは1ノードなので、置けなくてもエラーにしない(ScheduleAnyway)。
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: payment-api
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: payment-api
+          image: pingucoin/payment-api:dev
+          # minikubeに取り込んだイメージを使う(レジストリからは取得しない)。
+          imagePullPolicy: Never
+          ports:
+            # probeとServiceからは、番号ではなくこの名前で参照する。
+            - name: api
+              containerPort: 8081
+            # メトリクス(/metrics)。API のポートとは別。Prometheus だけが取る(NetworkPolicy)。Service には出さない。
+            - name: metrics
+              containerPort: 9090
+            - name: webhook
+              containerPort: 8086
+          envFrom:
+            - secretRef:
+                name: payment-api-env
+            - configMapRef:
+                name: pingucoin-cluster-config
+          env:
+            - name: PORT
+              value: "8081"
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/payment?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
+            - {name: MOCK_STRIPE_URL, value: "http://mock-stripe:8090"}
+            - {name: WEBHOOK_PORT, value: "8086"}
+            - {name: WEBHOOK_SECRET, value: local-webhook-secret}
+            - {name: PAYMENT_RETURN_URL, value: "http://localhost:3000/purchases"}
+          # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
+          # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # ヘルスチェック(probe)。
+          #   startupProbe   ... 起動が終わるまで待つ。終わるまで他のprobeは動かない(最大 5秒 x 30回)
+          #   readinessProbe ... 失敗するとServiceの宛先から外し、リクエストを送らない(再起動はしない)
+          #   livenessProbe  ... 失敗が続くとコンテナを再起動する(固まったプロセスの自動復旧)
+          # gRPC標準のヘルスチェック(grpc.health.v1)を使う。pkg/health を参照。
+          #   service を省略 ... readiness。DBに接続できる間だけ SERVING
+          #   liveness       ... プロセスが生きている間は常に SERVING(DBの障害では再起動しない)
+          # (grpcのprobeは、名前付きポートではなく番号で指定する)
+          startupProbe:
+            grpc:
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            grpc:
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            grpc:
+              port: 8081
+              service: liveness
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # 終了時: 先にServiceの宛先から外れるのを待ってから止める。
+          # 外れる前に止めると、まだ届いているリクエストが失敗する。
+          # (distrolessイメージにはシェルがないので、execのsleepではなくsleepアクションを使う)
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
+          # コンテナの権限を最小にする。
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+

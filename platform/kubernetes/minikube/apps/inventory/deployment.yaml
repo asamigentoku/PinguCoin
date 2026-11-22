@@ -1,0 +1,23 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata: {name: inventory-api}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: inventory-api}}
+  template:
+    metadata: {labels: {app: inventory-api}}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: inventory-api
+          image: pingucoin/inventory-api:dev
+          imagePullPolicy: Never
+          ports: [{name: api, containerPort: 8083}]
+          envFrom: [{configMapRef: {name: pingucoin-cluster-config}}]
+          env:
+            - {name: PORT, value: "8083"}
+            - {name: DATABASE_URL, value: "postgres://postgres:postgres@postgres:5432/inventory?sslmode=disable"}
+            - {name: INTERNAL_API_TOKEN, value: local-internal-token}
+          readinessProbe: {grpc: {port: 8083}}
+          livenessProbe: {grpc: {port: 8083, service: liveness}}
+

@@ -1,0 +1,11 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  10-service-databases.sql: |
+    CREATE DATABASE media;
+    CREATE DATABASE inventory;
+    CREATE DATABASE payment;
+    CREATE DATABASE orders;
+

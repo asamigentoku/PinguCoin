@@ -1,0 +1,27 @@
+﻿apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: media-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: media-api
+  # Keep two replicas for the v1 load test. Each replica owns an in-memory
+  # snapshot, so each one performs one batched upstream refresh every five minutes.
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    # 増やすのは素早く、減らすのはゆっくり(5分間落ち着いてから)。負荷が波打っても増減を繰り返さない。
+    scaleUp:
+      stabilizationWindowSeconds: 0
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
