@@ -1,5 +1,6 @@
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS failure_reason varchar(255);
 ALTER TABLE orders ALTER COLUMN payment_id SET DEFAULT 0;
+-- 注文作成イベントをDBに一時保存し、Kafkaへの発行漏れを防ぐためのoutboxテーブル。
 CREATE TABLE IF NOT EXISTS order_outbox (
  id bigserial PRIMARY KEY, aggregate_id bigint NOT NULL, topic varchar(255) NOT NULL,
  event_key varchar(255) NOT NULL, payload jsonb NOT NULL, published_at timestamptz,

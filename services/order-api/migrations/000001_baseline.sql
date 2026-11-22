@@ -1,3 +1,5 @@
+-- 注文の現在状態を保持するテーブル。
+-- 在庫・決済の非同期処理が進むたびにstatusが更新される。
 CREATE TABLE IF NOT EXISTS orders (
  id bigserial PRIMARY KEY, user_id bigint NOT NULL, product_id bigint NOT NULL,
  quantity bigint NOT NULL, unit_price bigint NOT NULL, total_amount bigint NOT NULL,

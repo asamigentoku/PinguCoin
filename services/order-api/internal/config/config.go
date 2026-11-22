@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Config はorder-apiの起動に必要な外部接続先と認証設定です。
 type Config struct {
 	DatabaseURL      string
 	Port             string
@@ -14,6 +15,7 @@ type Config struct {
 }
 
 func Load() Config {
+	// Kafkaブローカーはカンマ区切りで受け取り、空要素は除外します。
 	var brokers []string
 	for _, broker := range strings.Split(os.Getenv("KAFKA_BROKERS"), ",") {
 		if value := strings.TrimSpace(broker); value != "" {

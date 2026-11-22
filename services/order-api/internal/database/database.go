@@ -10,8 +10,11 @@ import (
 )
 
 func Connect(dsn string) (*gorm.DB, error) {
+	// 注文サービス専用のPostgreSQLへ接続します。
 	return gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 }
+
+// Migrate は起動時に注文テーブルとoutboxテーブルのマイグレーションを適用します。
 func Migrate(db *gorm.DB) error {
 	list, e := dbmigrate.Load(migrations.FS, ".")
 	if e != nil {

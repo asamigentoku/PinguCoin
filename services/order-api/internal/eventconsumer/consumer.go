@@ -19,6 +19,7 @@ type Consumer struct {
 	logger *slog.Logger
 }
 
+// Consumer はKafkaから在庫・決済の結果を受け取り、注文状態を更新します。
 func New(brokers []string, repo *repository.Repository, logger *slog.Logger) (*Consumer, error) {
 	if len(brokers) == 0 {
 		return &Consumer{repo: repo, logger: logger}, nil
@@ -29,11 +30,16 @@ func New(brokers []string, repo *repository.Repository, logger *slog.Logger) (*C
 	}
 	return &Consumer{client: client, repo: repo, logger: logger}, nil
 }
+
+// Close はKafkaコンシューマーを終了します。
 func (c *Consumer) Close() {
 	if c.client != nil {
 		c.client.Close()
 	}
 }
+
+// Run はイベント処理が成功した後にKafkaのoffsetをcommitします。
+// DB更新に失敗した場合はcommitしないため、イベントを再処理できます。
 func (c *Consumer) Run(ctx context.Context) error {
 	if c.client == nil {
 		return nil
@@ -58,6 +64,8 @@ func (c *Consumer) Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+// handle はイベントの種類に応じて注文ステータスを更新します。
 func (c *Consumer) handle(ctx context.Context, record *kgo.Record) error {
 	switch record.Topic {
 	case orderflow.TopicInventoryReserved, orderflow.TopicInventoryRejected:

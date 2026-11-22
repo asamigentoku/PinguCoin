@@ -25,6 +25,9 @@ func New(repo *repository.Repository, topic string) *Server {
 	return &Server{repo: repo, topic: topic}
 }
 
+// CreateOrder は注文を受け付け、注文と「注文作成イベント」をDBへ保存します。
+// 実際の在庫確保や決済処理はここでは行わず、イベントを介して非同期に開始します。
+// idempotency_keyにより、同じリクエストの再送による二重注文を防ぎます。
 func (s *Server) CreateOrder(ctx context.Context, in *pb.CreateOrderRequest) (*pb.CreateOrderResponse, error) {
 	key := strings.TrimSpace(in.GetIdempotencyKey())
 	quantity := in.GetQuantity()
@@ -45,6 +48,8 @@ func (s *Server) CreateOrder(ctx context.Context, in *pb.CreateOrderRequest) (*p
 	if (method == "point" && currency != "POINT") || (method != "point" && currency != "JPY") {
 		return nil, status.Error(codes.InvalidArgument, "currency does not match payment_method")
 	}
+    //replayedは重複リクエストかのフラグ
+    //repository層のCreateOrGetの関数を叩く
 	order, replayed, err := s.repo.CreateOrGet(&model.Order{UserID: uint(in.GetUserId()), ProductID: uint(in.GetProductId()), Quantity: quantity, UnitPrice: in.GetUnitPrice(), TotalAmount: in.GetUnitPrice() * quantity, PaymentMethod: method, Currency: currency, Status: "pending", IdempotencyKey: key}, s.topic)
 	if errors.Is(err, repository.ErrIdempotencyConflict) {
 		return nil, status.Error(codes.AlreadyExists, "idempotency key was already used for another order")
@@ -57,6 +62,8 @@ func (s *Server) CreateOrder(ctx context.Context, in *pb.CreateOrderRequest) (*p
 	}
 	return &pb.CreateOrderResponse{Order: toPB(order)}, nil
 }
+
+// GetOrder は指定ユーザーが所有する注文を1件取得します。
 func (s *Server) GetOrder(_ context.Context, in *pb.GetOrderRequest) (*pb.GetOrderResponse, error) {
 	row, e := s.repo.Find(uint(in.GetId()), uint(in.GetUserId()))
 	if errors.Is(e, gorm.ErrRecordNotFound) {
@@ -67,6 +74,8 @@ func (s *Server) GetOrder(_ context.Context, in *pb.GetOrderRequest) (*pb.GetOrd
 	}
 	return &pb.GetOrderResponse{Order: toPB(row)}, nil
 }
+
+// ListOrders は指定ユーザーの注文履歴を新しい順に返します。
 func (s *Server) ListOrders(_ context.Context, in *pb.ListOrdersRequest) (*pb.ListOrdersResponse, error) {
 	rows, e := s.repo.List(uint(in.GetUserId()))
 	if e != nil {
@@ -78,6 +87,8 @@ func (s *Server) ListOrders(_ context.Context, in *pb.ListOrdersRequest) (*pb.Li
 	}
 	return out, nil
 }
+
+// HasPaidOrder はユーザーが商品を購入済みかを確認します。
 func (s *Server) HasPaidOrder(_ context.Context, in *pb.HasPaidOrderRequest) (*pb.HasPaidOrderResponse, error) {
 	paid, e := s.repo.HasPaid(uint(in.GetUserId()), uint(in.GetProductId()))
 	if e != nil {
@@ -85,6 +96,8 @@ func (s *Server) HasPaidOrder(_ context.Context, in *pb.HasPaidOrderRequest) (*p
 	}
 	return &pb.HasPaidOrderResponse{Paid: paid}, nil
 }
+
+// toPB はDBモデルをgRPCレスポンス用のprotobuf型へ変換します。
 func toPB(row *model.Order) *pb.Order {
 	return &pb.Order{Id: uint64(row.ID), UserId: uint64(row.UserID), ProductId: uint64(row.ProductID), Quantity: row.Quantity, UnitPrice: row.UnitPrice, TotalAmount: row.TotalAmount, PaymentId: uint64(row.PaymentID), Status: row.Status, IdempotencyKey: row.IdempotencyKey, CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt), PaymentMethod: row.PaymentMethod, Currency: row.Currency, ActionUrl: row.ActionURL}
 }

@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/asamigentoku/PinguCoin/services/order-api/proto/order/v1;orderv1";
 
+// Order は注文の状態を表します。決済や在庫の処理結果に応じてstatusが更新されます。
 message Order {
   uint64 id = 1;
   uint64 user_id = 2;
@@ -23,10 +24,15 @@ message Order {
   string action_url = 14;
 }
 
+// OrderService は注文の作成・参照と購入済み判定を提供します。
 service OrderService {
+  //注文を作成
   rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  //注文を一軒取得
   rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  //ユーザーの注文履歴
   rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+  //商品を購入済みがどうか
   rpc HasPaidOrder(HasPaidOrderRequest) returns (HasPaidOrderResponse);
 }
 

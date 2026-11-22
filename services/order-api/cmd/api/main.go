@@ -22,6 +22,9 @@ import (
 	"syscall"
 )
 
+// main は注文サービスを起動するエントリポイントです。
+// 注文を受け付けるgRPCサーバーに加えて、注文イベントの発行と、
+// 在庫・決済結果イベントの受信を行う非同期処理も起動します。
 func main() {
 	logger := logging.NewFromEnv("order-api")
 	cfg := config.Load()
@@ -38,12 +41,14 @@ func main() {
 		logger.Error("migration failed", logging.Err(e))
 		os.Exit(1)
 	}
+	// 注文保存と同じDBを監視し、Kafkaへのイベント発行を担当します。
 	publisher, e := outbox.New(db, cfg.KafkaBrokers, logger)
 	if e != nil {
 		logger.Error("kafka client failed", logging.Err(e))
 		os.Exit(1)
 	}
 	defer publisher.Close()
+	// 在庫・決済サービスから返ってくる結果イベントを購読します。
 	consumer, e := eventconsumer.New(cfg.KafkaBrokers, repository.New(db), logger)
 	if e != nil {
 		logger.Error("kafka consumer failed", logging.Err(e))
@@ -55,6 +60,7 @@ func main() {
 		logger.Error("listen failed", logging.Err(e))
 		os.Exit(1)
 	}
+	// 注文の作成・参照はgRPC APIとして提供し、認証・ログ・メトリクスを共通適用します。
 	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(metrics.UnaryServerInterceptor(), interceptor.RequestID(), interceptor.Logging(logger), interceptor.Auth(cfg.InternalAPIToken)))
 	pb.RegisterOrderServiceServer(grpcServer, server.New(repository.New(db), cfg.KafkaTopic))
 	reflection.Register(grpcServer)
