@@ -7,6 +7,7 @@ import (
 )
 
 // PaymentStatus は決済のステータス。
+//ここでステータスを定義してpayment_usecaseで使う
 const (
 	PaymentStatusPending           = "pending"
 	PaymentStatusProcessing        = "processing"

@@ -52,6 +52,8 @@ func (c *Consumer) Run(ctx context.Context) error {
 			}); err != nil {
 				return fmt.Errorf("payment event handling exhausted: %w", err)
 			}
+
+            //kafkaへの書き込みをコミット
 			if err := consumerretry.Do(ctx, c.logger, "payment.commit", func(attemptCtx context.Context) error {
 				return c.client.CommitRecords(attemptCtx, record)
 			}); err != nil {

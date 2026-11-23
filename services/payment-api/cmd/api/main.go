@@ -96,6 +96,8 @@ func main() {
 	// ヘルスチェック(Kubernetesのprobe用)。SIGTERMを受けたら readiness を落として止める。
 	shutdownCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stopSignals()
+	//consumerを登録するを登録する
+	//createPayment := application.NewPaymentUseCas
 	consumer, err := eventconsumer.New(cfg.KafkaBrokers, createPayment, logger)
 	if err != nil {
 		logger.Error("kafka consumer failed", logging.Err(err))

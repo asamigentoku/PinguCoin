@@ -24,6 +24,7 @@ func New(brokers []string, repo *repository.InventoryRepository, logger *slog.Lo
 	if len(brokers) == 0 {
 		return &Consumer{repo: repo, logger: logger}, nil
 	}
+    //kafkaの読み取り方法、自動コミット設定までここで最初に定義
 	client, err := kgo.NewClient(kgo.SeedBrokers(brokers...), kgo.ConsumerGroup("inventory-api-v1"), kgo.ConsumeTopics(orderflow.TopicOrderCreated, orderflow.TopicPaymentFailed), kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()), kgo.DisableAutoCommit(), kgo.RequiredAcks(kgo.AllISRAcks()))
 	if err != nil {
 		return nil, err
