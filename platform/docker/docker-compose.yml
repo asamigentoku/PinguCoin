@@ -121,10 +121,10 @@ services:
       ORDER_API_ADDR: order-api:8084
       INTERNAL_API_TOKEN: local-internal-token
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
-      EXCHANGE_RATE_DIRECTORY: /var/cache/nginx/exchange-rates
+      EXCHANGE_RATE_DIRECTORY: /var/lib/pingucoin/exchange-rates
     expose: ["8082"]
     volumes:
-      - exchange-rates:/var/cache/nginx/exchange-rates
+      - exchange-rates:/var/lib/pingucoin/exchange-rates
     depends_on:
       media-api: {condition: service_started}
       order-api: {condition: service_started}

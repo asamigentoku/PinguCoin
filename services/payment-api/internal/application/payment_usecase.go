@@ -245,6 +245,7 @@ func (u *PaymentUseCase) createStripe(ctx context.Context, db *gorm.DB, cmd Crea
 	}
 	// 外部決済プロバイダーへ決済を依頼します。
 	// IdempotencyKeyを渡すことで、同じリクエストの再送による二重決済を防ぎます。
+	//ここで実際にstripeをたたく
 	charged, chargeErr := u.stripe.Charge(ctx, paymentmethod.ChargeRequest{Amount: cmd.Amount, Currency: cmd.Currency, IdempotencyKey: cmd.IdempotencyKey, ReturnURL: returnURL, PaymentMethod: cmd.PaymentMethod})
 	if chargeErr != nil {
 		if !paymentmethod.IsPermanent(chargeErr) {

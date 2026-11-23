@@ -37,10 +37,21 @@ func newRouter(logger *slog.Logger, media *orcanclient.Client, payment *paymentc
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products", catalog.ListProducts)
 	mux.HandleFunc("POST "+APIVersionPrefix+"/products", catalog.CreateProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}", catalog.GetProduct)
-	exchangeRateDir := envOr("EXCHANGE_RATE_DIRECTORY", "/var/cache/nginx/exchange-rates")
+	exchangeRateDir := envOr("EXCHANGE_RATE_DIRECTORY", "/var/lib/pingucoin/exchange-rates")
+	//ここでhandlerとエンドポイントを紐付ける
+	//旧外国為替取得API
+	// GET /api/v1/exchange-ratesは、media-apiのメモリ上にある最新レートを返す公開APIです。
+	// ExchangeRateLiveHandler.GetがBFFのgRPCクライアントでmedia-apiへ問い合わせます。
 	mux.HandleFunc("GET "+APIVersionPrefix+"/exchange-rates", NewExchangeRateLiveHandler(media.ExchangeRate).Get)
+	//新外国価格取得API
+	// GET /api/v2/exchange-rates/{date}/{file}は、BFFが保存した静的スナップショットを返します。
+	// ExchangeRateStaticHandler.Getがパスを検証し、exchangeRateDir内のJSONを読み込みます。
 	mux.HandleFunc("GET "+APIVersionV2Prefix+"/exchange-rates/{date}/{file}", NewExchangeRateStaticHandler(exchangeRateDir).Get)
+	//内部から叩かれるもの、新しい価格をpublish
+	// PUT /internal/exchange-ratesはmedia-apiから内部的に呼ばれる保存APIです。
+	// ExchangeRatePublishHandler.Putが認証し、受け取ったSnapshotを日付・時刻付きJSONとして保存します。
 	mux.HandleFunc("PUT /internal/exchange-rates", NewExchangeRatePublishHandler(exchangeRateDir, envOr("INTERNAL_API_TOKEN", "")).Put)
+
 	mux.HandleFunc("PATCH "+APIVersionPrefix+"/products/{id}", catalog.UpdateProduct)
 	mux.HandleFunc("DELETE "+APIVersionPrefix+"/products/{id}", catalog.DeleteProduct)
 	mux.HandleFunc("GET "+APIVersionPrefix+"/products/{id}/assets", catalog.ListAssets)

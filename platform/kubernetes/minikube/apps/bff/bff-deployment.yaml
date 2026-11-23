@@ -61,11 +61,11 @@ spec:
             - name: PORT
               value: "8082"
             - name: EXCHANGE_RATE_DIRECTORY
-              value: /var/cache/nginx/exchange-rates
+              value: /var/lib/pingucoin/exchange-rates
             - {name: INTERNAL_API_TOKEN, value: local-internal-token}
           volumeMounts:
             - name: exchange-rates
-              mountPath: /var/cache/nginx/exchange-rates
+              mountPath: /var/lib/pingucoin/exchange-rates
           # リソース: requests はスケジューラが確保する量(HPAのCPU使用率の基準にもなる)、
           # limits は超えられない上限(メモリは超えるとOOMKilledで再起動される)。
           resources:
